@@ -31,16 +31,6 @@
                 </label>
 
                 <label class="field">
-                    <span class="field__label">Variedad</span>
-                    <select class="field__input @error('id_variedad') is-invalid @enderror" name="id_variedad" required>
-                        <option value="">Seleccionar</option>
-                        @foreach ($variedades as $item)
-                            <option value="{{ $item->idVariedad }}" @selected((int) old('id_variedad') === (int) $item->idVariedad)>{{ $item->nomVariedad }}</option>
-                        @endforeach
-                    </select>
-                </label>
-
-                <label class="field">
                     <span class="field__label">Programa</span>
                     <select class="field__input @error('id_programa') is-invalid @enderror" name="id_programa" required>
                         <option value="">Seleccionar</option>
@@ -51,7 +41,7 @@
                 </label>
 
                 <label class="field">
-                    <span class="field__label">Presentación</span>
+                    <span class="field__label">Producto</span>
                     <select class="field__input @error('id_presentacion') is-invalid @enderror" name="id_presentacion" required>
                         <option value="">Seleccionar</option>
                         @foreach ($presentaciones as $item)
@@ -61,17 +51,27 @@
                 </label>
 
                 <label class="field">
-                    <span class="field__label">Presentación Nisira</span>
-                    <select class="field__input @error('id_pre_nisira') is-invalid @enderror" name="id_pre_nisira" required>
+                    <span class="field__label">Variedad</span>
+                    <select class="field__input @error('id_variedad') is-invalid @enderror" name="id_variedad" required>
                         <option value="">Seleccionar</option>
-                        @foreach ($preNisiras as $item)
-                            <option value="{{ $item->idPreNisira }}" @selected((int) old('id_pre_nisira') === (int) $item->idPreNisira)>{{ $item->nomNisira }}</option>
+                        @foreach ($variedades as $item)
+                            <option value="{{ $item->idVariedad }}" @selected((int) old('id_variedad') === (int) $item->idVariedad)>{{ $item->nomVariedad }}</option>
                         @endforeach
                     </select>
                 </label>
 
                 <label class="field">
-                    <span class="field__label">Código de planificación</span>
+                    <span class="field__label">Material</span>
+                    <select class="field__input @error('id_familia') is-invalid @enderror" name="id_familia" required>
+                        <option value="">Seleccionar</option>
+                        @foreach ($familias as $item)
+                            <option value="{{ $item->idFamilia }}" @selected((int) old('id_familia') === (int) $item->idFamilia)>{{ $item->nomFamilia }}</option>
+                        @endforeach
+                    </select>
+                </label>
+
+                <label class="field">
+                    <span class="field__label">Código PL</span>
                     <input
                         type="text"
                         class="field__input @error('codigo_pl') is-invalid @enderror"
@@ -84,7 +84,7 @@
                 </label>
 
                 <label class="field field--full">
-                    <span class="field__label">Material</span>
+                    <span class="field__label">Descripción material</span>
                     <input
                         type="text"
                         class="field__input @error('nom_material') is-invalid @enderror"
@@ -96,7 +96,17 @@
                 </label>
 
                 <label class="field">
-                    <span class="field__label">Cantidad X Caja</span>
+                    <span class="field__label">Observación</span>
+                    <select class="field__input @error('id_uso') is-invalid @enderror" name="id_uso" required>
+                        <option value="">Seleccionar</option>
+                        @foreach ($usos as $item)
+                            <option value="{{ $item->idUso }}" @selected((int) old('id_uso') === (int) $item->idUso)>{{ $item->nomUso }}</option>
+                        @endforeach
+                    </select>
+                </label>
+
+                <label class="field">
+                    <span class="field__label">Cantidad x caja</span>
                     <input
                         type="number"
                         step="0.01"
@@ -109,31 +119,11 @@
                 </label>
 
                 <label class="field">
-                    <span class="field__label">Uso</span>
-                    <select class="field__input @error('id_uso') is-invalid @enderror" name="id_uso" required>
-                        <option value="">Seleccionar</option>
-                        @foreach ($usos as $item)
-                            <option value="{{ $item->idUso }}" @selected((int) old('id_uso') === (int) $item->idUso)>{{ $item->nomUso }}</option>
-                        @endforeach
-                    </select>
-                </label>
-
-                <label class="field">
                     <span class="field__label">Situado</span>
                     <select class="field__input @error('id_situado') is-invalid @enderror" name="id_situado" required>
                         <option value="">Seleccionar</option>
                         @foreach ($situados as $item)
                             <option value="{{ $item->idSituado }}" @selected((int) old('id_situado') === (int) $item->idSituado)>{{ $item->nomSituado }}</option>
-                        @endforeach
-                    </select>
-                </label>
-
-                <label class="field">
-                    <span class="field__label">Familia</span>
-                    <select class="field__input @error('id_familia') is-invalid @enderror" name="id_familia" required>
-                        <option value="">Seleccionar</option>
-                        @foreach ($familias as $item)
-                            <option value="{{ $item->idFamilia }}" @selected((int) old('id_familia') === (int) $item->idFamilia)>{{ $item->nomFamilia }}</option>
                         @endforeach
                     </select>
                 </label>

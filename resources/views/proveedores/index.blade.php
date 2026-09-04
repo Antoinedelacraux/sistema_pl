@@ -17,53 +17,65 @@
 @include('partials.flash')
 
 <section class="panel panel--proveedor">
-    <form
-        method="GET"
-        action="{{ route('proveedor.index') }}"
-        class="receta-toolbar"
-        data-grid-filters
-        data-clear-url="{{ route('proveedor.index') }}"
-    >
-        <div class="receta-filters">
-            <label class="receta-filters__field">
-                <span class="receta-filters__label">Familia</span>
-                <select id="proveedor-filtro-familia" name="familia" class="receta-filters__input">
-                    <option value="">Todas</option>
-                    @foreach ($familias as $item)
-                        <option value="{{ $item->idFamilia }}" @selected((string) ($filtros['familia'] ?? '') === (string) $item->idFamilia)>{{ $item->nomFamilia }}</option>
-                    @endforeach
-                </select>
-            </label>
+    <div class="receta-command">
+        <div class="receta-command__shell">
+            <form
+                method="GET"
+                action="{{ route('proveedor.index') }}"
+                class="receta-command__form"
+                data-grid-filters
+                data-clear-url="{{ route('proveedor.index') }}"
+            >
+                <div class="receta-command__grid">
+                    <label class="receta-cmd-field">
+                        <span class="receta-cmd-label">Material</span>
+                        <select id="proveedor-filtro-familia" name="familia" class="receta-cmd-input">
+                            <option value="">Todas</option>
+                            @foreach ($familias as $item)
+                                <option value="{{ $item->idFamilia }}" @selected((string) ($filtros['familia'] ?? '') === (string) $item->idFamilia)>{{ $item->nomFamilia }}</option>
+                            @endforeach
+                        </select>
+                    </label>
 
-            <label class="receta-filters__field receta-filters__field--search">
-                <span class="receta-filters__label">Buscar</span>
-                <input
-                    type="search"
-                    id="proveedor-buscar"
-                    name="buscar"
-                    class="receta-filters__input"
-                    placeholder="Código PL, proveedor o material"
-                    autocomplete="off"
-                    value="{{ $filtros['buscar'] ?? '' }}"
-                >
-            </label>
+                    <label class="receta-cmd-field receta-cmd-field--search">
+                        <span class="receta-cmd-label">Buscar</span>
+                        <input
+                            type="search"
+                            id="proveedor-buscar"
+                            name="buscar"
+                            class="receta-cmd-input receta-cmd-input--search"
+                            placeholder="Código PL, proveedor o material"
+                            autocomplete="off"
+                            value="{{ $filtros['buscar'] ?? '' }}"
+                        >
+                    </label>
 
-            <button type="button" class="btn btn--outline btn--sm" id="proveedor-limpiar" data-grid-filters-clear>Limpiar</button>
+                    <div class="receta-cmd-clear">
+                        <button type="button" class="btn btn--outline btn--sm" id="proveedor-limpiar" data-grid-filters-clear>Limpiar</button>
+                    </div>
 
-            @include('partials.export-actions', [
-                'pdfUrl' => route('proveedor.export.pdf', $exportParams),
-                'excelUrl' => route('proveedor.export.excel', $exportParams),
-                'class' => 'inventario-export--toolbar proveedor-command__exports',
-            ])
+                    <div class="receta-cmd-export">
+                        @include('partials.export-actions', [
+                            'pdfUrl' => route('proveedor.export.pdf', $exportParams),
+                            'excelUrl' => route('proveedor.export.excel', $exportParams),
+                            'class' => 'receta-cmd-export-inner',
+                        ])
+                    </div>
+                </div>
+            </form>
+
+            <aside class="receta-command__aside">
+                <div class="receta-command__stat" aria-live="polite">
+                    <span class="receta-command__stat-value">{{ number_format($totalFilas) }}</span>
+                    <span class="receta-command__stat-label">registros</span>
+                </div>
+                <button type="button" class="btn btn--outline btn--sm" id="proveedor-abrir-columnas">Columnas</button>
+                @if ($puedeCrear)
+                    <button type="button" class="btn btn--purple btn--sm" id="proveedor-abrir-agregar">Agregar</button>
+                @endif
+            </aside>
         </div>
-
-        <div class="receta-toolbar__actions">
-            <button type="button" class="btn btn--outline btn--sm" id="proveedor-abrir-columnas">Columnas</button>
-            @if ($puedeCrear)
-                <button type="button" class="btn btn--purple btn--sm" id="proveedor-abrir-agregar">Agregar</button>
-            @endif
-        </div>
-    </form>
+    </div>
 
     <div class="grid-table-section">
         <div class="grid-table-head">
@@ -86,7 +98,7 @@
             <thead>
                 <tr>
                     <th class="programas-grid__th programas-grid__th--num" data-col="num">#</th>
-                    <th class="programas-grid__th programas-grid__th--stack" data-col="familia">Familia</th>
+                    <th class="programas-grid__th programas-grid__th--stack" data-col="familia">Material</th>
                     <th class="programas-grid__th programas-grid__th--stack" data-col="codigo-pl">Código<br>Planeamiento</th>
                     <th class="programas-grid__th programas-grid__th--stack" data-col="material-pl">Material<br>Planeamiento</th>
                     @foreach ($columnasProveedor as $proveedor)

@@ -7,6 +7,7 @@ use App\Http\Controllers\InicioController;
 use App\Http\Controllers\MaestroController;
 use App\Http\Controllers\MovimientoController;
 use App\Http\Controllers\ProgramaController;
+use App\Http\Controllers\ProgramaPresentacionParamController;
 use App\Http\Controllers\ProveedorController;
 use App\Http\Controllers\StockResumenController;
 use App\Http\Controllers\UsuarioController;
@@ -26,6 +27,10 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
     Route::get('/programas', [ProgramaController::class, 'index'])
         ->middleware('permiso:programas,ver')
         ->name('programas.index');
+
+    Route::post('/programas/import', [ProgramaController::class, 'importExcel'])
+        ->middleware('permiso:programas,crear')
+        ->name('programas.import');
 
     Route::post('/programas', [ProgramaController::class, 'store'])
         ->middleware('permiso:programas,crear')
@@ -47,6 +52,14 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
     Route::get('/programas/export/pdf', [ProgramaController::class, 'exportPdf'])
         ->middleware('permiso:programas,ver')
         ->name('programas.export.pdf');
+
+    Route::get('/programas/presentacion-params', [ProgramaPresentacionParamController::class, 'index'])
+        ->middleware('permiso:programas,ver')
+        ->name('programas.presentacion-params.index');
+
+    Route::post('/programas/presentacion-params', [ProgramaPresentacionParamController::class, 'store'])
+        ->middleware('permiso:programas,editar')
+        ->name('programas.presentacion-params.store');
 
     Route::get('/proveedor', [ProveedorController::class, 'index'])
         ->middleware('permiso:proveedor,ver')
@@ -141,6 +154,10 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         ->middleware('permiso:registro,ver')
         ->name('registro.export.pdf');
 
+    Route::get('/registro/offline/csrf', [MovimientoController::class, 'offlineCsrf'])
+        ->middleware('permiso:registro,crear')
+        ->name('registro.offline.csrf');
+
     Route::post('/registro/ingreso/leer-xml', [MovimientoController::class, 'parseIngresoXml'])
         ->middleware('permiso:registro,crear')
         ->name('registro.ingreso.leer-xml');
@@ -189,6 +206,10 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
     Route::get('/registro/stock-disponible', [MovimientoController::class, 'stockDisponible'])
         ->middleware('permiso:registro,ver')
         ->name('registro.stock-disponible');
+
+    Route::get('/registro/consumo/programas', [MovimientoController::class, 'programasConsumo'])
+        ->middleware('permiso:registro,ver')
+        ->name('registro.consumo.programas');
 
     Route::get('/registro/consumo/presentaciones', [MovimientoController::class, 'presentacionesConsumo'])
         ->middleware('permiso:registro,ver')

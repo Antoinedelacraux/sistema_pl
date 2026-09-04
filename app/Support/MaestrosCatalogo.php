@@ -89,8 +89,8 @@ class MaestrosCatalogo
                 'pk' => 'idPresentacion',
                 'nombre' => 'nomPresentacion',
                 'tabla' => 'Presentacion',
-                'label' => 'Presentación',
-                'labelPlural' => 'Presentaciones',
+                'label' => 'Producto',
+                'labelPlural' => 'Productos',
                 'maxLength' => 150,
             ],
             'familia' => [
@@ -98,8 +98,8 @@ class MaestrosCatalogo
                 'pk' => 'idFamilia',
                 'nombre' => 'nomFamilia',
                 'tabla' => 'Familia',
-                'label' => 'Familia',
-                'labelPlural' => 'Familias',
+                'label' => 'Material',
+                'labelPlural' => 'Materiales',
                 'maxLength' => 80,
             ],
             'uso' => [
@@ -107,8 +107,8 @@ class MaestrosCatalogo
                 'pk' => 'idUso',
                 'nombre' => 'nomUso',
                 'tabla' => 'Uso',
-                'label' => 'Uso',
-                'labelPlural' => 'Usos',
+                'label' => 'Observación',
+                'labelPlural' => 'Observaciones',
                 'maxLength' => 50,
             ],
             'situado' => [

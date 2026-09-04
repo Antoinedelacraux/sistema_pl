@@ -5,7 +5,7 @@
             <h2 class="modal__title" id="registro-egreso-title">Agregar consumo</h2>
             <button type="button" class="modal__close" data-cerrar-modal-registro="egreso">&times;</button>
         </header>
-        <form method="POST" action="{{ route('registro.egreso.store') }}" class="modal__form" id="registro-egreso-form" data-store-action="{{ route('registro.egreso.store') }}" enctype="multipart/form-data">
+        <form method="POST" action="{{ route('registro.egreso.store') }}" class="modal__form" id="registro-egreso-form" data-store-action="{{ route('registro.egreso.store') }}">
             @csrf
             <input type="hidden" name="_method" id="registro-egreso-method" value="POST" disabled>
             <div class="modal__grid">
@@ -41,30 +41,26 @@
                     </select>
                 </label>
                 <label class="field field--full">
-                    <span class="field__label">Presentación</span>
+                    <span class="field__label">Producto</span>
                     <select class="field__input @error('id_presentacion') is-invalid @enderror" name="id_presentacion" id="egreso-id-presentacion" required disabled>
                         <option value="">Seleccione un programa</option>
                     </select>
                 </label>
-                <input type="hidden" name="id_material_pl" id="egreso-id-material" value="{{ old('id_material_pl') }}">
                 <div class="field field--full registro-consumo-materiales" id="egreso-materiales-wrap">
                     <div class="registro-consumo-materiales__head">
-                        <span class="field__label">Materiales de la presentación</span>
+                        <span class="field__label">Materiales del producto</span>
                         <div class="registro-consumo-extra">
                             <label class="field registro-consumo-extra__field">
                                 <span class="field__label">Conformación (Dentro)</span>
                                 <input
                                     type="number"
-                                    class="field__input"
+                                    class="field__input @error('conformacion_dentro') is-invalid @enderror"
+                                    name="conformacion_dentro"
                                     id="egreso-conformacion-dentro"
-                                    value=""
+                                    value="{{ old('conformacion_dentro') }}"
                                     min="0"
                                     step="0.01"
                                     placeholder="—"
-                                    readonly
-                                    disabled
-                                    tabindex="-1"
-                                    title="Se definirá más adelante en Receta"
                                 >
                             </label>
                             <label class="field registro-consumo-extra__field">
@@ -77,21 +73,30 @@
                                     value="{{ old('pallets_fuera') }}"
                                     min="0"
                                     step="0.01"
-                                    placeholder="0"
-                                    data-consumo-factor="pallets"
+                                    placeholder="—"
                                 >
                             </label>
                         </div>
                     </div>
-                    <p class="field__hint" id="egreso-materiales-hint">Seleccione una presentación para cargar los materiales.</p>
+                    <p class="field__hint" id="egreso-materiales-hint">Seleccione un producto para cargar los materiales desde Receta.</p>
                     <div class="registro-consumo-tabla-wrap" id="egreso-materiales-tabla-wrap" hidden>
                         <table class="registro-consumo-tabla" id="egreso-materiales-tabla">
+                            <colgroup>
+                                <col class="registro-consumo-tabla__col registro-consumo-tabla__col--material">
+                                <col class="registro-consumo-tabla__col registro-consumo-tabla__col--code">
+                                <col class="registro-consumo-tabla__col registro-consumo-tabla__col--obsr">
+                                <col class="registro-consumo-tabla__col registro-consumo-tabla__col--cant">
+                                <col class="registro-consumo-tabla__col registro-consumo-tabla__col--pers">
+                                <col class="registro-consumo-tabla__col registro-consumo-tabla__col--total">
+                                <col class="registro-consumo-tabla__col registro-consumo-tabla__col--stock">
+                            </colgroup>
                             <thead>
                                 <tr>
-                                    <th>Material</th>
-                                    <th>Código PL</th>
-                                    <th class="registro-consumo-tabla__th--num">Cant. / caja</th>
-                                    <th class="registro-consumo-tabla__th--num">Otra cantidad</th>
+                                    <th class="registro-consumo-tabla__th--material">Material</th>
+                                    <th class="registro-consumo-tabla__th--code">Código PL</th>
+                                    <th class="registro-consumo-tabla__th--obsr">Obsr.</th>
+                                    <th class="registro-consumo-tabla__th--num registro-consumo-tabla__th--stack" title="Cantidad por caja">Cant.<br>/Ca.</th>
+                                    <th class="registro-consumo-tabla__th--num" title="Personalizado">Pers.</th>
                                     <th class="registro-consumo-tabla__th--num">Total</th>
                                     <th class="registro-consumo-tabla__th--num">Stock</th>
                                 </tr>
@@ -100,9 +105,8 @@
                         </table>
                     </div>
                 </div>
-                @include('registro._documento_fields')
                 <label class="field field--full">
-                    <span class="field__label">Observación</span>
+                    <span class="field__label">Observación del movimiento</span>
                     <input type="text" class="field__input @error('observacion') is-invalid @enderror" name="observacion" value="{{ old('observacion') }}" maxlength="500">
                 </label>
             </div>

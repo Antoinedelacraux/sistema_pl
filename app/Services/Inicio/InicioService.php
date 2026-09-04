@@ -21,21 +21,23 @@ class InicioService
      */
     public function dashboard(): array
     {
+        // Una sola lectura de la vista para KPIs + materiales críticos (evita doble full-scan).
+        $filasStock = DB::table('vw_StockAlmacenDetalle')->get();
+
         return [
-            'kpis' => $this->kpis(),
+            'kpis' => $this->kpis($filasStock),
             'stockPorAlmacen' => $this->stockPorAlmacen(),
-            'materialesCriticos' => $this->materialesCriticos(),
+            'materialesCriticos' => $this->materialesCriticos($filasStock),
             'ultimosMovimientos' => $this->ultimosMovimientos(),
         ];
     }
 
     /**
+     * @param  Collection<int, object>  $filas
      * @return array<string, int>
      */
-    private function kpis(): array
+    private function kpis(Collection $filas): array
     {
-        $filas = DB::table('vw_StockAlmacenDetalle')->get();
-
         $critico = 0;
         $alerta = 0;
         $materialesConStock = $filas
@@ -78,29 +80,35 @@ class InicioService
      */
     private function stockPorAlmacen(): Collection
     {
-        return $this->inventarioService->almacenes()->map(function ($almacen) {
-            $contadores = $this->inventarioService->contadoresPorAlmacen($almacen->codigo);
+        $contadores = $this->inventarioService->contadoresTodosAlmacenes();
+
+        return $this->inventarioService->almacenes()->map(function ($almacen) use ($contadores) {
+            $c = $contadores[$almacen->codigo] ?? [
+                'con_stock' => 0,
+                'critico' => 0,
+                'alerta' => 0,
+                'saludable' => 0,
+            ];
 
             return (object) [
                 'codigo' => $almacen->codigo,
                 'nombre' => $almacen->nomAlmacen,
-                'con_stock' => $contadores['con_stock'],
-                'critico' => $contadores['critico'],
-                'alerta' => $contadores['alerta'],
-                'saludable' => $contadores['saludable'],
+                'con_stock' => $c['con_stock'],
+                'critico' => $c['critico'],
+                'alerta' => $c['alerta'],
+                'saludable' => $c['saludable'],
             ];
         });
     }
 
     /**
+     * @param  Collection<int, object>  $filas
      * @return Collection<int, object>
      */
-    private function materialesCriticos(int $limite = 8): Collection
+    private function materialesCriticos(Collection $filas, int $limite = 8): Collection
     {
-        return DB::table('vw_StockAlmacenDetalle')
-            ->where('stockMinimo', '>', 0)
-            ->orderBy('stock')
-            ->get()
+        return $filas
+            ->filter(fn ($fila) => (float) $fila->stockMinimo > 0)
             ->map(function ($fila) {
                 $stock = (float) $fila->stock;
                 $stockMinimo = (float) $fila->stockMinimo;

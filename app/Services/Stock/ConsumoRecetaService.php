@@ -5,8 +5,11 @@ namespace App\Services\Stock;
 use App\Models\Estado;
 use App\Models\Programas\ProgramaCatalogo;
 use App\Models\Programas\ProgramaFila;
+use App\Models\Programas\ProgramaPresentacionParam;
 use App\Models\Programas\Presentacion;
 use App\Models\Stock\MovimientoStock;
+use App\Support\FamiliaMaterialSupport;
+use App\Support\UsoObservacionSupport;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
@@ -58,7 +61,9 @@ class ConsumoRecetaService
      *   id_familia: int|null,
      *   nom_familia: string|null,
      *   nom_uso: string|null,
-     *   es_caja_editable: bool,
+     *   nom_uso_clave: string,
+     *   clase_css_observacion: string,
+     *   es_caja_factor: bool,
      *   usa_pallets: bool,
      *   ya_sacado: float,
      *   faltante: float,
@@ -68,7 +73,7 @@ class ConsumoRecetaService
     public function materialesDePresentacion(
         int $idPrograma,
         int $idPresentacion,
-        ?int $excluirIdMovimiento = null,
+        ?array $excluirIdsMovimiento = null,
         ?int $idAlmacen = null
     ): array {
         if ($idPrograma <= 0 || $idPresentacion <= 0) {
@@ -88,7 +93,7 @@ class ConsumoRecetaService
             $idPrograma,
             $idPresentacion,
             $idsMaterial,
-            $excluirIdMovimiento
+            $excluirIdsMovimiento ?? []
         );
 
         $stocks = $this->stocksPorMaterial($idsMaterial, $idAlmacen);
@@ -112,16 +117,71 @@ class ConsumoRecetaService
                     'id_familia' => $fila->idFamilia ? (int) $fila->idFamilia : null,
                     'nom_familia' => $familia,
                     'nom_uso' => $uso,
-                    'es_caja_editable' => $this->esCajaEditable($familia, $uso),
-                    'usa_pallets' => $this->familiaUsaPallets($familia),
+                    'nom_uso_clave' => UsoObservacionSupport::clave($uso),
+                    'clase_css_observacion' => UsoObservacionSupport::claseCss($uso),
+                    'es_caja_factor' => FamiliaMaterialSupport::esCajas($familia),
+                    'usa_pallets' => FamiliaMaterialSupport::usaPallets($familia),
                     'ya_sacado' => $yaSacado,
                     'faltante' => $this->faltantePorSacar($necesario, $yaSacado),
                     'stock' => $stocks[$idMaterial] ?? null,
                 ];
             })
-            ->sortBy(fn (array $item) => mb_strtolower((string) ($item['nom_material'] ?? '')))
+            ->sortBy(function (array $item) {
+                $familia = FamiliaMaterialSupport::normalizar($item['nom_familia'] ?? null);
+                $ordenFamilia = match ($familia) {
+                    'cajas', 'box' => '0',
+                    default => '1_'.$familia,
+                };
+                $ordenFactor = ! empty($item['es_caja_factor']) ? '0' : '1';
+                $material = mb_strtolower((string) ($item['nom_material'] ?? ''));
+
+                return $ordenFamilia.'|'.$ordenFactor.'|'.$material;
+            })
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array{pallets: float, conformacion: float}
+     */
+    public function parametrosPresentacion(int $idPrograma, int $idPresentacion): array
+    {
+        if ($idPrograma <= 0 || $idPresentacion <= 0) {
+            return ['pallets' => 0.0, 'conformacion' => 0.0];
+        }
+
+        $param = ProgramaPresentacionParam::query()
+            ->where('idPrograma', $idPrograma)
+            ->where('idPresentacion', $idPresentacion)
+            ->where('Estado', Estado::ACTIVO)
+            ->first();
+
+        return [
+            'pallets' => (float) ($param?->pallets ?? 0),
+            'conformacion' => (float) ($param?->conformacion ?? 0),
+        ];
+    }
+
+    /**
+     * @return array{pallets: float, conformacion: float}
+     */
+    public function resolverParametrosPresentacion(
+        int $idPrograma,
+        int $idPresentacion,
+        mixed $palletsInput = null,
+        mixed $conformacionInput = null
+    ): array {
+        $params = $this->parametrosPresentacion($idPrograma, $idPresentacion);
+
+        if ($palletsInput !== null && $palletsInput !== '' && is_numeric($palletsInput)) {
+            $params['pallets'] = (float) $palletsInput;
+        }
+
+        if ($conformacionInput !== null && $conformacionInput !== '' && is_numeric($conformacionInput)) {
+            $params['conformacion'] = (float) $conformacionInput;
+        }
+
+        return $params;
     }
 
     public function cantidadPorCaja(int $idPrograma, int $idPresentacion, int $idMaterialPL): float
@@ -138,32 +198,45 @@ class ConsumoRecetaService
     }
 
     /**
-     * @param  list<array{id_material_pl?: mixed, cantidad?: mixed}>  $lineasInput
+     * @param  list<array{id_material_pl?: mixed, cantidad?: mixed, total?: mixed}>  $lineasInput
      * @return list<array{id_material_pl: int, cantidad: float, nom_material: string|null}>
      */
     public function resolverLineasConsumo(
         int $idPrograma,
         int $idPresentacion,
         array $lineasInput = [],
-        mixed $palletsFuera = null
+        mixed $palletsInput = null,
+        mixed $conformacionInput = null
     ): array {
         $receta = $this->materialesDePresentacion($idPrograma, $idPresentacion);
         $inputPorId = collect($lineasInput)->keyBy(fn ($linea) => (int) ($linea['id_material_pl'] ?? 0));
-        $factorCajas = $this->factorCajasDesdeLineas($receta, $inputPorId);
-        $factorPallets = $this->factorMultiplicador($palletsFuera);
+        $factoresCajas = $this->factoresCajasDesdeLineas($receta, $inputPorId);
+        $params = $this->resolverParametrosPresentacion($idPrograma, $idPresentacion, $palletsInput, $conformacionInput);
 
         $lineas = [];
         foreach ($receta as $item) {
-            $base = (float) $item['cantidad_por_caja'];
-            $factor = ! empty($item['usa_pallets']) ? $factorPallets : $factorCajas;
-            $cantidad = round($base * $factor, 2);
+            $idMaterial = (int) $item['id_material_pl'];
+            $input = $inputPorId->get($idMaterial, []);
+            $totalOverride = trim((string) ($input['total'] ?? ''));
+
+            if ($totalOverride !== '' && is_numeric($totalOverride) && (float) $totalOverride > 0) {
+                $cantidad = round((float) $totalOverride, 2);
+            } else {
+                $cantidad = $this->calcularCantidadMaterial(
+                    $item,
+                    $factoresCajas,
+                    $input,
+                    $params['pallets'],
+                    $params['conformacion']
+                );
+            }
 
             if ($cantidad <= 0) {
                 continue;
             }
 
             $lineas[] = [
-                'id_material_pl' => (int) $item['id_material_pl'],
+                'id_material_pl' => $idMaterial,
                 'cantidad' => $cantidad,
                 'nom_material' => $item['nom_material'] ?? null,
             ];
@@ -172,32 +245,94 @@ class ConsumoRecetaService
         return $lineas;
     }
 
-    public function familiaUsaPallets(?string $nomFamilia): bool
-    {
-        $nombre = mb_strtolower(trim((string) $nomFamilia));
+    /**
+     * @param  array<string, mixed>  $item
+     * @param  array<string, mixed>  $input
+     */
+    private function calcularCantidadMaterial(
+        array $item,
+        array $factoresCajas,
+        array $input,
+        float $pallets,
+        float $conformacion
+    ): float {
+        if (FamiliaMaterialSupport::esCajas($item['nom_familia'] ?? null)) {
+            return round($this->baseCantidad($item, $input), 2);
+        }
 
-        return in_array($nombre, ['tapas', 'parihuelas', 'termografos'], true);
+        $factorCaja = $this->factorCajaParaItem($item, $factoresCajas);
+
+        if (! empty($item['usa_pallets'])) {
+            $conf = max($conformacion, 0.00001);
+
+            return round(($pallets / $conf) * $factorCaja, 2);
+        }
+
+        return round($this->baseCantidad($item, $input) * $factorCaja, 2);
     }
 
-    public function esCajaEditable(?string $nomFamilia, ?string $nomUso): bool
+    /**
+     * @param  array<string, float>  $factoresCajas
+     */
+    private function factorCajaParaItem(array $item, array $factoresCajas): float
     {
-        $familia = mb_strtolower(trim((string) $nomFamilia));
-        $uso = $this->normalizarUso($nomUso);
+        $clave = UsoObservacionSupport::clave($item['nom_uso'] ?? null);
 
-        return $familia === 'cajas' && in_array($uso, ['comun', 'alternativo'], true);
+        if (isset($factoresCajas[$clave]) && $factoresCajas[$clave] > 0) {
+            return $factoresCajas[$clave];
+        }
+
+        return 1.0;
+    }
+
+    private function baseCantidad(array $item, array $input): float
+    {
+        if (FamiliaMaterialSupport::esCajas($item['nom_familia'] ?? null)) {
+            $override = trim((string) ($input['cantidad'] ?? ''));
+            if ($override !== '' && is_numeric($override) && (float) $override > 0) {
+                return (float) $override;
+            }
+        }
+
+        return (float) $item['cantidad_por_caja'];
+    }
+
+    public function esUsoFactorCaja(?string $nomUso): bool
+    {
+        return UsoObservacionSupport::esFactorCaja($nomUso);
+    }
+
+    public function claveUsoConsumo(?string $nomUso): string
+    {
+        return UsoObservacionSupport::clave($nomUso);
+    }
+
+    public function claseCssObservacion(?string $nomUso): string
+    {
+        return UsoObservacionSupport::claseCss($nomUso);
+    }
+
+    public function esFamiliaCajas(?string $nomFamilia): bool
+    {
+        return FamiliaMaterialSupport::esCajas($nomFamilia);
+    }
+
+    public function familiaUsaPallets(?string $nomFamilia): bool
+    {
+        return FamiliaMaterialSupport::usaPallets($nomFamilia);
     }
 
     /**
      * @param  list<array<string, mixed>>  $receta
      * @param  Collection<int, mixed>  $inputPorId
+     * @return array<string, float>
      */
-    private function factorCajasDesdeLineas(array $receta, Collection $inputPorId): float
+    private function factoresCajasDesdeLineas(array $receta, Collection $inputPorId): array
     {
-        $factorComun = 0.0;
-        $factorAlternativo = 0.0;
+        $factores = [];
 
         foreach ($receta as $item) {
-            if (empty($item['es_caja_editable'])) {
+            if (empty($item['es_caja_factor'])) {
                 continue;
             }
 
@@ -207,53 +342,11 @@ class ConsumoRecetaService
                 continue;
             }
 
-            $numero = (float) $override;
-            $uso = $this->normalizarUso($item['nom_uso'] ?? null);
-            if ($uso === 'comun' && $factorComun <= 0) {
-                $factorComun = $numero;
-            }
-            if ($uso === 'alternativo' && $factorAlternativo <= 0) {
-                $factorAlternativo = $numero;
-            }
+            $clave = UsoObservacionSupport::clave($item['nom_uso'] ?? null);
+            $factores[$clave] = (float) $override;
         }
 
-        if ($factorComun > 0) {
-            return $factorComun;
-        }
-
-        if ($factorAlternativo > 0) {
-            return $factorAlternativo;
-        }
-
-        return 1.0;
-    }
-
-    private function normalizarUso(?string $nomUso): string
-    {
-        $uso = mb_strtolower(trim((string) $nomUso));
-        $uso = str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $uso);
-
-        if (str_starts_with($uso, 'alternativ')) {
-            return 'alternativo';
-        }
-
-        if (str_starts_with($uso, 'comun')) {
-            return 'comun';
-        }
-
-        return $uso;
-    }
-
-    private function factorMultiplicador(mixed $valor): float
-    {
-        $texto = trim((string) $valor);
-        if ($texto === '' || ! is_numeric($texto)) {
-            return 1.0;
-        }
-
-        $numero = (float) $texto;
-
-        return $numero > 0 ? $numero : 1.0;
+        return $factores;
     }
 
     /**
@@ -266,29 +359,7 @@ class ConsumoRecetaService
             return [];
         }
 
-        $filas = MovimientoStock::query()
-            ->where('estado', 1)
-            ->where('idAlmacen', $idAlmacen)
-            ->whereIn('idMaterialPL', $idsMaterial)
-            ->selectRaw("
-                idMaterialPL,
-                COALESCE(SUM(
-                    CASE
-                        WHEN tipo = 'ingreso' THEN cantidad
-                        WHEN tipo = 'egreso' THEN -cantidad
-                        ELSE 0
-                    END
-                ), 0) AS stock
-            ")
-            ->groupBy('idMaterialPL')
-            ->pluck('stock', 'idMaterialPL');
-
-        $stocks = [];
-        foreach ($idsMaterial as $idMaterial) {
-            $stocks[(int) $idMaterial] = (float) ($filas[$idMaterial] ?? 0);
-        }
-
-        return $stocks;
+        return app(MovimientoService::class)->stocksDisponiblesPorMaterial($idsMaterial, $idAlmacen);
     }
 
     public function materialPerteneceAPresentacion(int $idPrograma, int $idPresentacion, int $idMaterialPL): bool
@@ -305,27 +376,61 @@ class ConsumoRecetaService
         int $idPrograma,
         int $idPresentacion,
         int $idMaterialPL,
-        ?int $excluirIdMovimiento = null
+        array $excluirIdsMovimiento = []
     ): float {
         $mapa = $this->cantidadesSacadasPorMaterial(
             $idPrograma,
             $idPresentacion,
             [$idMaterialPL],
-            $excluirIdMovimiento
+            $excluirIdsMovimiento
         );
 
         return (float) ($mapa[$idMaterialPL] ?? 0);
     }
 
     /**
+     * @param  Collection<int, MovimientoStock>  $movimientos
+     * @return list<array{id_movimiento: int, id_material_pl: int, cantidad: float}>
+     */
+    public function lineasEdicionDesdeMovimientos(int $idPrograma, int $idPresentacion, Collection $movimientos): array
+    {
+        if ($idPrograma <= 0 || $idPresentacion <= 0) {
+            return [];
+        }
+
+        $recetaPorCodigo = ProgramaFila::query()
+            ->with('material')
+            ->where('idPrograma', $idPrograma)
+            ->where('idPresentacion', $idPresentacion)
+            ->where('Estado', Estado::ACTIVO)
+            ->get()
+            ->groupBy(fn (ProgramaFila $fila) => trim((string) ($fila->material?->CodigoPL ?? '')));
+
+        return $movimientos
+            ->map(function (MovimientoStock $movimiento) use ($recetaPorCodigo) {
+                $codigo = trim((string) ($movimiento->materialPl?->CodigoPL ?? ''));
+                $recetaId = (int) ($recetaPorCodigo->get($codigo)?->first()?->idMaterialPL ?? $movimiento->idMaterialPL);
+
+                return [
+                    'id_movimiento' => (int) $movimiento->idMovimiento,
+                    'id_material_pl' => $recetaId,
+                    'cantidad' => (float) $movimiento->cantidad,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
      * @param  list<int>  $idsMaterial
+     * @param  list<int>  $excluirIdsMovimiento
      * @return array<int, float>
      */
     public function cantidadesSacadasPorMaterial(
         int $idPrograma,
         int $idPresentacion,
         array $idsMaterial,
-        ?int $excluirIdMovimiento = null
+        array $excluirIdsMovimiento = []
     ): array {
         if ($idsMaterial === []) {
             return [];
@@ -341,8 +446,8 @@ class ConsumoRecetaService
             ->groupBy('idMaterialPL')
             ->selectRaw('idMaterialPL, COALESCE(SUM(cantidad), 0) AS total');
 
-        if ($excluirIdMovimiento) {
-            $query->where('idMovimiento', '!=', $excluirIdMovimiento);
+        if ($excluirIdsMovimiento !== []) {
+            $query->whereNotIn('idMovimiento', $excluirIdsMovimiento);
         }
 
         return $query
@@ -378,10 +483,10 @@ class ConsumoRecetaService
         int $idPresentacion,
         int $idMaterialPL,
         int $idAlmacen,
-        ?int $excluirIdMovimiento = null
+        array $excluirIdsMovimiento = []
     ): array {
         $necesario = $this->cantidadPorCaja($idPrograma, $idPresentacion, $idMaterialPL);
-        $yaSacado = $this->cantidadSacada($idPrograma, $idPresentacion, $idMaterialPL, $excluirIdMovimiento);
+        $yaSacado = $this->cantidadSacada($idPrograma, $idPresentacion, $idMaterialPL, $excluirIdsMovimiento);
         $stock = app(MovimientoService::class)->stockDisponible($idMaterialPL, $idAlmacen);
 
         return [

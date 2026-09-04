@@ -1,15 +1,19 @@
 (function () {
     var materialUrl = window.registroMaterialUrl || '';
+    var materialesMap = window.registroMaterialesMap || {};
     var stockUrl = window.registroStockUrl || '';
+    var consumoProgramasUrl = window.registroConsumoProgramasUrl || '';
     var consumoPresentacionesUrl = window.registroConsumoPresentacionesUrl || '';
     var consumoMaterialesUrl = window.registroConsumoMaterialesUrl || '';
     var consumoHintUrl = window.registroConsumoHintUrl || '';
     var tabActiva = window.registroTabActiva || 'ingresos';
     var lookupTimer = null;
     var consumoEditId = null;
-    var consumoEditMaterialId = null;
-    var consumoEditCantidad = null;
+    var consumoEditLineas = {};
     var consumoOverrides = {};
+    var consumoTotalOverrides = {};
+    var consumoProgramasBackup = '';
+    var consumoPresentacionesCache = {};
 
     var modales = {
         ingreso: document.getElementById('registro-ingreso-modal'),
@@ -85,9 +89,9 @@
 
         if (tipo === 'egreso') {
             consumoEditId = null;
-            consumoEditMaterialId = null;
-            consumoEditCantidad = null;
+            consumoEditLineas = {};
             consumoOverrides = {};
+            consumoTotalOverrides = {};
             resetConsumoCascada();
         }
     }
@@ -118,7 +122,7 @@
             materialHidden.value = '';
         }
 
-        vaciarTablaMaterialesConsumo('Seleccione una presentación para cargar los materiales.');
+        vaciarTablaMaterialesConsumo('Seleccione un producto para cargar los materiales desde Receta.');
     }
 
     function vaciarTablaMaterialesConsumo(mensaje) {
@@ -134,8 +138,71 @@
         }
         if (hint) {
             hint.hidden = false;
-            hint.textContent = mensaje || 'Seleccione una presentación para cargar los materiales.';
+            hint.textContent = mensaje || 'Seleccione un producto para cargar los materiales desde Receta.';
         }
+        limpiarParametrosPresentacionConsumo();
+    }
+
+    function claveUsoConsumo(nomUso) {
+        var uso = String(nomUso || '')
+            .toLowerCase()
+            .trim()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+
+        if (uso.indexOf('comun') === 0) {
+            return 'comun';
+        }
+
+        var altMatch = uso.match(/^alternativo(?:\s*(\d+))?/);
+        if (altMatch) {
+            return altMatch[1] ? 'alternativo ' + altMatch[1] : 'alternativo';
+        }
+
+        return uso;
+    }
+
+    function pintarBadgeObservacionConsumo(badge, claseObsr) {
+        badge.className = 'registro-consumo-tabla__obsr-valor';
+        if (claseObsr) {
+            badge.classList.add(claseObsr);
+        }
+    }
+
+    function esUsoFactorCaja(nomUso) {
+        var clave = claveUsoConsumo(nomUso);
+
+        return clave === 'comun' || clave === 'oficial' || clave.indexOf('alternativo') === 0;
+    }
+
+    function normalizarFamiliaConsumo(nomFamilia) {
+        return String(nomFamilia || '')
+            .toLowerCase()
+            .trim()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function esTruthy(val) {
+        return val === true || val === 1 || val === '1';
+    }
+
+    function esFamiliaCajasConsumo(nomFamilia) {
+        var familia = normalizarFamiliaConsumo(nomFamilia);
+
+        return familia === 'cajas' || familia === 'caja' || familia === 'box';
+    }
+
+    function esCajaEditableItem(item) {
+        if (!item) {
+            return false;
+        }
+
+        if (esTruthy(item.es_caja_factor)) {
+            return true;
+        }
+
+        return esFamiliaCajasConsumo(item.nom_familia);
     }
 
     function overrideDeMaterial(idMaterial) {
@@ -144,42 +211,132 @@
             return consumoOverrides[clave];
         }
 
-        if (consumoEditMaterialId && String(consumoEditMaterialId) === clave && consumoEditCantidad != null) {
-            return null;
-        }
-
         return '';
     }
 
-    function factorConsumo(inputId) {
-        var input = document.getElementById(inputId);
+    function totalOverrideDeMaterial(idMaterial) {
+        var clave = String(idMaterial);
+        if (Object.prototype.hasOwnProperty.call(consumoTotalOverrides, clave)) {
+            return consumoTotalOverrides[clave];
+        }
+
+        if (consumoEditLineas[clave] && consumoEditLineas[clave].cantidad != null) {
+            return String(consumoEditLineas[clave].cantidad);
+        }
+
+        return null;
+    }
+
+    function limpiarParametrosPresentacionConsumo() {
+        actualizarParametrosPresentacionConsumo(null);
+    }
+
+    function actualizarParametrosPresentacionConsumo(params) {
+        var conformacion = document.getElementById('egreso-conformacion-dentro');
+        var pallets = document.getElementById('egreso-pallets-fuera');
+
+        if (!params) {
+            if (conformacion) {
+                conformacion.value = '';
+            }
+            if (pallets) {
+                pallets.value = '';
+            }
+            return;
+        }
+
+        if (conformacion) {
+            conformacion.value = params.conformacion != null && String(params.conformacion).trim() !== ''
+                ? Number(params.conformacion).toFixed(2)
+                : '';
+        }
+        if (pallets) {
+            pallets.value = params.pallets != null && String(params.pallets).trim() !== ''
+                ? Number(params.pallets).toFixed(2)
+                : '';
+        }
+    }
+
+    function parametrosPresentacionConsumo() {
+        var conformacionEl = document.getElementById('egreso-conformacion-dentro');
+        var palletsEl = document.getElementById('egreso-pallets-fuera');
+        var palletsText = palletsEl ? String(palletsEl.value || '').trim() : '';
+        var conformacionText = conformacionEl ? String(conformacionEl.value || '').trim() : '';
+
+        return {
+            pallets: palletsText !== '' && Number(palletsText) >= 0 ? Number(palletsText) : 0,
+            conformacion: conformacionText !== '' && Number(conformacionText) > 0 ? Number(conformacionText) : 1,
+        };
+    }
+
+    function parseFactorInput(input) {
         if (!input) {
-            return 1;
+            return 0;
         }
         var texto = String(input.value || '').trim();
         if (texto === '' || Number(texto) <= 0) {
-            return 1;
+            return 0;
         }
         return Number(texto);
     }
 
-    function factorCajasDesdeTabla(body) {
-        var comun = body.querySelector('[data-caja-factor][data-uso="comun"]');
-        var alternativo = body.querySelector('[data-caja-factor][data-uso="alternativo"]');
-        var valorComun = comun && String(comun.value || '').trim() !== '' && Number(comun.value) > 0
-            ? Number(comun.value)
-            : 0;
-        var valorAlternativo = alternativo && String(alternativo.value || '').trim() !== '' && Number(alternativo.value) > 0
-            ? Number(alternativo.value)
-            : 0;
+    function factoresCajasDesdeTabla(body) {
+        var factores = {};
 
-        if (valorComun > 0) {
-            return valorComun;
+        body.querySelectorAll('[data-caja-factor]').forEach(function (input) {
+            var clave = input.getAttribute('data-uso') || '';
+            if (!clave) {
+                return;
+            }
+            var val = parseFactorInput(input);
+            if (val > 0) {
+                factores[clave] = val;
+            }
+        });
+
+        return factores;
+    }
+
+    function factorCajaParaFila(tr, factores) {
+        var uso = tr.getAttribute('data-uso') || '';
+
+        if (factores[uso] > 0) {
+            return factores[uso];
         }
-        if (valorAlternativo > 0) {
-            return valorAlternativo;
-        }
+
         return 1;
+    }
+
+    function baseCantidadFila(tr) {
+        var cantCaja = Number(tr.getAttribute('data-cantidad-caja') || 0);
+        if (tr.getAttribute('data-es-caja') !== '1') {
+            return cantCaja;
+        }
+
+        var input = tr.querySelector('[data-consumo-override]');
+        var val = input ? String(input.value || '').trim() : '';
+        if (val !== '' && Number(val) > 0) {
+            return Number(val);
+        }
+
+        return cantCaja;
+    }
+
+    function calcularTotalMaterial(tr, factores, params) {
+        var esCaja = tr.getAttribute('data-es-caja') === '1';
+        var usaPallets = tr.getAttribute('data-usa-pallets') === '1';
+        var factorCaja = factorCajaParaFila(tr, factores);
+
+        if (esCaja) {
+            return baseCantidadFila(tr);
+        }
+
+        if (usaPallets) {
+            var conf = Math.max(params.conformacion, 0.00001);
+            return (params.pallets / conf) * factorCaja;
+        }
+
+        return baseCantidadFila(tr) * factorCaja;
     }
 
     function recalcularTotalesConsumo() {
@@ -188,19 +345,21 @@
             return;
         }
 
-        var factorCajas = factorCajasDesdeTabla(body);
-        var factorPallets = factorConsumo('egreso-pallets-fuera');
+        var factores = factoresCajasDesdeTabla(body);
+        var params = parametrosPresentacionConsumo();
 
         body.querySelectorAll('tr[data-consumo-row]').forEach(function (tr) {
-            var totalEl = tr.querySelector('[data-consumo-total]');
-            var cantCaja = Number(tr.getAttribute('data-cantidad-caja') || 0);
-            var usaPallets = tr.getAttribute('data-usa-pallets') === '1';
-            var factor = usaPallets ? factorPallets : factorCajas;
-            var total = cantCaja * factor;
-
-            if (totalEl) {
-                totalEl.textContent = formatearNumero(total);
+            if (tr.getAttribute('data-total-manual') === '1') {
+                return;
             }
+
+            var totalInput = tr.querySelector('[data-consumo-total]');
+            if (!totalInput) {
+                return;
+            }
+
+            var total = calcularTotalMaterial(tr, factores, params);
+            totalInput.value = total > 0 ? total.toFixed(2) : '';
         });
     }
 
@@ -219,7 +378,7 @@
             wrap.hidden = true;
             if (hint) {
                 hint.hidden = false;
-                hint.textContent = 'Esta presentación no tiene materiales activos en Receta.';
+                hint.textContent = 'Este producto no tiene materiales activos en Receta.';
             }
             return;
         }
@@ -227,96 +386,144 @@
         items.forEach(function (item, index) {
             var idMaterial = String(item.id_material_pl || '');
             var override = overrideDeMaterial(idMaterial);
-            if (override === null) {
-                var defaultQty = Number(item.cantidad_por_caja || 0);
-                var savedQty = Number(consumoEditCantidad);
-                override = Math.abs(savedQty - defaultQty) > 0.001 ? savedQty.toFixed(2) : '';
-            }
+            var totalOverride = totalOverrideDeMaterial(idMaterial);
             var stock = item.stock == null ? null : Number(item.stock);
             var usaPallets = !!item.usa_pallets;
-            var esCajaEditable = !!item.es_caja_editable;
-            var usoNorm = String(item.nom_uso || '')
-                .toLowerCase()
-                .normalize('NFD')
-                .replace(/[\u0300-\u036f]/g, '');
-            if (usoNorm.indexOf('alternativ') === 0) {
-                usoNorm = 'alternativo';
-            } else if (usoNorm.indexOf('comun') === 0) {
-                usoNorm = 'comun';
-            }
+            var esCajaEditable = esCajaEditableItem(item);
+            var esCajaFactor = esCajaEditable;
+            var esFilaCaja = esCajaEditable;
+            var claveUso = item.nom_uso_clave || claveUsoConsumo(item.nom_uso);
             var tr = document.createElement('tr');
             tr.setAttribute('data-consumo-row', '1');
             tr.setAttribute('data-cantidad-caja', String(item.cantidad_por_caja || 0));
             tr.setAttribute('data-usa-pallets', usaPallets ? '1' : '0');
-            if (consumoEditMaterialId && String(consumoEditMaterialId) === idMaterial) {
-                tr.className = (tr.className ? tr.className + ' ' : '') + 'is-edit-row';
+            tr.setAttribute('data-es-caja', esFilaCaja ? '1' : '0');
+            tr.setAttribute('data-uso', claveUso);
+            if (consumoEditLineas[idMaterial]) {
+                tr.classList.add('is-edit-row');
             }
-            if (esCajaEditable) {
+            if (esCajaFactor) {
                 tr.classList.add('is-caja-editable');
             }
 
             var tdMaterial = document.createElement('td');
-            tdMaterial.className = 'registro-consumo-tabla__material';
-            tdMaterial.textContent = item.nom_material || '—';
+            tdMaterial.className = 'registro-consumo-tabla__cell--material';
+            var materialText = document.createElement('span');
+            materialText.className = 'registro-consumo-tabla__material';
+            materialText.textContent = item.nom_material || '—';
+            materialText.title = item.nom_material || '';
+            tdMaterial.appendChild(materialText);
 
             var tdCodigo = document.createElement('td');
             tdCodigo.className = 'registro-consumo-tabla__code';
             tdCodigo.textContent = item.codigo_pl || '—';
+            tdCodigo.title = item.codigo_pl || '';
+
+            var tdUso = document.createElement('td');
+            tdUso.className = 'registro-consumo-tabla__uso';
+            var badgeUso = document.createElement('span');
+            pintarBadgeObservacionConsumo(badgeUso, item.clase_css_observacion || '');
+            badgeUso.textContent = item.nom_uso || '—';
+            badgeUso.title = item.nom_uso || '';
+            tdUso.appendChild(badgeUso);
 
             var tdCaja = document.createElement('td');
-            tdCaja.className = 'registro-consumo-tabla__qty';
-            tdCaja.textContent = formatearNumero(item.cantidad_por_caja || 0);
-
-            var tdOtra = document.createElement('td');
+            tdCaja.className = 'registro-consumo-tabla__qty registro-consumo-tabla__cant-receta';
             var hiddenId = document.createElement('input');
             hiddenId.type = 'hidden';
             hiddenId.name = 'lineas[' + index + '][id_material_pl]';
             hiddenId.value = idMaterial;
-            var input = document.createElement('input');
-            input.type = 'number';
-            input.className = 'field__input';
-            input.min = '0';
-            input.step = '0.01';
-            input.placeholder = '';
-            input.value = esCajaEditable ? override : '';
-            if (esCajaEditable) {
-                input.name = 'lineas[' + index + '][cantidad]';
-                input.setAttribute('data-consumo-override', idMaterial);
-                input.setAttribute('data-caja-factor', '1');
-                input.setAttribute('data-uso', usoNorm);
-                input.addEventListener('input', function () {
-                    consumoOverrides[idMaterial] = input.value;
+            tdCaja.appendChild(hiddenId);
+
+            var editLinea = consumoEditLineas[idMaterial];
+            if (editLinea && editLinea.id_movimiento) {
+                var hiddenMov = document.createElement('input');
+                hiddenMov.type = 'hidden';
+                hiddenMov.name = 'lineas[' + index + '][id_movimiento]';
+                hiddenMov.value = String(editLinea.id_movimiento);
+                tdCaja.appendChild(hiddenMov);
+            }
+
+            var qtyReceta = document.createElement('span');
+            qtyReceta.textContent = formatearNumero(item.cantidad_por_caja || 0);
+            tdCaja.appendChild(qtyReceta);
+
+            var tdPersonalizado = document.createElement('td');
+            tdPersonalizado.className = 'registro-consumo-tabla__qty registro-consumo-tabla__personalizado';
+            if (esCajaFactor) {
+                var inputCaja = document.createElement('input');
+                inputCaja.type = 'number';
+                inputCaja.className = 'field__input';
+                inputCaja.min = '0';
+                inputCaja.step = '0.01';
+                inputCaja.placeholder = '';
+                inputCaja.value = override;
+                inputCaja.name = 'lineas[' + index + '][cantidad]';
+                inputCaja.setAttribute('data-consumo-override', idMaterial);
+                inputCaja.setAttribute('data-caja-factor', '1');
+                inputCaja.setAttribute('data-uso', claveUso);
+                inputCaja.addEventListener('input', function () {
+                    consumoOverrides[idMaterial] = inputCaja.value;
+                    tr.removeAttribute('data-total-manual');
                     recalcularTotalesConsumo();
                 });
+                tdPersonalizado.appendChild(inputCaja);
             } else {
-                input.disabled = true;
-                input.readOnly = true;
-                input.tabIndex = -1;
-                input.setAttribute('aria-hidden', 'true');
+                tdPersonalizado.classList.add('registro-consumo-tabla__personalizado--empty');
+                var dashPersonalizado = document.createElement('span');
+                dashPersonalizado.textContent = '—';
+                tdPersonalizado.appendChild(dashPersonalizado);
             }
-            tdOtra.appendChild(hiddenId);
-            tdOtra.appendChild(input);
 
             var tdTotal = document.createElement('td');
             tdTotal.className = 'registro-consumo-tabla__qty registro-consumo-tabla__total';
-            tdTotal.setAttribute('data-consumo-total', '1');
-            tdTotal.textContent = '0';
+            var totalInput = document.createElement('input');
+            totalInput.type = 'number';
+            totalInput.className = 'field__input';
+            totalInput.min = '0';
+            totalInput.step = '0.01';
+            totalInput.name = 'lineas[' + index + '][total]';
+            totalInput.setAttribute('data-consumo-total', '1');
+            totalInput.setAttribute('data-material-id', idMaterial);
+            if (totalOverride != null && String(totalOverride).trim() !== '') {
+                totalInput.value = Number(totalOverride).toFixed(2);
+                totalInput.setAttribute('data-total-manual', '1');
+                tr.setAttribute('data-total-manual', '1');
+            }
+            totalInput.addEventListener('input', function () {
+                var texto = String(totalInput.value || '').trim();
+                if (texto === '') {
+                    delete consumoTotalOverrides[idMaterial];
+                    tr.removeAttribute('data-total-manual');
+                    totalInput.removeAttribute('data-total-manual');
+                    recalcularTotalesConsumo();
+                    return;
+                }
+                consumoTotalOverrides[idMaterial] = totalInput.value;
+                tr.setAttribute('data-total-manual', '1');
+                totalInput.setAttribute('data-total-manual', '1');
+            });
+            tdTotal.appendChild(totalInput);
 
             var tdStock = document.createElement('td');
             tdStock.className = 'registro-consumo-tabla__qty registro-consumo-tabla__stock';
             if (stock == null) {
                 tdStock.textContent = '—';
             } else {
-                tdStock.textContent = formatearNumero(stock);
+                var stockBadge = document.createElement('span');
+                stockBadge.className = 'registro-consumo-tabla__stock-valor';
+                stockBadge.textContent = formatearNumero(stock);
                 if (stock <= 0) {
-                    tdStock.classList.add('is-critico');
+                    stockBadge.classList.add('is-critico');
                 }
+                tdStock.appendChild(stockBadge);
             }
 
             tr.appendChild(tdMaterial);
             tr.appendChild(tdCodigo);
+            tr.appendChild(tdUso);
             tr.appendChild(tdCaja);
-            tr.appendChild(tdOtra);
+            tr.appendChild(tdPersonalizado);
             tr.appendChild(tdTotal);
             tr.appendChild(tdStock);
             body.appendChild(tr);
@@ -331,6 +538,90 @@
         recalcularTotalesConsumo();
     }
 
+    function respaldarProgramasConsumo() {
+        var programa = document.getElementById('egreso-id-programa');
+        if (programa && !consumoProgramasBackup) {
+            consumoProgramasBackup = programa.innerHTML;
+        }
+    }
+
+    function restaurarProgramasConsumo(idProgramaSeleccionado) {
+        var programa = document.getElementById('egreso-id-programa');
+        if (!programa || !consumoProgramasBackup) {
+            return;
+        }
+
+        programa.innerHTML = consumoProgramasBackup;
+        programa.disabled = programa.options.length <= 1;
+        if (idProgramaSeleccionado) {
+            programa.value = String(idProgramaSeleccionado);
+        }
+    }
+
+    function pintarPresentacionesConsumo(presentacion, items, idPresentacionSeleccionada) {
+        presentacion.innerHTML = '<option value="">Seleccionar producto</option>';
+        items.forEach(function (item) {
+            var opt = document.createElement('option');
+            opt.value = String(item.id_presentacion);
+            opt.textContent = item.nom_presentacion || ('#' + item.id_presentacion);
+            presentacion.appendChild(opt);
+        });
+        presentacion.disabled = items.length === 0;
+        if (idPresentacionSeleccionada) {
+            presentacion.value = String(idPresentacionSeleccionada);
+        }
+    }
+
+    function prepararEnvioConsumo() {
+        recalcularTotalesConsumo();
+        ['egreso-id-programa', 'egreso-id-presentacion'].forEach(function (id) {
+            var campo = document.getElementById(id);
+            if (campo && String(campo.value || '').trim() !== '') {
+                campo.disabled = false;
+            }
+        });
+    }
+
+    window.registroPrepararEgresoSubmit = prepararEnvioConsumo;
+
+    function cargarProgramasConsumo(idProgramaSeleccionado) {
+        var programa = document.getElementById('egreso-id-programa');
+
+        if (!programa) {
+            return Promise.resolve();
+        }
+
+        respaldarProgramasConsumo();
+
+        if (!consumoProgramasUrl || !navigator.onLine) {
+            restaurarProgramasConsumo(idProgramaSeleccionado);
+            return Promise.resolve();
+        }
+
+        programa.disabled = true;
+        programa.innerHTML = '<option value="">Cargando programas...</option>';
+
+        return fetch(consumoProgramasUrl, { headers: { Accept: 'application/json' } })
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                var items = Array.isArray(data.programas) ? data.programas : [];
+                programa.innerHTML = '<option value="">Seleccionar programa</option>';
+                items.forEach(function (item) {
+                    var opt = document.createElement('option');
+                    opt.value = String(item.id_programa);
+                    opt.textContent = item.nom_programa || ('#' + item.id_programa);
+                    programa.appendChild(opt);
+                });
+                programa.disabled = items.length === 0;
+                if (idProgramaSeleccionado) {
+                    programa.value = String(idProgramaSeleccionado);
+                }
+            })
+            .catch(function () {
+                restaurarProgramasConsumo(idProgramaSeleccionado);
+            });
+    }
+
     function cargarPresentacionesConsumo(idPrograma, idPresentacionSeleccionada) {
         var presentacion = document.getElementById('egreso-id-presentacion');
 
@@ -338,11 +629,16 @@
             return Promise.resolve();
         }
 
-        vaciarTablaMaterialesConsumo('Seleccione una presentación para cargar los materiales.');
+        vaciarTablaMaterialesConsumo('Seleccione un producto para cargar los materiales desde Receta.');
 
         if (!idPrograma || !consumoPresentacionesUrl) {
             presentacion.innerHTML = '<option value="">Seleccione un programa</option>';
             presentacion.disabled = true;
+            return Promise.resolve();
+        }
+
+        if (!navigator.onLine && consumoPresentacionesCache[idPrograma]) {
+            pintarPresentacionesConsumo(presentacion, consumoPresentacionesCache[idPrograma], idPresentacionSeleccionada);
             return Promise.resolve();
         }
 
@@ -355,19 +651,14 @@
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 var items = Array.isArray(data.presentaciones) ? data.presentaciones : [];
-                presentacion.innerHTML = '<option value="">Seleccionar presentación</option>';
-                items.forEach(function (item) {
-                    var opt = document.createElement('option');
-                    opt.value = String(item.id_presentacion);
-                    opt.textContent = item.nom_presentacion || ('#' + item.id_presentacion);
-                    presentacion.appendChild(opt);
-                });
-                presentacion.disabled = items.length === 0;
-                if (idPresentacionSeleccionada) {
-                    presentacion.value = String(idPresentacionSeleccionada);
-                }
+                consumoPresentacionesCache[idPrograma] = items;
+                pintarPresentacionesConsumo(presentacion, items, idPresentacionSeleccionada);
             })
             .catch(function () {
+                if (consumoPresentacionesCache[idPrograma]) {
+                    pintarPresentacionesConsumo(presentacion, consumoPresentacionesCache[idPrograma], idPresentacionSeleccionada);
+                    return;
+                }
                 presentacion.innerHTML = '<option value="">Error al cargar</option>';
                 presentacion.disabled = true;
             });
@@ -375,7 +666,7 @@
 
     function cargarMaterialesConsumo(idPrograma, idPresentacion) {
         if (!idPrograma || !idPresentacion || !consumoMaterialesUrl) {
-            vaciarTablaMaterialesConsumo('Seleccione una presentación para cargar los materiales.');
+            vaciarTablaMaterialesConsumo('Seleccione un producto para cargar los materiales desde Receta.');
             return Promise.resolve();
         }
 
@@ -405,6 +696,14 @@
         return fetch(url, { headers: { Accept: 'application/json' } })
             .then(function (response) { return response.json(); })
             .then(function (data) {
+                var params = data.presentacion || null;
+                if (consumoOld && (consumoOld.conformacion_dentro != null || consumoOld.pallets_fuera != null)) {
+                    params = {
+                        conformacion: consumoOld.conformacion_dentro,
+                        pallets: consumoOld.pallets_fuera,
+                    };
+                }
+                actualizarParametrosPresentacionConsumo(params);
                 renderTablaMaterialesConsumo(Array.isArray(data.materiales) ? data.materiales : []);
             })
             .catch(function () {
@@ -419,6 +718,33 @@
             return;
         }
         cargarMaterialesConsumo(programa.value, presentacion.value);
+    }
+
+    function ensureMaterialOption(select, idMaterial, codigoPl, nomMaterialPl) {
+        if (!select || !idMaterial) {
+            return;
+        }
+
+        var value = String(idMaterial);
+        var option = Array.prototype.find.call(select.options, function (opt) {
+            return opt.value === value;
+        });
+
+        if (!option) {
+            option = document.createElement('option');
+            option.value = value;
+            select.appendChild(option);
+        }
+
+        option.setAttribute('data-codigo-pl', codigoPl || '');
+        option.setAttribute('data-nom-material-pl', nomMaterialPl || '');
+        option.textContent = (codigoPl || value) + (nomMaterialPl ? ' — ' + nomMaterialPl : '');
+        select.value = value;
+
+        materialesMap[value] = {
+            codigo: codigoPl || (materialesMap[value] && materialesMap[value].codigo) || '',
+            nombre: nomMaterialPl || (materialesMap[value] && materialesMap[value].nombre) || '',
+        };
     }
 
     function syncMaterial(prefix) {
@@ -463,7 +789,12 @@
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 if (data.encontrado) {
-                    select.value = String(data.id_material_pl);
+                    ensureMaterialOption(
+                        select,
+                        data.id_material_pl,
+                        data.codigo_pl || '',
+                        data.nom_material || ''
+                    );
                     syncMaterial(prefix);
                 }
             })
@@ -561,7 +892,7 @@
         });
     }
 
-    ['egreso-pallets-fuera'].forEach(function (id) {
+    ['egreso-conformacion-dentro', 'egreso-pallets-fuera'].forEach(function (id) {
         var input = document.getElementById(id);
         if (input) {
             input.addEventListener('input', recalcularTotalesConsumo);
@@ -586,7 +917,10 @@
     });
     if (abrirEgreso) abrirEgreso.addEventListener('click', function () {
         resetModalCreacion('egreso');
-        abrirModal('egreso');
+        respaldarProgramasConsumo();
+        cargarProgramasConsumo().then(function () {
+            abrirModal('egreso');
+        });
     });
     if (abrirTraslado) abrirTraslado.addEventListener('click', function () {
         resetModalCreacion('traslado');
@@ -619,17 +953,27 @@
     }
 
     var consumoOld = window.registroConsumoOld || null;
+    respaldarProgramasConsumo();
     if (consumoOld && consumoOld.id_programa) {
         var programaSelectOld = document.getElementById('egreso-id-programa');
         consumoOverrides = {};
+        consumoTotalOverrides = {};
         (Array.isArray(consumoOld.lineas) ? consumoOld.lineas : []).forEach(function (linea) {
             if (linea && linea.id_material_pl) {
-                consumoOverrides[String(linea.id_material_pl)] = linea.cantidad != null ? String(linea.cantidad) : '';
+                var id = String(linea.id_material_pl);
+                if (linea.cantidad != null && linea.cantidad !== '') {
+                    consumoOverrides[id] = String(linea.cantidad);
+                }
+                if (linea.total != null && linea.total !== '') {
+                    consumoTotalOverrides[id] = String(linea.total);
+                }
             }
         });
         if (programaSelectOld) {
-            programaSelectOld.value = String(consumoOld.id_programa);
-            cargarPresentacionesConsumo(consumoOld.id_programa, consumoOld.id_presentacion || '')
+            cargarProgramasConsumo(consumoOld.id_programa)
+                .then(function () {
+                    return cargarPresentacionesConsumo(consumoOld.id_programa, consumoOld.id_presentacion || '');
+                })
                 .then(function () {
                     return cargarMaterialesConsumo(
                         consumoOld.id_programa,
@@ -642,7 +986,7 @@
     /* ── Ingreso: carrito de materiales ── */
     var ingresoForm = document.getElementById('registro-ingreso-form');
     var ingresoLineas = [];
-    var materialesMap = window.registroMaterialesMap || {};
+    // materialesMap declared earlier for lazy option injection
 
     function almacenCodigoIngreso() {
         var select = document.getElementById('ingreso-id-almacen');
@@ -854,6 +1198,13 @@
                 event.preventDefault();
                 mostrarHintIngreso('Agregue al menos un material con Añadir o cargue el XML de la guía.', true);
             }
+        });
+    }
+
+    var egresoForm = document.getElementById('registro-egreso-form');
+    if (egresoForm) {
+        egresoForm.addEventListener('submit', function () {
+            prepararEnvioConsumo();
         });
     }
 
@@ -1105,17 +1456,28 @@
             document.getElementById('registro-detalle-destino').textContent = data.almacen_destino || '—';
         }
 
-        mostrarCampoDetalle('registro-detalle-factura-wrap', 'registro-detalle-factura', data.factura);
-        mostrarCampoDetalle('registro-detalle-guia-wrap', 'registro-detalle-guia', data.guia);
         mostrarCampoDetalle('registro-detalle-motivo-wrap', 'registro-detalle-motivo', data.motivo);
         mostrarCampoDetalle('registro-detalle-programa-wrap', 'registro-detalle-programa', data.programa);
         mostrarCampoDetalle('registro-detalle-presentacion-wrap', 'registro-detalle-presentacion', data.presentacion);
         mostrarCampoDetalle('registro-detalle-observacion-wrap', 'registro-detalle-observacion', data.observacion);
 
+        var esEgreso = data.tipo === 'egreso';
+        if (!esEgreso) {
+            mostrarCampoDetalle('registro-detalle-factura-wrap', 'registro-detalle-factura', data.factura);
+            mostrarCampoDetalle('registro-detalle-guia-wrap', 'registro-detalle-guia', data.guia);
+        } else {
+            ['registro-detalle-factura-wrap', 'registro-detalle-guia-wrap'].forEach(function (id) {
+                var wrap = document.getElementById(id);
+                if (wrap) {
+                    wrap.hidden = true;
+                }
+            });
+        }
+
         var pdfWrap = document.getElementById('registro-detalle-pdf-wrap');
         var pdfValue = document.getElementById('registro-detalle-pdf');
         if (pdfWrap && pdfValue) {
-            if (data.pdf_url) {
+            if (!esEgreso && data.pdf_url) {
                 pdfWrap.hidden = false;
                 pdfValue.innerHTML = '<a href="' + escaparHtml(data.pdf_url) + '" class="registro-pdf-link" target="_blank" rel="noopener noreferrer">' +
                     escaparHtml(data.pdf_nombre || 'Ver') + '</a>';
@@ -1274,14 +1636,20 @@
                         var idMaterial = String(linea.id_material_pl || '');
                         var material = materialesMap[idMaterial] || {};
                         var cantidad = parseFloat(linea.cantidad);
+                        var codigoPl = linea.codigo_pl || material.codigo || '';
+                        var nomMaterial = linea.nom_material || material.nombre || '';
+
+                        if (idMaterial) {
+                            materialesMap[idMaterial] = { codigo: codigoPl, nombre: nomMaterial };
+                        }
 
                         return {
                             idMovimiento: linea.id_movimiento ? String(linea.id_movimiento) : null,
                             idMaterialPL: idMaterial,
                             cantidad: cantidad.toFixed(2),
                             cantidadTexto: cantidad.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                            codigoPl: material.codigo || '',
-                            nomMaterial: material.nombre || '',
+                            codigoPl: codigoPl,
+                            nomMaterial: nomMaterial,
                             almacenCodigo: almacenCodigoIngreso(),
                         };
                     });
@@ -1294,14 +1662,28 @@
 
                 if (modalTipo === 'egreso') {
                     consumoEditId = id;
-                    consumoEditMaterialId = edit.id_material_pl || null;
-                    consumoEditCantidad = edit.cantidad != null ? Number(edit.cantidad) : null;
+                    consumoEditLineas = {};
                     consumoOverrides = {};
+                    consumoTotalOverrides = {};
+
+                    (Array.isArray(edit.lineas) ? edit.lineas : []).forEach(function (linea) {
+                        if (!linea || !linea.id_material_pl) {
+                            return;
+                        }
+
+                        var clave = String(linea.id_material_pl);
+                        consumoEditLineas[clave] = {
+                            id_movimiento: linea.id_movimiento || null,
+                            cantidad: linea.cantidad != null ? Number(linea.cantidad) : null,
+                        };
+
+                        if (linea.cantidad != null && linea.cantidad !== '') {
+                            consumoTotalOverrides[clave] = String(linea.cantidad);
+                        }
+                    });
+
                     setFieldValue(form, 'fecha', edit.fecha || '');
                     setFieldValue(form, 'id_almacen', edit.id_almacen || '');
-                    setFieldValue(form, 'id_material_pl', edit.id_material_pl || '');
-                    setFieldValue(form, 'factura', edit.factura || '');
-                    setFieldValue(form, 'guia', edit.guia || '');
                     setFieldValue(form, 'observacion', edit.observacion || '');
 
                     var selectMotivo = form.querySelector('[name="id_tipo_consumo"]');
@@ -1317,11 +1699,11 @@
                     }
 
                     var programaSelect = document.getElementById('egreso-id-programa');
-                    if (programaSelect && edit.id_programa) {
-                        programaSelect.value = String(edit.id_programa);
-                    }
 
-                    cargarPresentacionesConsumo(edit.id_programa || '', edit.id_presentacion || '')
+                    cargarProgramasConsumo(edit.id_programa || '')
+                        .then(function () {
+                            return cargarPresentacionesConsumo(edit.id_programa || '', edit.id_presentacion || '');
+                        })
                         .then(function () {
                             return cargarMaterialesConsumo(
                                 edit.id_programa || '',
@@ -1344,7 +1726,12 @@
 
                 var selectTraslado = form.querySelector('[data-material-select="traslado"]');
                 if (selectTraslado && edit.id_material_pl) {
-                    selectTraslado.value = String(edit.id_material_pl);
+                    ensureMaterialOption(
+                        selectTraslado,
+                        edit.id_material_pl,
+                        edit.codigo_pl || '',
+                        edit.nom_material || ''
+                    );
                     syncMaterial('traslado');
                 }
 
@@ -1364,5 +1751,19 @@
             }
             abrirEdicion(tipo, id);
         });
+    });
+
+    document.addEventListener('registro-offline-queued', function (event) {
+        var tipo = event.detail && event.detail.tipo;
+        if (tipo === 'ingreso') {
+            ingresoLineas = [];
+            renderIngresoPreview();
+            limpiarLineaIngreso();
+            resetModalCreacion('ingreso');
+            cerrarModal('ingreso');
+        } else if (tipo === 'egreso') {
+            resetModalCreacion('egreso');
+            cerrarModal('egreso');
+        }
     });
 })();

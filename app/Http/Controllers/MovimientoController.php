@@ -19,6 +19,7 @@ use App\Support\AuditoriaAccion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\Response;
@@ -68,6 +69,17 @@ class MovimientoController extends Controller
             'puedeEliminar' => $user?->puede('registro', 'eliminar') ?? false,
             'activeNav' => 'registro',
         ]);
+
+        // Solo materiales referenciados por old() (errores de validación), no el catálogo completo.
+        $idsOld = collect(old('lineas', []))
+            ->pluck('id_material_pl')
+            ->push(old('id_material_pl'))
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $viewData['materiales'] = $this->movimientoService->materialesPorIds($idsOld);
 
         return view('registro.index', $viewData);
     }
@@ -133,7 +145,7 @@ class MovimientoController extends Controller
         return response()->json($resultado);
     }
 
-    public function storeIngreso(StoreIngresoRequest $request): RedirectResponse
+    public function storeIngreso(StoreIngresoRequest $request): RedirectResponse|JsonResponse
     {
         try {
             $cantidad = $this->movimientoService->crearIngreso(
@@ -142,11 +154,19 @@ class MovimientoController extends Controller
                 $request->file('archivo_pdf')
             );
         } catch (InvalidArgumentException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => false, 'message' => $exception->getMessage()], 422);
+            }
+
             return redirect()
                 ->route('registro.index', ['tab' => 'ingresos'])
                 ->withErrors(['lineas' => $exception->getMessage()])
                 ->withInput();
         } catch (\RuntimeException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => false, 'message' => $exception->getMessage()], 422);
+            }
+
             return redirect()
                 ->route('registro.index', ['tab' => 'ingresos'])
                 ->withErrors(['archivo_pdf' => $exception->getMessage()])
@@ -161,12 +181,18 @@ class MovimientoController extends Controller
             request: $request,
         );
 
+        $mensaje = $cantidad === 1 ? 'Ingreso registrado.' : "Se registraron {$cantidad} ingresos.";
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'message' => $mensaje, 'cantidad' => $cantidad]);
+        }
+
         return redirect()
             ->route('registro.index', ['tab' => 'ingresos'])
-            ->with('status', $cantidad === 1 ? 'Ingreso registrado.' : "Se registraron {$cantidad} ingresos.");
+            ->with('status', $mensaje);
     }
 
-    public function storeEgreso(StoreEgresoRequest $request): RedirectResponse
+    public function storeEgreso(StoreEgresoRequest $request): RedirectResponse|JsonResponse
     {
         try {
             $cantidad = $this->movimientoService->crearEgreso(
@@ -175,11 +201,19 @@ class MovimientoController extends Controller
                 $request->file('archivo_pdf')
             );
         } catch (InvalidArgumentException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => false, 'message' => $exception->getMessage()], 422);
+            }
+
             return redirect()
                 ->route('registro.index', ['tab' => 'consumos'])
                 ->withErrors(['lineas' => $exception->getMessage()])
                 ->withInput();
         } catch (\RuntimeException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => false, 'message' => $exception->getMessage()], 422);
+            }
+
             return redirect()
                 ->route('registro.index', ['tab' => 'consumos'])
                 ->withErrors(['archivo_pdf' => $exception->getMessage()])
@@ -194,9 +228,15 @@ class MovimientoController extends Controller
             request: $request,
         );
 
+        $mensaje = $cantidad === 1 ? 'Consumo registrado.' : "Se registraron {$cantidad} consumos.";
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'message' => $mensaje, 'cantidad' => $cantidad]);
+        }
+
         return redirect()
             ->route('registro.index', ['tab' => 'consumos'])
-            ->with('status', $cantidad === 1 ? 'Consumo registrado.' : "Se registraron {$cantidad} consumos.");
+            ->with('status', $mensaje);
     }
 
     public function storeTraslado(StoreTrasladoRequest $request): RedirectResponse
@@ -415,6 +455,22 @@ class MovimientoController extends Controller
         ]);
     }
 
+    public function programasConsumo(): JsonResponse
+    {
+        Cache::forget('catalogo.programas_consumo');
+
+        return response()->json([
+            'programas' => $this->consumoRecetaService
+                ->programasDisponibles()
+                ->map(fn ($item) => [
+                    'id_programa' => $item->idPrograma,
+                    'nom_programa' => $item->nomPrograma,
+                ])
+                ->values()
+                ->all(),
+        ]);
+    }
+
     public function presentacionesConsumo(Request $request): JsonResponse
     {
         $idPrograma = (int) $request->query('id_programa', 0);
@@ -438,14 +494,27 @@ class MovimientoController extends Controller
         $excluir = (int) $request->query('excluir_id_movimiento', 0);
         $idAlmacen = (int) $request->query('id_almacen', 0);
 
+        $excluirIds = $excluir > 0
+            ? $this->movimientoService->idsMovimientosLoteEgreso($excluir)
+            : [];
+
         return response()->json([
+            'presentacion' => $this->consumoRecetaService->parametrosPresentacion(
+                $idPrograma,
+                $idPresentacion
+            ),
             'materiales' => $this->consumoRecetaService->materialesDePresentacion(
                 $idPrograma,
                 $idPresentacion,
-                $excluir > 0 ? $excluir : null,
+                $excluirIds !== [] ? $excluirIds : null,
                 $idAlmacen > 0 ? $idAlmacen : null
             ),
         ]);
+    }
+
+    public function offlineCsrf(): JsonResponse
+    {
+        return response()->json(['token' => csrf_token()]);
     }
 
     public function hintConsumo(Request $request): JsonResponse
@@ -465,13 +534,17 @@ class MovimientoController extends Controller
             ]);
         }
 
+        $excluirIds = $excluir > 0
+            ? $this->movimientoService->idsMovimientosLoteEgreso($excluir)
+            : [];
+
         return response()->json(
             $this->consumoRecetaService->hintConsumo(
                 $idPrograma,
                 $idPresentacion,
                 $idMaterial,
                 $idAlmacen,
-                $excluir > 0 ? $excluir : null
+                $excluirIds
             )
         );
     }

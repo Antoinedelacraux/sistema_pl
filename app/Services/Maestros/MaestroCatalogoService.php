@@ -41,9 +41,29 @@ class MaestroCatalogoService
         $definicion = MaestrosCatalogo::definicion($tab);
         $modelClass = $definicion['model'];
         $columnaNombre = $definicion['nombre'];
+        $nombre = trim($nombre);
+
+        $existente = $modelClass::query()
+            ->whereRaw('LOWER('.$columnaNombre.') = ?', [mb_strtolower($nombre)])
+            ->first();
+
+        if ($existente) {
+            if ((int) $existente->getAttribute('Estado') === Estado::INACTIVO) {
+                $existente->update([
+                    $columnaNombre => $nombre,
+                    'Estado' => Estado::ACTIVO,
+                ]);
+
+                return $existente->fresh();
+            }
+
+            throw new InvalidArgumentException(
+                'El nombre de '.$definicion['label'].' ya está registrado.'
+            );
+        }
 
         return $modelClass::query()->create([
-            $columnaNombre => trim($nombre),
+            $columnaNombre => $nombre,
             'Estado' => Estado::ACTIVO,
         ]);
     }

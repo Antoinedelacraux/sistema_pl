@@ -23,7 +23,6 @@ class ProgramaFila extends Model
         'idVariedad',
         'idPrograma',
         'idPresentacion',
-        'idPreNisira',
         'idMaterialPL',
         'idCantidadCaja',
         'idUso',
@@ -65,11 +64,6 @@ class ProgramaFila extends Model
     public function presentacion(): BelongsTo
     {
         return $this->belongsTo(Presentacion::class, 'idPresentacion', 'idPresentacion');
-    }
-
-    public function preNisira(): BelongsTo
-    {
-        return $this->belongsTo(PreNisira::class, 'idPreNisira', 'idPreNisira');
     }
 
     public function material(): BelongsTo

@@ -13,7 +13,7 @@
 
             <div class="modal__grid">
                 <label class="field">
-                    <span class="field__label">Familia</span>
+                    <span class="field__label">Material</span>
                     <select class="field__input @error('id_familia') is-invalid @enderror" name="id_familia" id="proveedor-id-familia">
                         <option value="">Sin familia</option>
                         @foreach ($familias as $item)

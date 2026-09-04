@@ -3,7 +3,7 @@
 @section('title', 'Crud')
 
 @section('heading', 'Crud')
-@section('crumbs', 'Catálogos · mercados, clientes, familias y más')
+@section('crumbs', 'Catálogos · mercados, clientes, materiales y más')
 
 @section('page')
 @php

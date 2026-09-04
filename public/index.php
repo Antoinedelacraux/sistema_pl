@@ -4,6 +4,12 @@ use Illuminate\Http\Request;
 
 define('LARAVEL_START', microtime(true));
 
+// Reduce fingerprinting on php artisan serve / PHP SAPI
+@ini_set('expose_php', '0');
+if (function_exists('header_remove')) {
+    header_remove('X-Powered-By');
+}
+
 // Determine if the application is in maintenance mode...
 if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php')) {
     require $maintenance;

@@ -48,7 +48,7 @@
                             <dd id="registro-detalle-programa">—</dd>
                         </div>
                         <div class="registro-detalle-dl__item" id="registro-detalle-presentacion-wrap" hidden>
-                            <dt>Presentación</dt>
+                            <dt>Producto</dt>
                             <dd id="registro-detalle-presentacion">—</dd>
                         </div>
                         <div class="registro-detalle-dl__item" id="registro-detalle-factura-wrap" hidden>

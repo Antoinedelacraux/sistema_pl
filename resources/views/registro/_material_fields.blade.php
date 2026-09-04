@@ -7,7 +7,7 @@
         @if (empty($pickerOnly)) required @endif
     >
         <option value="">Seleccionar material</option>
-        @foreach ($materiales as $item)
+        @foreach (($materiales ?? collect()) as $item)
             <option
                 value="{{ $item->idMaterialPL }}"
                 data-codigo-pl="{{ $item->CodigoPL }}"

@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Programas\ImportProgramaExcelRequest;
 use App\Http\Requests\Programas\StoreProgramaFilaRequest;
 use App\Http\Requests\Programas\UpdateProgramaFilaImagenRequest;
 use App\Models\Programas\ProgramaFila;
 use App\Services\Auditoria\AuditoriaService;
 use App\Services\Programas\ProgramaExportService;
 use App\Services\Programas\ProgramaGridService;
+use App\Services\Programas\ProgramaImportService;
 use App\Support\AuditoriaAccion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -21,6 +23,7 @@ class ProgramaController extends Controller
     public function __construct(
         private readonly ProgramaGridService $gridService,
         private readonly ProgramaExportService $exportService,
+        private readonly ProgramaImportService $importService,
         private readonly AuditoriaService $auditoria
     ) {}
 
@@ -34,6 +37,7 @@ class ProgramaController extends Controller
             'filas' => $filas,
             'filtros' => $filtros,
             'totalFilas' => $filas->total(),
+            'totalProgramas' => $this->gridService->totalProgramasDistintos($filtros),
             'puedeCrear' => $request->user()?->puede('programas', 'crear') ?? false,
             'puedeEditar' => $request->user()?->puede('programas', 'editar') ?? false,
             'activeNav' => 'programas',
@@ -53,6 +57,46 @@ class ProgramaController extends Controller
         return $this->exportService->exportarPdf(
             $this->filtrosDesdeRequest($request),
             $request->user()
+        );
+    }
+
+    public function importExcel(ImportProgramaExcelRequest $request): RedirectResponse
+    {
+        try {
+            $resultado = $this->importService->importar($request->file('archivo_excel'));
+        } catch (\InvalidArgumentException $exception) {
+            return redirect()
+                ->route('programas.index')
+                ->with('error', $exception->getMessage());
+        }
+
+        $this->auditoria->registrar(
+            accion: AuditoriaAccion::PROGRAMA_CREAR,
+            entidad: 'ProgramaFila',
+            idEntidad: null,
+            descripcion: 'Importación Excel de receta',
+            datosNuevos: $resultado,
+            request: $request,
+        );
+
+        return redirect()
+            ->route('programas.index')
+            ->with(
+                'status',
+                $this->mensajeImportacion($resultado)
+            );
+    }
+
+    /**
+     * @param  array{insertadas: int, omitidas: int, total: int}  $resultado
+     */
+    private function mensajeImportacion(array $resultado): string
+    {
+        return sprintf(
+            'Importación: %d nueva(s), %d ya existente(s) (omitida(s)). Total: %d.',
+            $resultado['insertadas'],
+            $resultado['omitidas'],
+            $resultado['total']
         );
     }
 
@@ -110,6 +154,8 @@ class ProgramaController extends Controller
                 'mercado' => $request->input('mercado'),
                 'cliente' => $request->input('cliente'),
                 'familia' => $request->input('familia'),
+                'programa' => $request->input('programa'),
+                'presentacion' => $request->input('presentacion'),
                 'buscar' => $request->input('buscar'),
             ], fn ($valor) => filled($valor)))
             ->with('status', $mensaje);
@@ -132,7 +178,7 @@ class ProgramaController extends Controller
     }
 
     /**
-     * @return array{mercado: mixed, cliente: mixed, familia: mixed, q: string}
+     * @return array{mercado: mixed, cliente: mixed, familia: mixed, programa: mixed, presentacion: mixed, q: string}
      */
     private function filtrosDesdeRequest(Request $request): array
     {
@@ -140,6 +186,8 @@ class ProgramaController extends Controller
             'mercado' => $request->query('mercado'),
             'cliente' => $request->query('cliente'),
             'familia' => $request->query('familia'),
+            'programa' => $request->query('programa'),
+            'presentacion' => $request->query('presentacion'),
             'q' => trim((string) $request->query('buscar', '')),
         ];
     }

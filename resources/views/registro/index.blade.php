@@ -23,6 +23,17 @@
 <div class="registro-page">
 @include('partials.flash')
 
+<div class="offline-registro-banner" id="offline-registro-banner" hidden role="status">
+    <div class="offline-registro-banner__body">
+        <span id="offline-registro-status"></span>
+        <ul class="offline-registro-banner__errors" id="offline-registro-errors" hidden></ul>
+    </div>
+    <div class="offline-registro-banner__actions">
+        <button type="button" class="btn btn--outline btn--sm" id="offline-registro-sync" hidden>Sincronizar ahora</button>
+        <button type="button" class="btn btn--outline btn--sm" id="offline-registro-clear" hidden>Descartar cola</button>
+    </div>
+</div>
+
 <section class="panel panel--registro">
     <div class="registro-tabs" role="tablist" aria-label="Tipo de movimiento">
         <a href="{{ route('registro.index', array_merge(request()->except(['tab', 'page']), ['tab' => 'ingresos'])) }}" class="registro-tabs__btn {{ $tabActiva === 'ingresos' ? 'is-active' : '' }}" role="tab">Ingresos</a>
@@ -91,45 +102,19 @@
                                 @endif
                             </td>
                             <td>{{ $ingreso->observacion }}</td>
-                            <td class="proveedor-grid__actions">
-                                <div class="proveedor-grid__action-group">
-                                    <button
-                                        type="button"
-                                        class="icon-action icon-action--view"
-                                        data-registro-detalle="movimiento"
-                                        data-registro-detalle-id="{{ $ingreso->idMovimiento }}"
-                                        title="Ver detalle"
-                                        aria-label="Ver detalle"
-                                    >
-                                        @include('partials.icons.eye')
-                                    </button>
-                                    @if ($puedeEditar)
-                                        <button
-                                            type="button"
-                                            class="icon-action icon-action--edit"
-                                            data-registro-editar="ingreso"
-                                            data-registro-editar-id="{{ $ingreso->idMovimiento }}"
-                                            title="Editar"
-                                            aria-label="Editar ingreso"
-                                        >
-                                            @include('partials.icons.edit')
-                                        </button>
-                                    @endif
-                                    @if ($puedeEliminar)
-                                        <form
-                                            method="POST"
-                                            action="{{ route('registro.movimiento.destroy', $ingreso->idMovimiento) }}"
-                                            data-confirm="{{ $ingreso->es_lote ? 'Se anulará este ingreso y todos sus materiales asociados. Esta acción no se puede deshacer.' : 'Se anulará este ingreso. Esta acción no se puede deshacer.' }}"
-                                            data-confirm-title="Anular ingreso"
-                                            data-confirm-ok="Sí, anular"
-                                        >
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="icon-action icon-action--delete" title="Anular" aria-label="Anular">@include('partials.icons.trash')</button>
-                                        </form>
-                                    @endif
-                                </div>
-                            </td>
+                            @include('registro._fila_acciones', [
+                                'tipoDetalle' => 'movimiento',
+                                'tipoEditar' => 'ingreso',
+                                'id' => $ingreso->idMovimiento,
+                                'puedeEditar' => $puedeEditar,
+                                'puedeEliminar' => $puedeEliminar,
+                                'destroyRoute' => route('registro.movimiento.destroy', $ingreso->idMovimiento),
+                                'confirmMessage' => $ingreso->es_lote
+                                    ? 'Se anulará este ingreso y todos sus materiales asociados. Esta acción no se puede deshacer.'
+                                    : 'Se anulará este ingreso. Esta acción no se puede deshacer.',
+                                'confirmTitle' => 'Anular ingreso',
+                                'editLabel' => 'Editar ingreso',
+                            ])
                         </tr>
                     @empty
                         <tr><td colspan="11" class="data-table__empty">No hay ingresos registrados.</td></tr>
@@ -155,19 +140,16 @@
                 <p class="grid-table-count" id="registro-contador" data-total="{{ $totalContador }}" data-etiqueta="{{ $etiquetaContador }}">{{ number_format($totalContador) }} {{ $etiquetaContador }}</p>
             </div>
             <div class="programas-grid-wrap">
-            <table class="programas-grid registro-grid" id="registro-grid-egresos">
+            <table class="programas-grid registro-grid registro-grid--consumos" id="registro-grid-egresos">
                 <thead>
                     <tr>
                         <th class="programas-grid__th">Fecha</th>
                         <th class="programas-grid__th">Almacén</th>
                         <th class="programas-grid__th">Programa</th>
-                        <th class="programas-grid__th">Presentación</th>
+                        <th class="programas-grid__th">Producto</th>
                         <th class="programas-grid__th">Motivo</th>
                         <th class="programas-grid__th registro-grid__th--material">Material</th>
                         <th class="programas-grid__th programas-grid__th--num">Cantidad</th>
-                        <th class="programas-grid__th">Factura</th>
-                        <th class="programas-grid__th">Guía</th>
-                        <th class="programas-grid__th registro-grid__th--pdf">PDF</th>
                         <th class="programas-grid__th">Observación</th>
                         <th class="programas-grid__th proveedor-grid__th--actions">Acciones</th>
                     </tr>
@@ -175,67 +157,39 @@
                 <tbody>
                     @forelse ($consumos as $mov)
                         @php
-                            $guiaEgreso = $mov->guia ?: ($mov->factura ? '' : ($mov->facturaGuia ?: ''));
+                            $materialEgreso = $mov->material ?? ($mov->materialPl?->nomMaterial);
+                            $codigoEgreso = $mov->codigo_pl ?? ($mov->materialPl?->CodigoPL);
                         @endphp
                         <tr
                             class="registro-fila"
                             data-fecha="{{ $mov->fecha?->format('Y-m-d') }}"
                             data-almacen="{{ $mov->almacen?->idAlmacen }}"
-                            data-codigo="{{ strtolower($mov->materialPl?->CodigoPL ?? '') }}"
-                            data-factura="{{ strtolower($mov->factura ?? '') }}"
-                            data-guia="{{ strtolower($guiaEgreso) }}"
+                            data-codigo="{{ strtolower($codigoEgreso ?? '') }}"
                         >
                             <td>{{ $mov->fecha?->format('d/m/Y') }}</td>
                             <td>{{ $mov->almacen?->codigo }}</td>
                             <td>{{ $mov->programa?->nomPrograma ?: '—' }}</td>
                             <td>{{ $mov->presentacion?->nomPresentacion ?: '—' }}</td>
                             <td>{{ $mov->tipoConsumo?->nomTipoConsumo ?: '—' }}</td>
-                            <td class="programas-grid__material registro-grid__td--material">{{ $mov->materialPl?->nomMaterial }}</td>
+                            <td class="programas-grid__material registro-grid__td--material">{{ $materialEgreso }}</td>
                             <td class="programas-grid__qty">{{ number_format((float) $mov->cantidad, 2, '.', '') }}</td>
-                            <td>{{ $mov->factura ?: '—' }}</td>
-                            <td>{{ $guiaEgreso ?: '—' }}</td>
-                            <td class="registro-grid__td--pdf">
-                                @if ($mov->archivoOneDriveUrl)
-                                    <a href="{{ $mov->archivoOneDriveUrl }}" class="registro-pdf-link" target="_blank" rel="noopener noreferrer">Ver</a>
-                                @endif
-                            </td>
-                            <td>{{ $mov->observacion }}</td>
-                            <td class="proveedor-grid__actions">
-                                <div class="proveedor-grid__action-group">
-                                    <button
-                                        type="button"
-                                        class="icon-action icon-action--view"
-                                        data-registro-detalle="movimiento"
-                                        data-registro-detalle-id="{{ $mov->idMovimiento }}"
-                                        title="Ver detalle"
-                                        aria-label="Ver detalle"
-                                    >
-                                        @include('partials.icons.eye')
-                                    </button>
-                                    @if ($puedeEditar)
-                                        <button
-                                            type="button"
-                                            class="icon-action icon-action--edit"
-                                            data-registro-editar="egreso"
-                                            data-registro-editar-id="{{ $mov->idMovimiento }}"
-                                            title="Editar"
-                                            aria-label="Editar consumo"
-                                        >
-                                            @include('partials.icons.edit')
-                                        </button>
-                                    @endif
-                                    @if ($puedeEliminar)
-                                        <form method="POST" action="{{ route('registro.movimiento.destroy', $mov->idMovimiento) }}" data-confirm="Se anulará este consumo. Esta acción no se puede deshacer." data-confirm-title="Anular consumo" data-confirm-ok="Sí, anular">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="icon-action icon-action--delete" title="Anular" aria-label="Anular">@include('partials.icons.trash')</button>
-                                        </form>
-                                    @endif
-                                </div>
-                            </td>
+                            <td>{{ $mov->observacion ?: '—' }}</td>
+                            @include('registro._fila_acciones', [
+                                'tipoDetalle' => 'movimiento',
+                                'tipoEditar' => 'egreso',
+                                'id' => $mov->idMovimiento,
+                                'puedeEditar' => $puedeEditar,
+                                'puedeEliminar' => $puedeEliminar,
+                                'destroyRoute' => route('registro.movimiento.destroy', $mov->idMovimiento),
+                                'confirmMessage' => ! empty($mov->es_lote)
+                                    ? 'Se anulará este consumo y todos sus materiales asociados. Esta acción no se puede deshacer.'
+                                    : 'Se anulará este consumo. Esta acción no se puede deshacer.',
+                                'confirmTitle' => 'Anular consumo',
+                                'editLabel' => 'Editar consumo',
+                            ])
                         </tr>
                     @empty
-                        <tr><td colspan="12" class="data-table__empty">No hay consumos registrados.</td></tr>
+                        <tr><td colspan="9" class="data-table__empty">No hay consumos registrados.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -302,39 +256,17 @@
                                 @endif
                             </td>
                             <td>{{ $traslado->observacion }}</td>
-                            <td class="proveedor-grid__actions">
-                                <div class="proveedor-grid__action-group">
-                                    <button
-                                        type="button"
-                                        class="icon-action icon-action--view"
-                                        data-registro-detalle="traslado"
-                                        data-registro-detalle-id="{{ $traslado->idTraslado }}"
-                                        title="Ver detalle"
-                                        aria-label="Ver detalle"
-                                    >
-                                        @include('partials.icons.eye')
-                                    </button>
-                                    @if ($puedeEditar)
-                                        <button
-                                            type="button"
-                                            class="icon-action icon-action--edit"
-                                            data-registro-editar="traslado"
-                                            data-registro-editar-id="{{ $traslado->idTraslado }}"
-                                            title="Editar"
-                                            aria-label="Editar traslado"
-                                        >
-                                            @include('partials.icons.edit')
-                                        </button>
-                                    @endif
-                                    @if ($puedeEliminar)
-                                        <form method="POST" action="{{ route('registro.traslado.destroy', $traslado->idTraslado) }}" data-confirm="Se anulará este traslado. Esta acción no se puede deshacer." data-confirm-title="Anular traslado" data-confirm-ok="Sí, anular">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="icon-action icon-action--delete" title="Anular" aria-label="Anular">@include('partials.icons.trash')</button>
-                                        </form>
-                                    @endif
-                                </div>
-                            </td>
+                            @include('registro._fila_acciones', [
+                                'tipoDetalle' => 'traslado',
+                                'tipoEditar' => 'traslado',
+                                'id' => $traslado->idTraslado,
+                                'puedeEditar' => $puedeEditar,
+                                'puedeEliminar' => $puedeEliminar,
+                                'destroyRoute' => route('registro.traslado.destroy', $traslado->idTraslado),
+                                'confirmMessage' => 'Se anulará este traslado. Esta acción no se puede deshacer.',
+                                'confirmTitle' => 'Anular traslado',
+                                'editLabel' => 'Editar traslado',
+                            ])
                         </tr>
                     @empty
                         <tr><td colspan="11" class="data-table__empty">No hay traslados registrados.</td></tr>
@@ -357,6 +289,11 @@
 @include('registro._modal_detalle')
 @endsection
 
+@push('head')
+<link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
+<meta name="theme-color" content="#6d4ba8">
+@endpush
+
 @push('scripts')
 @php
     $registroConsumoOld = [
@@ -365,9 +302,11 @@
         'id_material_pl' => old('id_material_pl'),
         'id_almacen' => old('id_almacen'),
         'lineas' => old('lineas', []),
+        'conformacion_dentro' => old('conformacion_dentro'),
+        'pallets_fuera' => old('pallets_fuera'),
     ];
 
-    $registroMaterialesMap = $materiales->mapWithKeys(function ($m) {
+    $registroMaterialesMap = collect($materiales ?? [])->mapWithKeys(function ($m) {
         return [
             (string) $m->idMaterialPL => [
                 'codigo' => $m->CodigoPL,
@@ -379,6 +318,7 @@
 <script>
     window.registroMaterialUrl = @json(route('registro.material-por-codigo'));
     window.registroStockUrl = @json(route('registro.stock-disponible'));
+    window.registroConsumoProgramasUrl = @json(route('registro.consumo.programas'));
     window.registroConsumoPresentacionesUrl = @json(route('registro.consumo.presentaciones'));
     window.registroConsumoMaterialesUrl = @json(route('registro.consumo.materiales'));
     window.registroConsumoHintUrl = @json(route('registro.consumo.hint'));
@@ -392,7 +332,10 @@
     window.registroIngresoLineasOld = @json(old('lineas', []));
     window.registroConsumoOld = @json($registroConsumoOld);
     window.registroMaterialesMap = @json($registroMaterialesMap);
+    window.registroOfflineCsrfUrl = @json(route('registro.offline.csrf'));
 </script>
+<script src="{{ asset('js/offline-queue.js') }}" defer></script>
+<script src="{{ asset('js/offline-sync-registro.js') }}?v=3" defer></script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script src="{{ asset('js/registro.js') }}" defer></script>
+<script src="{{ asset('js/registro.js') }}?v=13" defer></script>
 @endpush

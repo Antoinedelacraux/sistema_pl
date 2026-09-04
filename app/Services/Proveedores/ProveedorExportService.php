@@ -2,17 +2,36 @@
 
 namespace App\Services\Proveedores;
 
-use App\Models\Usuario;
-use App\Support\DocumentoExportSupport;
+use App\Support\ExportaGridDocumento;
 use App\Support\ExportText;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProveedorExportService
 {
+    use ExportaGridDocumento;
+
     public function __construct(
         private readonly ProveedorGridService $gridService
     ) {}
+
+    /**
+     * @return array{
+     *     tituloDocumento: string,
+     *     tituloPdf: string,
+     *     prefijo: string,
+     *     tituloHoja: string,
+     *     nombreTabla: string
+     * }
+     */
+    protected function configuracionExport(): array
+    {
+        return [
+            'tituloDocumento' => 'Proveedor',
+            'tituloPdf' => 'Proveedor · Códigos TGF Y SAFCO',
+            'prefijo' => 'proveedor',
+            'tituloHoja' => 'Proveedor',
+            'nombreTabla' => 'TablaProveedor',
+        ];
+    }
 
     /**
      * @return list<string>
@@ -21,7 +40,7 @@ class ProveedorExportService
     {
         $encabezados = ExportText::tituloPalabrasLista([
             '#',
-            'Familia',
+            'Material',
             'Código Planeamiento',
             'Material Planeamiento',
         ]);
@@ -42,33 +61,6 @@ class ProveedorExportService
         return $this->gridService->filasGrilla($filtros)
             ->map(fn (object $fila) => $this->filaComoFila($fila))
             ->all();
-    }
-
-    public function exportarExcel(array $filtros, ?Usuario $usuario = null): StreamedResponse
-    {
-        return DocumentoExportSupport::exportarExcel(
-            $this->encabezados(),
-            $this->filasExportables($filtros),
-            $usuario,
-            'Proveedor',
-            'proveedor',
-            'TablaProveedor'
-        );
-    }
-
-    public function exportarPdf(array $filtros, ?Usuario $usuario = null): Response
-    {
-        $filas = $this->filasExportables($filtros);
-
-        return DocumentoExportSupport::exportarPdf('exports.pdf-grid', [
-            'tituloDocumento' => 'Proveedor',
-            'titulo' => 'Proveedor · Códigos TGF Y SAFCO',
-            'filas' => $filas,
-            'encabezados' => $this->encabezados(),
-            'total' => count($filas),
-            'generado' => now()->format('d/m/Y H:i'),
-            'exportadoPor' => DocumentoExportSupport::nombreExportador($usuario),
-        ], 'proveedor');
     }
 
     /**

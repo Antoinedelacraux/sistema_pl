@@ -58,25 +58,18 @@
                     <div class="field-mode__head">
                         <span class="field__label">Código planeamiento</span>
                         <div class="mode-switch" role="group" aria-label="Modo código planeamiento">
-                            <button type="button" class="mode-switch__btn is-active" data-mode="select">Seleccionar</button>
-                            <button type="button" class="mode-switch__btn" data-mode="search">Buscador</button>
+                            <button type="button" class="mode-switch__btn" data-mode="select">Seleccionar</button>
+                            <button type="button" class="mode-switch__btn is-active" data-mode="search">Buscador</button>
                         </div>
                     </div>
 
-                    <div class="field-mode__panel" data-panel="select">
+                    <div class="field-mode__panel" data-panel="select" hidden>
                         <select class="field__input" id="proveedor-agregar-codigo-pl-select">
                             <option value="">Seleccionar código PL</option>
-                            @foreach ($materiales as $item)
-                                <option
-                                    value="{{ $item->idMaterialPL }}"
-                                    data-codigo-pl="{{ $item->CodigoPL }}"
-                                    data-nom-material-pl="{{ $item->nomMaterial }}"
-                                >{{ $item->CodigoPL }}</option>
-                            @endforeach
                         </select>
                     </div>
 
-                    <div class="field-mode__panel" data-panel="search" hidden>
+                    <div class="field-mode__panel" data-panel="search">
                         <input
                             type="text"
                             class="field__input"
@@ -91,25 +84,18 @@
                     <div class="field-mode__head">
                         <span class="field__label">Material planeamiento</span>
                         <div class="mode-switch" role="group" aria-label="Modo material planeamiento">
-                            <button type="button" class="mode-switch__btn is-active" data-mode="select">Seleccionar</button>
-                            <button type="button" class="mode-switch__btn" data-mode="search">Buscador</button>
+                            <button type="button" class="mode-switch__btn" data-mode="select">Seleccionar</button>
+                            <button type="button" class="mode-switch__btn is-active" data-mode="search">Buscador</button>
                         </div>
                     </div>
 
-                    <div class="field-mode__panel" data-panel="select">
+                    <div class="field-mode__panel" data-panel="select" hidden>
                         <select class="field__input" id="proveedor-agregar-material-pl-select">
                             <option value="">Seleccionar material planeamiento</option>
-                            @foreach ($materiales as $item)
-                                <option
-                                    value="{{ $item->idMaterialPL }}"
-                                    data-codigo-pl="{{ $item->CodigoPL }}"
-                                    data-nom-material-pl="{{ $item->nomMaterial }}"
-                                >{{ $item->nomMaterial }}</option>
-                            @endforeach
                         </select>
                     </div>
 
-                    <div class="field-mode__panel" data-panel="search" hidden>
+                    <div class="field-mode__panel" data-panel="search">
                         <input
                             type="text"
                             class="field__input"

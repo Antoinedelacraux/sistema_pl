@@ -1,3 +1,13 @@
+@if (session('error'))
+    @push('scripts')
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        window.TalsaToast && window.TalsaToast.show(@json(session('error')), 'error');
+    });
+    </script>
+    @endpush
+@endif
+
 @if (session('status'))
     @push('scripts')
     <script>

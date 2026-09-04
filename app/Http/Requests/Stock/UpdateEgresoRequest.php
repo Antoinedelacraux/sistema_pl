@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Stock;
 
-use App\Models\Stock\MovimientoStock;
 use App\Services\Stock\ConsumoRecetaService;
 use App\Services\Stock\MovimientoService;
 use Illuminate\Foundation\Http\FormRequest;
@@ -11,8 +10,6 @@ use Illuminate\Validation\Validator;
 
 class UpdateEgresoRequest extends FormRequest
 {
-    use MovimientoDocumentoRules;
-
     public function authorize(): bool
     {
         return $this->user()?->puede('registro', 'editar') ?? false;
@@ -20,24 +17,25 @@ class UpdateEgresoRequest extends FormRequest
 
     public function rules(): array
     {
-        return array_merge([
+        return [
             'id_almacen' => ['required', 'integer', Rule::exists('Almacen', 'idAlmacen')],
             'id_programa' => ['required', 'integer', Rule::exists('Programa', 'idPrograma')],
             'id_presentacion' => ['required', 'integer', Rule::exists('Presentacion', 'idPresentacion')],
-            'id_material_pl' => ['required', 'integer', Rule::exists('MaterialProgramaPL', 'idMaterialPL')],
             'id_tipo_consumo' => [
                 'required',
                 'integer',
                 Rule::exists('TipoConsumo', 'idTipoConsumo'),
             ],
-            'cantidad' => ['nullable', 'numeric', 'min:0'],
-            'pallets_fuera' => ['nullable', 'numeric', 'min:0'],
-            'lineas' => ['nullable', 'array'],
-            'lineas.*.id_material_pl' => ['required_with:lineas', 'integer', Rule::exists('MaterialProgramaPL', 'idMaterialPL')],
+            'lineas' => ['required', 'array', 'min:1'],
+            'lineas.*.id_movimiento' => ['nullable', 'integer'],
+            'lineas.*.id_material_pl' => ['required', 'integer', Rule::exists('MaterialProgramaPL', 'idMaterialPL')],
             'lineas.*.cantidad' => ['nullable', 'numeric', 'min:0'],
+            'lineas.*.total' => ['nullable', 'numeric', 'min:0'],
+            'conformacion_dentro' => ['nullable', 'numeric', 'min:0'],
+            'pallets_fuera' => ['nullable', 'numeric', 'min:0'],
             'fecha' => ['required', 'date'],
             'observacion' => ['nullable', 'string', 'max:500'],
-        ], $this->documentoRules());
+        ];
     }
 
     public function withValidator(Validator $validator): void
@@ -47,81 +45,66 @@ class UpdateEgresoRequest extends FormRequest
                 return;
             }
 
-            $movimiento = MovimientoStock::query()
-                ->where('estado', 1)
-                ->where('tipo', MovimientoStock::TIPO_EGRESO)
-                ->whereNull('idTraslado')
-                ->find($this->route('idMovimiento'));
-
-            if (! $movimiento) {
-                return;
-            }
-
             $receta = app(ConsumoRecetaService::class);
+            $movimiento = app(MovimientoService::class);
             $idPrograma = (int) $this->input('id_programa');
             $idPresentacion = (int) $this->input('id_presentacion');
-            $idMaterial = (int) $this->input('id_material_pl');
             $idAlmacen = (int) $this->input('id_almacen');
-
-            if (! $receta->materialPerteneceAPresentacion($idPrograma, $idPresentacion, $idMaterial)) {
-                $validator->errors()->add(
-                    'id_material_pl',
-                    'El material no pertenece a la presentación seleccionada.'
-                );
-
-                return;
-            }
-
+            $idMovimiento = (int) $this->route('idMovimiento');
             $lineas = $receta->resolverLineasConsumo(
                 $idPrograma,
                 $idPresentacion,
                 $this->input('lineas', []),
-                $this->input('pallets_fuera')
+                $this->input('pallets_fuera'),
+                $this->input('conformacion_dentro')
             );
-            $linea = collect($lineas)->firstWhere('id_material_pl', $idMaterial);
-            $cantidad = $linea
-                ? (float) $linea['cantidad']
-                : (float) $this->input('cantidad');
 
-            if ($cantidad <= 0) {
+            if ($lineas === []) {
                 $validator->errors()->add(
-                    'cantidad',
-                    'Indique una cantidad o deje el campo en blanco para usar la cantidad por caja.'
+                    'lineas',
+                    'No hay cantidades para retirar. Complete la receta o indique otra cantidad.'
                 );
 
                 return;
             }
 
-            $this->merge(['cantidad' => $cantidad]);
+            $cantidadesActuales = collect(
+                $movimiento->detalleMovimiento($idMovimiento)['datos_edicion']['lineas'] ?? []
+            )->keyBy('id_material_pl');
 
-            $disponible = app(MovimientoService::class)->stockDisponible($idMaterial, $idAlmacen);
+            foreach ($lineas as $linea) {
+                $idMaterial = (int) $linea['id_material_pl'];
+                $disponible = app(MovimientoService::class)->stockDisponible($idMaterial, $idAlmacen);
+                $actual = (float) ($cantidadesActuales->get($idMaterial)['cantidad'] ?? 0);
+                $disponible += $actual;
 
-            if ($movimiento->idMaterialPL === $idMaterial && $movimiento->idAlmacen === $idAlmacen) {
-                $disponible += (float) $movimiento->cantidad;
-            }
+                if ($linea['cantidad'] > $disponible) {
+                    $nombre = $linea['nom_material'] ?: 'material';
+                    $validator->errors()->add(
+                        'lineas',
+                        'Stock insuficiente de '.$nombre.'. Disponible: '.number_format($disponible, 2, '.', '')
+                    );
 
-            if ((float) $this->input('cantidad') > $disponible) {
-                $validator->errors()->add(
-                    'cantidad',
-                    'Stock insuficiente. Disponible: '.number_format($disponible, 2, '.', '')
-                );
+                    return;
+                }
             }
         });
     }
 
     public function attributes(): array
     {
-        return array_merge([
+        return [
             'id_almacen' => 'almacén',
             'id_programa' => 'programa',
-            'id_presentacion' => 'presentación',
-            'id_material_pl' => 'material',
+            'id_presentacion' => 'producto',
             'id_tipo_consumo' => 'motivo',
-            'cantidad' => 'cantidad',
-            'pallets_fuera' => 'pallets (fuera)',
+            'lineas' => 'materiales',
+            'lineas.*.id_material_pl' => 'material',
+            'lineas.*.cantidad' => 'otra cantidad',
+            'lineas.*.total' => 'total',
             'fecha' => 'fecha',
             'observacion' => 'observación',
-        ], $this->documentoAttributes());
+        ];
     }
 
     protected function getRedirectUrl(): string

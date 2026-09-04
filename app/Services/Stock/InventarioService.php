@@ -28,7 +28,7 @@ class InventarioService
 
     {
 
-        return Almacen::query()->activo()->orderBy('orden')->get();
+        return Almacen::query()->activo()->orderBy('codigo')->get();
 
     }
 
@@ -75,6 +75,39 @@ class InventarioService
             'alerta' => (int) ($fila->alerta ?? 0),
             'saludable' => (int) ($fila->saludable ?? 0),
         ];
+    }
+
+    /**
+     * Contadores de stock por almacén en una sola consulta (evita N+1 en dashboard).
+     *
+     * @return array<string, array{total: int, con_stock: int, critico: int, alerta: int, saludable: int}>
+     */
+    public function contadoresTodosAlmacenes(): array
+    {
+        $filas = DB::table('vw_StockAlmacenDetalle')
+            ->selectRaw('
+                codigoAlmacen,
+                COUNT(*) AS total,
+                COALESCE(SUM(CASE WHEN stock > 0 THEN 1 ELSE 0 END), 0) AS con_stock,
+                COALESCE(SUM(CASE WHEN stockMinimo > 0 AND stock <= 0 THEN 1 ELSE 0 END), 0) AS critico,
+                COALESCE(SUM(CASE WHEN stockMinimo > 0 AND stock > 0 AND stock < stockMinimo THEN 1 ELSE 0 END), 0) AS alerta,
+                COALESCE(SUM(CASE WHEN stockMinimo > 0 AND stock >= stockMinimo THEN 1 ELSE 0 END), 0) AS saludable
+            ')
+            ->groupBy('codigoAlmacen')
+            ->get();
+
+        $resultado = [];
+        foreach ($filas as $fila) {
+            $resultado[(string) $fila->codigoAlmacen] = [
+                'total' => (int) $fila->total,
+                'con_stock' => (int) $fila->con_stock,
+                'critico' => (int) $fila->critico,
+                'alerta' => (int) $fila->alerta,
+                'saludable' => (int) $fila->saludable,
+            ];
+        }
+
+        return $resultado;
     }
 
 

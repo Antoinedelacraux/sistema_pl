@@ -35,6 +35,8 @@ class UpdateProgramaFilaImagenRequest extends FormRequest
             'mercado' => $this->input('mercado'),
             'cliente' => $this->input('cliente'),
             'familia' => $this->input('familia'),
+            'programa' => $this->input('programa'),
+            'presentacion' => $this->input('presentacion'),
             'buscar' => $this->input('buscar'),
         ], fn ($valor) => filled($valor)));
     }

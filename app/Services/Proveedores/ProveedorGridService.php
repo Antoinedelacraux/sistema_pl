@@ -7,114 +7,125 @@ use App\Models\Programas\MaterialProgramaPL;
 use App\Models\Programas\ProgramaFila;
 use App\Models\Proveedores\Proveedor;
 use App\Support\GridPagination;
+use App\Support\MaterialProgramaLookup;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class ProveedorGridService
 {
+    private const CACHE_TTL = 600;
+
     public function filasGrilla(array $filtros = []): Collection
     {
-        $query = Proveedor::query()
+        $registros = $this->queryBase($filtros)
             ->with(['familia', 'materialPl'])
-            ->where('estado', 1);
-
-        if (! empty($filtros['familia'])) {
-            $query->where('idFamilia', (int) $filtros['familia']);
-        }
-
-        if (! empty($filtros['buscar'])) {
-            $termino = '%'.$filtros['buscar'].'%';
-            $query->where(function ($consulta) use ($termino) {
-                $consulta->where('codigo', 'like', $termino)
-                    ->orWhere('nomMaterial', 'like', $termino)
-                    ->orWhere('nomProveedor', 'like', $termino)
-                    ->orWhereHas('materialPl', function ($material) use ($termino) {
-                        $material->where('CodigoPL', 'like', $termino)
-                            ->orWhere('nomMaterial', 'like', $termino);
-                    });
-            });
-        }
-
-        $registros = $query
             ->orderBy('nroFila')
             ->get();
 
-        return $registros
-            ->groupBy('nroFila')
-            ->map(function (Collection $grupo) {
-                $primero = $grupo->first();
-                $proveedores = [];
-
-                foreach ($grupo as $registro) {
-                    $proveedores[$registro->nomProveedor] = [
-                        'codigo' => $registro->codigo,
-                        'nomMaterial' => $registro->nomMaterial,
-                    ];
-                }
-
-                return (object) [
-                    'nroFila' => (int) $primero->nroFila,
-                    'idMaterialPL' => $primero->idMaterialPL,
-                    'idFamilia' => $primero->idFamilia,
-                    'familia' => $primero->familia,
-                    'materialPl' => $primero->materialPl,
-                    'proveedores' => $proveedores,
-                ];
-            })
-            ->sortBy('nroFila')
-            ->values();
+        return $this->agruparFilas($registros);
     }
 
     public function filasGrillaPaginadas(array $filtros, Request $request): LengthAwarePaginator
     {
-        return GridPagination::paginateCollection(
-            $this->filasGrilla($filtros),
-            $request
+        $perPage = GridPagination::PER_PAGE;
+        $page = max(1, (int) $request->query('page', 1));
+
+        $base = $this->queryBase($filtros);
+
+        $total = (int) DB::query()
+            ->fromSub(
+                (clone $base)->select('nroFila')->groupBy('nroFila'),
+                'filas_proveedor'
+            )
+            ->count();
+
+        $nroFilasPage = (clone $base)
+            ->select('nroFila')
+            ->groupBy('nroFila')
+            ->orderBy('nroFila')
+            ->forPage($page, $perPage)
+            ->pluck('nroFila')
+            ->map(fn ($nro) => (int) $nro)
+            ->values()
+            ->all();
+
+        if ($nroFilasPage === []) {
+            $items = collect();
+        } else {
+            $registros = Proveedor::query()
+                ->with(['familia', 'materialPl'])
+                ->where('estado', 1)
+                ->whereIn('nroFila', $nroFilasPage)
+                ->orderBy('nroFila')
+                ->get();
+
+            $agrupadas = $this->agruparFilas($registros)->keyBy('nroFila');
+            $items = collect($nroFilasPage)
+                ->map(fn (int $nro) => $agrupadas->get($nro))
+                ->filter()
+                ->values();
+        }
+
+        return new LengthAwarePaginator(
+            $items,
+            $total,
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
         );
     }
 
     public function columnasProveedor(): array
     {
-        $nombres = Proveedor::query()
-            ->where('estado', 1)
-            ->whereNotNull('nomProveedor')
-            ->where('nomProveedor', '!=', '')
-            ->distinct()
-            ->pluck('nomProveedor')
-            ->unique()
-            ->sortBy(fn (string $nombre) => $this->ordenNombreProveedor($nombre))
-            ->values();
+        return Cache::remember('proveedor.columnas_proveedor.v1', self::CACHE_TTL, function () {
+            $nombres = Proveedor::query()
+                ->where('estado', 1)
+                ->whereNotNull('nomProveedor')
+                ->where('nomProveedor', '!=', '')
+                ->distinct()
+                ->pluck('nomProveedor')
+                ->unique()
+                ->sortBy(fn (string $nombre) => $this->ordenNombreProveedor($nombre))
+                ->values();
 
-        return $nombres->map(fn (string $nombre) => [
-            'nombre' => $nombre,
-            'key' => self::claveColumnaProveedor($nombre),
-        ])->all();
+            return $nombres->map(fn (string $nombre) => [
+                'nombre' => $nombre,
+                'key' => self::claveColumnaProveedor($nombre),
+            ])->all();
+        });
     }
 
     public function columnasConfig(): array
     {
-        $columnas = [
-            ['key' => 'num', 'label' => '#'],
-            ['key' => 'familia', 'label' => 'Familia'],
-            ['key' => 'codigo-pl', 'label' => 'Código planeamiento'],
-            ['key' => 'material-pl', 'label' => 'Material planeamiento'],
-        ];
-
-        foreach ($this->columnasProveedor() as $proveedor) {
-            $columnas[] = [
-                'key' => $proveedor['key'].'-codigo',
-                'label' => 'Código '.$proveedor['nombre'],
+        return Cache::remember('proveedor.columnas_config.v1', self::CACHE_TTL, function () {
+            $columnas = [
+                ['key' => 'num', 'label' => '#'],
+                ['key' => 'familia', 'label' => 'Material'],
+                ['key' => 'codigo-pl', 'label' => 'Código planeamiento'],
+                ['key' => 'material-pl', 'label' => 'Material planeamiento'],
             ];
-            $columnas[] = [
-                'key' => $proveedor['key'].'-material',
-                'label' => 'Material '.$proveedor['nombre'],
-            ];
-        }
 
-        $columnas[] = ['key' => 'acciones', 'label' => 'Acciones', 'fija' => true];
+            foreach ($this->columnasProveedor() as $proveedor) {
+                $columnas[] = [
+                    'key' => $proveedor['key'].'-codigo',
+                    'label' => 'Código '.$proveedor['nombre'],
+                ];
+                $columnas[] = [
+                    'key' => $proveedor['key'].'-material',
+                    'label' => 'Material '.$proveedor['nombre'],
+                ];
+            }
 
-        return $columnas;
+            $columnas[] = ['key' => 'acciones', 'label' => 'Acciones', 'fija' => true];
+
+            return $columnas;
+        });
     }
 
     public static function claveColumnaProveedor(string $nombre): string
@@ -124,43 +135,34 @@ class ProveedorGridService
 
     public function catalogos(): array
     {
-        $desdeDb = Proveedor::query()
-            ->where('estado', 1)
-            ->whereNotNull('nomProveedor')
-            ->distinct()
-            ->orderBy('nomProveedor')
-            ->pluck('nomProveedor')
-            ->all();
+        return Cache::remember('proveedor.catalogos.v2', self::CACHE_TTL, function () {
+            $desdeDb = Proveedor::query()
+                ->where('estado', 1)
+                ->whereNotNull('nomProveedor')
+                ->distinct()
+                ->orderBy('nomProveedor')
+                ->pluck('nomProveedor')
+                ->all();
 
-        $nombresProveedor = collect(['TGF', 'SAFCO'])
-            ->merge($desdeDb)
-            ->unique()
-            ->sort()
-            ->values()
-            ->all();
+            $nombresProveedor = collect(['TGF', 'SAFCO'])
+                ->merge($desdeDb)
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
 
-        return [
-            'familias' => Familia::query()->activo()->orderBy('idFamilia')->get(),
-            'materiales' => MaterialProgramaPL::query()
-                ->activo()
-                ->orderBy('CodigoPL')
-                ->get(['idMaterialPL', 'CodigoPL', 'nomMaterial']),
-            'nombresProveedor' => $nombresProveedor,
-        ];
+            return [
+                'familias' => Familia::query()->activo()->orderBy('nomFamilia')->get(),
+                // Lista completa se resuelve vía AJAX (material-por-codigo / material-por-nombre).
+                'materiales' => collect(),
+                'nombresProveedor' => $nombresProveedor,
+            ];
+        });
     }
 
     public function materialPorCodigo(string $codigo): ?MaterialProgramaPL
     {
-        $codigo = trim($codigo);
-        if ($codigo === '') {
-            return null;
-        }
-
-        return MaterialProgramaPL::query()
-            ->activo()
-            ->where('CodigoPL', $codigo)
-            ->orderByDesc('idMaterialPL')
-            ->first();
+        return MaterialProgramaLookup::porCodigo($codigo);
     }
 
     public function materialPorNombre(string $nombre): ?MaterialProgramaPL
@@ -205,6 +207,8 @@ class ProveedorGridService
             'codigo' => trim($datos['codigo']),
             'nomMaterial' => trim($datos['nom_material']),
         ];
+
+        $this->olvidarCachesCatalogo();
 
         if ($existente) {
             $existente->update($payload);
@@ -261,6 +265,8 @@ class ProveedorGridService
                 $item['nom_material'] ?? null
             );
         }
+
+        $this->olvidarCachesCatalogo();
     }
 
     public function eliminarGrupo(int $nroFila): void
@@ -268,6 +274,74 @@ class ProveedorGridService
         Proveedor::query()
             ->where('nroFila', $nroFila)
             ->update(['estado' => 0]);
+
+        $this->olvidarCachesCatalogo();
+    }
+
+    /**
+     * @param  array<string, mixed>  $filtros
+     * @return \Illuminate\Database\Eloquent\Builder<Proveedor>
+     */
+    private function queryBase(array $filtros)
+    {
+        $query = Proveedor::query()->where('estado', 1);
+
+        if (! empty($filtros['familia'])) {
+            $query->where('idFamilia', (int) $filtros['familia']);
+        }
+
+        if (! empty($filtros['buscar'])) {
+            $termino = '%'.$filtros['buscar'].'%';
+            $query->where(function ($consulta) use ($termino) {
+                $consulta->where('codigo', 'like', $termino)
+                    ->orWhere('nomMaterial', 'like', $termino)
+                    ->orWhere('nomProveedor', 'like', $termino)
+                    ->orWhereHas('materialPl', function ($material) use ($termino) {
+                        $material->where('CodigoPL', 'like', $termino)
+                            ->orWhere('nomMaterial', 'like', $termino);
+                    });
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param  Collection<int, Proveedor>  $registros
+     */
+    private function agruparFilas(Collection $registros): Collection
+    {
+        return $registros
+            ->groupBy('nroFila')
+            ->map(function (Collection $grupo) {
+                $primero = $grupo->first();
+                $proveedores = [];
+
+                foreach ($grupo as $registro) {
+                    $proveedores[$registro->nomProveedor] = [
+                        'codigo' => $registro->codigo,
+                        'nomMaterial' => $registro->nomMaterial,
+                    ];
+                }
+
+                return (object) [
+                    'nroFila' => (int) $primero->nroFila,
+                    'idMaterialPL' => $primero->idMaterialPL,
+                    'idFamilia' => $primero->idFamilia,
+                    'familia' => $primero->familia,
+                    'materialPl' => $primero->materialPl,
+                    'proveedores' => $proveedores,
+                ];
+            })
+            ->sortBy('nroFila')
+            ->values();
+    }
+
+    private function olvidarCachesCatalogo(): void
+    {
+        Cache::forget('proveedor.catalogos.v2');
+        Cache::forget('proveedor.columnas_proveedor.v1');
+        Cache::forget('proveedor.columnas_config.v1');
     }
 
     private function guardarProveedorEnGrupo(
@@ -336,13 +410,6 @@ class ProveedorGridService
         $maxFila = Proveedor::query()->where('estado', 1)->max('nroFila');
 
         return $maxFila ? ((int) $maxFila + 1) : 1;
-    }
-
-    private function registroPorNombre(Collection $grupo, string $nombre): ?Proveedor
-    {
-        return $grupo->first(function (Proveedor $registro) use ($nombre) {
-            return mb_strtoupper($registro->nomProveedor) === mb_strtoupper($nombre);
-        });
     }
 
     private function nullableString(?string $value): ?string

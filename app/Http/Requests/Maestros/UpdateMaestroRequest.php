@@ -14,6 +14,15 @@ class UpdateMaestroRequest extends FormRequest
         return (bool) $this->user()?->puede('maestros', 'editar');
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('nombre')) {
+            $this->merge([
+                'nombre' => trim((string) $this->input('nombre')),
+            ]);
+        }
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -28,7 +37,8 @@ class UpdateMaestroRequest extends FormRequest
                 'required',
                 'string',
                 'max:'.$definicion['maxLength'],
-                Rule::unique($definicion['tabla'], $definicion['nombre'])->ignore($id, $definicion['pk']),
+                Rule::unique($definicion['tabla'], $definicion['nombre'])
+                    ->ignore($id, $definicion['pk']),
             ],
             'estado' => ['required', 'integer', Rule::in([Estado::ACTIVO, Estado::INACTIVO])],
         ];
@@ -45,6 +55,16 @@ class UpdateMaestroRequest extends FormRequest
         return [
             'nombre' => 'nombre de '.$label,
             'estado' => 'estado',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'nombre.unique' => 'El :attribute ya está registrado.',
         ];
     }
 }

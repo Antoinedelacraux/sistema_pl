@@ -40,7 +40,15 @@ class MaestroController extends Controller
     public function store(StoreMaestroRequest $request, string $tab): RedirectResponse
     {
         $tab = MaestrosCatalogo::normalizarTab($tab);
-        $this->catalogoService->crear($tab, $request->validated('nombre'));
+
+        try {
+            $this->catalogoService->crear($tab, $request->validated('nombre'));
+        } catch (InvalidArgumentException $exception) {
+            return redirect()
+                ->route('maestros.index', ['tab' => $tab])
+                ->withInput()
+                ->withErrors(['nombre' => $exception->getMessage()]);
+        }
 
         return redirect()
             ->route('maestros.index', ['tab' => $tab])

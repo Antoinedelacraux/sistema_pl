@@ -1,0 +1,533 @@
+﻿/* ============================================================
+   RESPONSIVE — cargar después de app.css
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar,
+    .sidebar__head,
+    .sidebar__logo,
+    .sidebar__link,
+    .sidebar__link-label,
+    .sidebar__chevron,
+    .sidebar__submenu-panel,
+    .sidebar__toggle svg {
+        transition-duration: 0.01ms !important;
+    }
+}
+
+@media (max-width: 1080px) {
+    .panel--programas .receta-command__shell,
+    .panel--proveedor .receta-command__shell {
+        grid-template-columns: 1fr;
+    }
+
+    .panel--programas .receta-command__grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .panel--proveedor .receta-command__grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .panel--programas .receta-cmd-field--search {
+        grid-column: 1 / -1;
+    }
+
+    .panel--proveedor .receta-cmd-field--search {
+        grid-column: 1 / -1;
+    }
+
+    .panel--programas .receta-cmd-clear {
+        grid-column: 1;
+    }
+
+    .panel--proveedor .receta-cmd-clear {
+        grid-column: 1;
+    }
+
+    .panel--receta-params .receta-command__grid--params {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.4fr) auto;
+        grid-template-rows: auto;
+    }
+
+    .panel--receta-params .receta-cmd-clear {
+        grid-column: auto;
+        grid-row: auto;
+    }
+
+    .panel--programas .receta-cmd-export {
+        grid-column: 2 / -1;
+    }
+
+    .panel--proveedor .receta-cmd-export {
+        grid-column: 2 / -1;
+    }
+
+    .panel--programas .receta-command__aside,
+    .panel--proveedor .receta-command__aside {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: stretch;
+    }
+
+    .panel--programas .receta-command__stat,
+    .panel--proveedor .receta-command__stat {
+        flex: 0 0 120px;
+        min-height: 0;
+    }
+
+    .panel--programas .receta-import-form,
+    .panel--programas .receta-import-form .btn,
+    .panel--programas .receta-command__aside > .btn,
+    .panel--proveedor .receta-command__aside > .btn {
+        flex: 1 1 auto;
+        width: auto;
+        min-width: 0;
+    }
+
+    .panel--programas .grid-table-section .programas-grid-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .panel--programas .programas-grid {
+        min-width: 1020px;
+    }
+
+    .panel--programas .programas-grid__th {
+        white-space: nowrap;
+        hyphens: none;
+        word-break: normal;
+    }
+
+    .app-kpis,
+    .inventario-kpis,
+    .kpi-grid,
+    .module-list,
+    .profile-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .form-section--org .form-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 920px) {
+    .login-page {
+        grid-template-columns: 1fr;
+    }
+
+    .login-visual {
+        min-height: 280px;
+    }
+
+    .login-visual__copy {
+        left: 24px;
+        right: 24px;
+        bottom: 24px;
+        max-width: none;
+    }
+
+    .login-panel {
+        border-left: 0;
+        border-top: 1px solid var(--cream-line);
+    }
+
+    .topbar__menu {
+        display: inline-flex;
+    }
+
+    .sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 55;
+        background: rgba(15, 15, 18, 0.48);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--sidebar-duration) var(--sidebar-ease);
+    }
+
+    .app.is-sidebar-open .sidebar-backdrop {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        height: 100vh;
+        height: 100dvh;
+        width: min(280px, 88vw) !important;
+        z-index: 60;
+        transform: translateX(-105%);
+        transition:
+            transform var(--sidebar-duration) var(--sidebar-ease),
+            width var(--sidebar-duration) var(--sidebar-ease);
+        box-shadow: 8px 0 32px rgba(0, 0, 0, 0.28);
+    }
+
+    .app.is-sidebar-open .sidebar {
+        transform: translateX(0);
+    }
+
+    .app.is-sidebar-collapsed .sidebar {
+        width: min(280px, 88vw) !important;
+    }
+
+    .app.is-sidebar-collapsed .sidebar__head {
+        flex-direction: row;
+        align-items: center;
+        padding: 16px var(--sidebar-pad-x) 14px;
+        padding-right: 44px;
+        min-height: 84px;
+        gap: 0;
+    }
+
+    .app.is-sidebar-collapsed .sidebar__toggle {
+        position: absolute;
+    }
+
+    .app.is-sidebar-collapsed .sidebar__brand {
+        width: 100%;
+        height: 56px;
+        justify-content: flex-start;
+    }
+
+    .app.is-sidebar-collapsed .sidebar__logo {
+        width: 212px;
+        height: 56px;
+        max-width: 100%;
+    }
+
+    .app.is-sidebar-collapsed .sidebar__link-label,
+    .app.is-sidebar-collapsed .sidebar__chevron {
+        max-width: 170px;
+        opacity: 1;
+        flex: 1;
+    }
+
+    .app.is-sidebar-collapsed .sidebar__chevron {
+        max-width: 14px;
+        flex: 0;
+    }
+
+    .app.is-sidebar-collapsed .sidebar__link {
+        justify-content: flex-start;
+        padding: 9px 12px;
+        gap: 10px;
+    }
+
+    .app.is-sidebar-collapsed .sidebar__submenu.is-open .sidebar__submenu-panel {
+        max-height: 180px !important;
+        opacity: 1 !important;
+        margin: 2px 0 4px 20px !important;
+        padding: 0 0 0 11px !important;
+        pointer-events: auto !important;
+    }
+
+    .app.is-sidebar-collapsed .sidebar-foot {
+        display: block;
+    }
+
+    .app.is-sidebar-collapsed .sidebar__toggle svg {
+        transform: none;
+    }
+
+    .sidebar__nav {
+        flex-direction: column;
+        flex-wrap: nowrap;
+    }
+
+    .sidebar__foot {
+        display: block;
+    }
+
+    body.is-sidebar-locked {
+        overflow: hidden;
+    }
+}
+
+@media (max-width: 760px) {
+    .registro-detalle-dl {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 720px) {
+    .panel--programas .receta-command,
+    .panel--proveedor .receta-command {
+        padding: 10px 10px 0;
+    }
+
+    .panel--programas .receta-command__shell,
+    .panel--proveedor .receta-command__shell {
+        padding: 10px;
+    }
+
+    .panel--programas .receta-command__grid,
+    .panel--proveedor .receta-command__grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .panel--programas .receta-cmd-field--search,
+    .panel--programas .receta-cmd-clear,
+    .panel--programas .receta-cmd-export,
+    .panel--proveedor .receta-cmd-field--search,
+    .panel--proveedor .receta-cmd-clear,
+    .panel--proveedor .receta-cmd-export {
+        grid-column: 1 / -1;
+    }
+
+    .panel--receta-params .receta-command__grid--params {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+    }
+
+    .panel--receta-params .receta-cmd-field,
+    .panel--receta-params .receta-cmd-clear {
+        grid-column: 1 / -1;
+        grid-row: auto;
+    }
+
+    .panel--programas .receta-cmd-clear .btn,
+    .panel--proveedor .receta-cmd-clear .btn {
+        width: 100%;
+    }
+
+    .panel--programas .receta-cmd-export,
+    .panel--proveedor .receta-cmd-export {
+        justify-content: flex-start;
+    }
+
+    .panel--programas .receta-cmd-export-inner.inventario-export {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        width: 100%;
+    }
+
+    .panel--programas .grid-table-section .programas-grid-wrap {
+        padding: 0 10px;
+        max-height: calc(100dvh - 320px);
+    }
+
+    .panel--programas .grid-table-head {
+        padding: 0 10px;
+    }
+
+    .receta-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .receta-toolbar__actions {
+        justify-content: flex-end;
+    }
+
+    .modal__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .modal-proveedor-block__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .topbar {
+        flex-direction: row;
+        align-items: center;
+        flex-wrap: wrap;
+        padding: 14px 16px;
+        gap: 12px;
+    }
+
+    .topbar__lead {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .topbar__title {
+        font-size: 17px;
+    }
+
+    .topbar__actions {
+        width: auto;
+        margin-left: auto;
+        justify-content: flex-end;
+    }
+
+    .topbar__user-meta {
+        display: none;
+    }
+
+    .app-kpis,
+    .inventario-kpis,
+    .kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .inventario-filters {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .inventario-filters__main {
+        flex-wrap: wrap;
+    }
+
+    .inventario-filters__field--search {
+        max-width: none;
+        flex-basis: 100%;
+    }
+
+    .registro-toolbar-wrap {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .registro-filters {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .registro-filters__field--search {
+        max-width: none;
+        flex-basis: 100%;
+    }
+
+    .resumen-filters {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .resumen-filters__field--search {
+        max-width: none;
+        flex-basis: 100%;
+    }
+
+    .usuarios-hero {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .usuarios-hero__cta {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .usuarios-filters {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .usuarios-filters__field--search {
+        max-width: none;
+        flex-basis: 100%;
+    }
+
+    .inventario-export--toolbar {
+        align-items: flex-start;
+        padding-top: 4px;
+    }
+
+    .grid-pagination {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .grid-pagination__controls {
+        flex-wrap: wrap;
+    }
+
+    .app-content {
+        padding: 18px;
+    }
+
+    .app-kpis,
+    .inventario-kpis,
+    .kpi-grid,
+    .module-list,
+    .profile-grid,
+    .inicio-dashboard,
+    .inicio-dashboard--tables {
+        grid-template-columns: 1fr;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-section--org .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .panel__head {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .modal__panel--wide {
+        max-width: none;
+        width: calc(100vw - 24px);
+        margin: 12px;
+    }
+
+    .registro-consumo-materiales__head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .registro-consumo-extra {
+        width: 100%;
+        margin-left: 0;
+        flex-wrap: wrap;
+    }
+
+    .registro-consumo-extra__field {
+        flex: 1 1 calc(50% - 5px);
+        min-width: 120px;
+        width: auto;
+    }
+
+    .registro-consumo-tabla {
+        min-width: 620px;
+        font-size: 11px;
+    }
+
+    .registro-consumo-tabla th,
+    .registro-consumo-tabla td {
+        padding: 6px 6px;
+    }
+
+    .registro-consumo-tabla-wrap {
+        max-height: 280px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .registro-ingreso-archivos {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .registro-consumo-extra__field {
+        flex: 1 1 100%;
+    }
+
+    .panel--programas .receta-command__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .panel--programas .receta-command__aside {
+        flex-direction: column;
+    }
+
+    .panel--programas .receta-command__stat {
+        flex: 1 1 auto;
+        width: 100%;
+    }
+}

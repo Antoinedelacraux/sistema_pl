@@ -9,11 +9,11 @@
         $inventarioAlmacen = 'SFC';
     }
 
-    $almacenesInventario = [
-        'SFC' => 'SAFCO',
-        'SF' => 'SUN FRUIT',
+    $almacenesInventario = collect([
         'FC' => 'FRUCHINCHA',
-    ];
+        'SF' => 'SUN FRUIT',
+        'SFC' => 'SAFCO',
+    ])->sortKeys()->all();
 
 
 

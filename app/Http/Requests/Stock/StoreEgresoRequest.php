@@ -10,8 +10,6 @@ use Illuminate\Validation\Validator;
 
 class StoreEgresoRequest extends FormRequest
 {
-    use MovimientoDocumentoRules;
-
     public function authorize(): bool
     {
         return $this->user()?->puede('registro', 'crear') ?? false;
@@ -19,7 +17,7 @@ class StoreEgresoRequest extends FormRequest
 
     public function rules(): array
     {
-        return array_merge([
+        return [
             'id_almacen' => ['required', 'integer', Rule::exists('Almacen', 'idAlmacen')],
             'id_programa' => ['required', 'integer', Rule::exists('Programa', 'idPrograma')],
             'id_presentacion' => ['required', 'integer', Rule::exists('Presentacion', 'idPresentacion')],
@@ -31,10 +29,12 @@ class StoreEgresoRequest extends FormRequest
             'lineas' => ['required', 'array', 'min:1'],
             'lineas.*.id_material_pl' => ['required', 'integer', Rule::exists('MaterialProgramaPL', 'idMaterialPL')],
             'lineas.*.cantidad' => ['nullable', 'numeric', 'min:0'],
+            'lineas.*.total' => ['nullable', 'numeric', 'min:0'],
+            'conformacion_dentro' => ['nullable', 'numeric', 'min:0'],
             'pallets_fuera' => ['nullable', 'numeric', 'min:0'],
             'fecha' => ['required', 'date'],
             'observacion' => ['nullable', 'string', 'max:500'],
-        ], $this->documentoRules());
+        ];
     }
 
     public function withValidator(Validator $validator): void
@@ -52,7 +52,8 @@ class StoreEgresoRequest extends FormRequest
                 $idPrograma,
                 $idPresentacion,
                 $this->input('lineas', []),
-                $this->input('pallets_fuera')
+                $this->input('pallets_fuera'),
+                $this->input('conformacion_dentro')
             );
 
             if ($lineas === []) {
@@ -82,18 +83,18 @@ class StoreEgresoRequest extends FormRequest
 
     public function attributes(): array
     {
-        return array_merge([
+        return [
             'id_almacen' => 'almacén',
             'id_programa' => 'programa',
-            'id_presentacion' => 'presentación',
+            'id_presentacion' => 'producto',
             'id_tipo_consumo' => 'motivo',
             'lineas' => 'materiales',
             'lineas.*.id_material_pl' => 'material',
             'lineas.*.cantidad' => 'otra cantidad',
-            'pallets_fuera' => 'pallets (fuera)',
+            'lineas.*.total' => 'total',
             'fecha' => 'fecha',
             'observacion' => 'observación',
-        ], $this->documentoAttributes());
+        ];
     }
 
     protected function getRedirectUrl(): string

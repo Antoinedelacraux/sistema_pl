@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permiso' => \App\Http\Middleware\EnsurePermiso::class,
             'usuario.activo' => \App\Http\Middleware\EnsureUsuarioActivo::class,
         ]);
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

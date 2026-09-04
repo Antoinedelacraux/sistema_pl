@@ -98,7 +98,10 @@ class AuditoriaGridService
      */
     public function accionesDisponibles(): array
     {
-        return AuditoriaAccion::etiquetas();
+        $etiquetas = AuditoriaAccion::etiquetas();
+        asort($etiquetas, SORT_FLAG_CASE | SORT_NATURAL);
+
+        return $etiquetas;
     }
 
     /**

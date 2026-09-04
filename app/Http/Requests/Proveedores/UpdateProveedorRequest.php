@@ -27,7 +27,7 @@ class UpdateProveedorRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'id_familia' => 'familia',
+            'id_familia' => 'Material',
             'proveedores.*.nombre' => 'proveedor',
             'proveedores.*.codigo' => 'código',
             'proveedores.*.nom_material' => 'material',

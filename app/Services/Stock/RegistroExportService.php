@@ -6,6 +6,7 @@ use App\Models\Stock\MovimientoStock;
 use App\Models\Stock\Traslado;
 use App\Models\Usuario;
 use App\Support\DocumentoExportSupport;
+use App\Support\DocumentoGuiaSupport;
 use App\Support\ExportText;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -30,8 +31,6 @@ class RegistroExportService
                 'Motivo',
                 'Material Planeamiento',
                 'Cantidad',
-                'Factura',
-                'Guía',
                 'Observación',
             ]),
             'traslados' => ExportText::tituloPalabrasLista([
@@ -66,7 +65,7 @@ class RegistroExportService
     {
         return match ($tab) {
             'consumos' => $this->movimientoService->listarEgresos($filtros)
-                ->map(fn (MovimientoStock $mov) => $this->filaEgreso($mov))
+                ->map(fn (object $egreso) => $this->filaEgreso($egreso))
                 ->all(),
             'traslados' => $this->movimientoService->listarTraslados($filtros)
                 ->map(fn (Traslado $traslado) => $this->filaTraslado($traslado))
@@ -144,19 +143,17 @@ class RegistroExportService
     /**
      * @return list<string|float|null>
      */
-    private function filaEgreso(MovimientoStock $mov): array
+    private function filaEgreso(object $egreso): array
     {
         return [
-            $mov->fecha?->format('d/m/Y'),
-            $mov->almacen?->codigo,
-            $mov->programa?->nomPrograma ?: '—',
-            $mov->presentacion?->nomPresentacion ?: '—',
-            $mov->tipoConsumo?->nomTipoConsumo ?: '—',
-            $mov->materialPl?->nomMaterial,
-            number_format((float) $mov->cantidad, 2, '.', ''),
-            $mov->factura ?: '—',
-            $this->guiaMovimiento($mov) ?: '—',
-            $mov->observacion ?: '—',
+            $egreso->fecha?->format('d/m/Y'),
+            $egreso->almacen?->codigo,
+            $egreso->programa?->nomPrograma ?: '—',
+            $egreso->presentacion?->nomPresentacion ?: '—',
+            $egreso->tipoConsumo?->nomTipoConsumo ?: '—',
+            $egreso->material ?? ($egreso->materialPl?->nomMaterial),
+            number_format((float) $egreso->cantidad, 2, '.', ''),
+            $egreso->observacion ?: '—',
         ];
     }
 
@@ -180,27 +177,11 @@ class RegistroExportService
 
     private function guiaMovimiento(MovimientoStock $mov): ?string
     {
-        if ($mov->guia) {
-            return $mov->guia;
-        }
-
-        if ($mov->factura) {
-            return null;
-        }
-
-        return $mov->facturaGuia ?: null;
+        return DocumentoGuiaSupport::resolver($mov->guia, $mov->factura, $mov->facturaGuia);
     }
 
     private function guiaTraslado(Traslado $traslado): ?string
     {
-        if ($traslado->guia) {
-            return $traslado->guia;
-        }
-
-        if ($traslado->factura) {
-            return null;
-        }
-
-        return $traslado->facturaGuia ?: null;
+        return DocumentoGuiaSupport::resolver($traslado->guia, $traslado->factura, $traslado->facturaGuia);
     }
 }

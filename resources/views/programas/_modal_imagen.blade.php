@@ -13,6 +13,8 @@
             <input type="hidden" name="mercado" value="{{ request('mercado') }}">
             <input type="hidden" name="cliente" value="{{ request('cliente') }}">
             <input type="hidden" name="familia" value="{{ request('familia') }}">
+            <input type="hidden" name="programa" value="{{ request('programa') }}">
+            <input type="hidden" name="presentacion" value="{{ request('presentacion') }}">
             <input type="hidden" name="buscar" value="{{ request('buscar') }}">
 
             <p class="receta-imagen-modal__meta" id="receta-imagen-meta"></p>

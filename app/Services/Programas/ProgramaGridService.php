@@ -8,13 +8,13 @@ use App\Models\Programas\Familia;
 use App\Models\Programas\MaterialProgramaPL;
 use App\Models\Programas\Mercado;
 use App\Models\Programas\Presentacion;
-use App\Models\Programas\PreNisira;
 use App\Models\Programas\ProgramaCatalogo;
 use App\Models\Programas\ProgramaFila;
 use App\Models\Programas\Situado;
 use App\Models\Programas\Uso;
 use App\Models\Programas\Variedad;
 use App\Support\GridPagination;
+use App\Support\MaterialProgramaLookup;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -48,32 +48,32 @@ class ProgramaGridService
         return $this->queryFilas($filtros)->count();
     }
 
+    /** Programas distintos presentes en la grilla de receta (no el catálogo CRUD). */
+    public function totalProgramasDistintos(array $filtros = []): int
+    {
+        return (int) $this->queryFilas($filtros)
+            ->select('idPrograma')
+            ->distinct()
+            ->count('idPrograma');
+    }
+
     public function catalogos(): array
     {
         return [
-            'mercados' => Mercado::query()->activo()->orderBy('idMercado')->get(),
-            'clientes' => Cliente::query()->activo()->orderBy('idCliente')->get(),
-            'variedades' => Variedad::query()->activo()->orderBy('idVariedad')->get(),
-            'programas' => ProgramaCatalogo::query()->activo()->orderBy('idPrograma')->get(),
-            'presentaciones' => Presentacion::query()->activo()->orderBy('idPresentacion')->get(),
-            'preNisiras' => PreNisira::query()->activo()->orderBy('idPreNisira')->get(),
-            'usos' => Uso::query()->activo()->orderBy('idUso')->get(),
-            'situados' => Situado::query()->activo()->orderBy('idSituado')->get(),
-            'familias' => Familia::query()->activo()->orderBy('idFamilia')->get(),
+            'mercados' => Mercado::query()->activo()->orderBy('nomMercado')->get(),
+            'clientes' => Cliente::query()->activo()->orderBy('nomCliente')->get(),
+            'variedades' => Variedad::query()->activo()->orderBy('nomVariedad')->get(),
+            'programas' => ProgramaCatalogo::query()->activo()->orderBy('nomPrograma')->get(),
+            'presentaciones' => Presentacion::query()->activo()->orderBy('nomPresentacion')->get(),
+            'usos' => Uso::query()->activo()->orderBy('nomUso')->get(),
+            'situados' => Situado::query()->activo()->orderBy('nomSituado')->get(),
+            'familias' => Familia::query()->activo()->orderBy('nomFamilia')->get(),
         ];
     }
 
     public function materialPorCodigo(string $codigo): ?MaterialProgramaPL
     {
-        $codigo = trim($codigo);
-        if ($codigo === '') {
-            return null;
-        }
-
-        return MaterialProgramaPL::query()
-            ->where('CodigoPL', $codigo)
-            ->orderByDesc('idMaterialPL')
-            ->first();
+        return MaterialProgramaLookup::porCodigo($codigo, soloActivos: false);
     }
 
     public function crearFila(array $datos, ?UploadedFile $imagen = null): ProgramaFila
@@ -104,7 +104,6 @@ class ProgramaGridService
                 'idVariedad' => $datos['id_variedad'],
                 'idPrograma' => $datos['id_programa'],
                 'idPresentacion' => $datos['id_presentacion'],
-                'idPreNisira' => $datos['id_pre_nisira'],
                 'idMaterialPL' => $material->idMaterialPL,
                 'idCantidadCaja' => $cantidad->idCantidadCaja,
                 'idUso' => $datos['id_uso'],
@@ -123,7 +122,7 @@ class ProgramaGridService
 
             return $fila->fresh()->load([
                 'mercado', 'cliente', 'variedad', 'programa', 'presentacion',
-                'preNisira', 'material', 'cantidadCaja', 'uso', 'situado', 'familia',
+                'material', 'cantidadCaja', 'uso', 'situado', 'familia',
             ]);
         });
     }
@@ -160,7 +159,6 @@ class ProgramaGridService
             'variedad',
             'programa',
             'presentacion',
-            'preNisira',
             'material',
             'cantidadCaja',
             'uso',
@@ -178,6 +176,14 @@ class ProgramaGridService
 
         if (! empty($filtros['familia'])) {
             $query->where('idFamilia', (int) $filtros['familia']);
+        }
+
+        if (! empty($filtros['programa'])) {
+            $query->where('idPrograma', (int) $filtros['programa']);
+        }
+
+        if (! empty($filtros['presentacion'])) {
+            $query->where('idPresentacion', (int) $filtros['presentacion']);
         }
 
         if (! empty($filtros['q'])) {

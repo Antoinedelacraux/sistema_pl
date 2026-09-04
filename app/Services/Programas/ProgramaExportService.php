@@ -3,38 +3,54 @@
 namespace App\Services\Programas;
 
 use App\Models\Programas\ProgramaFila;
-use App\Models\Usuario;
-use App\Support\DocumentoExportSupport;
-use App\Support\ExportText;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Support\ExportaGridDocumento;
 
 class ProgramaExportService
 {
+    use ExportaGridDocumento;
+
     public function __construct(
         private readonly ProgramaGridService $gridService
     ) {}
+
+    /**
+     * @return array{
+     *     tituloDocumento: string,
+     *     tituloPdf: string,
+     *     prefijo: string,
+     *     tituloHoja: string,
+     *     nombreTabla: string
+     * }
+     */
+    protected function configuracionExport(): array
+    {
+        return [
+            'tituloDocumento' => 'Receta',
+            'tituloPdf' => 'Receta · Materiales Por Receta',
+            'prefijo' => 'receta',
+            'tituloHoja' => 'Receta',
+            'nombreTabla' => 'TablaReceta',
+        ];
+    }
 
     /**
      * @return list<string>
      */
     public function encabezados(): array
     {
-        return ExportText::tituloPalabrasLista([
+        return [
             '#',
             'Mercado',
             'Cliente',
-            'Variedad',
             'Programa',
-            'Presentación',
-            'Presentación Nisira',
-            'Código PL',
+            'Variedad',
+            'Producto',
             'Material',
+            'Código PL',
+            'Descripción material',
+            'Observación',
             'Cantidad x caja',
-            'Uso',
-            'Situado',
-            'Familia',
-        ]);
+        ];
     }
 
     /**
@@ -47,33 +63,6 @@ class ProgramaExportService
             ->all();
     }
 
-    public function exportarExcel(array $filtros, ?Usuario $usuario = null): StreamedResponse
-    {
-        return DocumentoExportSupport::exportarExcel(
-            $this->encabezados(),
-            $this->filasExportables($filtros),
-            $usuario,
-            'Receta',
-            'receta',
-            'TablaReceta'
-        );
-    }
-
-    public function exportarPdf(array $filtros, ?Usuario $usuario = null): Response
-    {
-        $filas = $this->filasExportables($filtros);
-
-        return DocumentoExportSupport::exportarPdf('exports.pdf-grid', [
-            'tituloDocumento' => 'Receta',
-            'titulo' => 'Receta · Materiales Por Receta',
-            'filas' => $filas,
-            'encabezados' => $this->encabezados(),
-            'total' => count($filas),
-            'generado' => now()->format('d/m/Y H:i'),
-            'exportadoPor' => DocumentoExportSupport::nombreExportador($usuario),
-        ], 'receta');
-    }
-
     /**
      * @return list<string|int|float|null>
      */
@@ -83,16 +72,14 @@ class ProgramaExportService
             $fila->nroFila,
             $fila->mercado?->nomMercado,
             $fila->cliente?->nomCliente,
-            $fila->variedad?->nomVariedad,
             $fila->programa?->nomPrograma,
+            $fila->variedad?->nomVariedad,
             $fila->presentacion?->nomPresentacion,
-            $fila->preNisira?->nomNisira,
+            $fila->familia?->nomFamilia,
             $fila->material?->CodigoPL,
             $fila->material?->nomMaterial,
-            number_format((float) $fila->cantidadCaja?->cantidad, 2, '.', ''),
             $fila->uso?->nomUso,
-            $fila->situado?->nomSituado,
-            $fila->familia?->nomFamilia,
+            number_format((float) $fila->cantidadCaja?->cantidad, 2, '.', ''),
         ];
     }
 }

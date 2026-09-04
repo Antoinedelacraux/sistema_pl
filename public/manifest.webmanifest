@@ -1,0 +1,17 @@
+{
+    "name": "Talsa Grape Farms",
+    "short_name": "Talsa",
+    "description": "Sistema de stock Talsa",
+    "start_url": "/registro?tab=consumos",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#6d4ba8",
+    "icons": [
+        {
+            "src": "/images/logo-talsa-login.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        }
+    ]
+}

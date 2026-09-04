@@ -284,17 +284,51 @@
         aplicarVisibilidadColumnas([]);
     }
 
+    function ensureMaterialOption(select, idMaterial, codigoPl, nomMaterialPl) {
+        if (!select || !idMaterial) {
+            return;
+        }
+
+        var value = String(idMaterial);
+        var option = Array.prototype.find.call(select.options, function (opt) {
+            return opt.value === value;
+        });
+
+        if (!option) {
+            option = document.createElement('option');
+            option.value = value;
+            select.appendChild(option);
+        }
+
+        option.setAttribute('data-codigo-pl', codigoPl || '');
+        option.setAttribute('data-nom-material-pl', nomMaterialPl || '');
+        option.textContent = codigoPl
+            ? (codigoPl + (nomMaterialPl ? ' — ' + nomMaterialPl : ''))
+            : (nomMaterialPl || value);
+        select.value = value;
+    }
+
     function setMaterialPlSeleccion(idMaterial, codigoPl, nomMaterialPl) {
         if (agregarIdMaterial) {
             agregarIdMaterial.value = idMaterial || '';
         }
 
-        if (agregarCodigoPlSelect && idMaterial) {
-            agregarCodigoPlSelect.value = String(idMaterial);
-        }
-
-        if (agregarMaterialPlSelect && idMaterial) {
-            agregarMaterialPlSelect.value = String(idMaterial);
+        if (idMaterial) {
+            ensureMaterialOption(agregarCodigoPlSelect, idMaterial, codigoPl, nomMaterialPl);
+            ensureMaterialOption(agregarMaterialPlSelect, idMaterial, codigoPl, nomMaterialPl);
+            if (agregarMaterialPlSelect) {
+                var matOpt = agregarMaterialPlSelect.options[agregarMaterialPlSelect.selectedIndex];
+                if (matOpt) {
+                    matOpt.textContent = nomMaterialPl || codigoPl || String(idMaterial);
+                }
+            }
+        } else {
+            if (agregarCodigoPlSelect) {
+                agregarCodigoPlSelect.value = '';
+            }
+            if (agregarMaterialPlSelect) {
+                agregarMaterialPlSelect.value = '';
+            }
         }
 
         if (agregarCodigoPlSearch) {

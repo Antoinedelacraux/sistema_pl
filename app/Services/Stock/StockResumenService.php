@@ -32,7 +32,7 @@ class StockResumenService
 
         return [
 
-            'almacenes' => Almacen::query()->activo()->orderBy('orden')->get(),
+            'almacenes' => Almacen::query()->activo()->orderBy('codigo')->get(),
 
         ];
 
@@ -60,7 +60,7 @@ class StockResumenService
 
     {
 
-        $almacenes = Almacen::query()->activo()->orderBy('orden')->get();
+        $almacenes = Almacen::query()->activo()->orderBy('codigo')->get();
 
         $materiales = MaterialProgramaPL::query()->activo()->orderBy('CodigoPL')->get();
 

@@ -28,6 +28,8 @@ class AuditoriaAccion
 
     public const PROGRAMA_IMAGEN_ACTUALIZAR = 'programa.imagen.actualizar';
 
+    public const PROGRAMA_PARAM_GUARDAR = 'programa.param.guardar';
+
     public const REGISTRO_INGRESO_CREAR = 'registro.ingreso.crear';
 
     public const REGISTRO_INGRESO_ACTUALIZAR = 'registro.ingreso.actualizar';
@@ -62,6 +64,7 @@ class AuditoriaAccion
             self::PROVEEDOR_ELIMINAR => 'Proveedor eliminado',
             self::PROGRAMA_CREAR => 'Receta creada',
             self::PROGRAMA_IMAGEN_ACTUALIZAR => 'Imagen de receta actualizada',
+            self::PROGRAMA_PARAM_GUARDAR => 'Parámetros de presentación guardados',
             self::REGISTRO_INGRESO_CREAR => 'Ingreso registrado',
             self::REGISTRO_INGRESO_ACTUALIZAR => 'Ingreso actualizado',
             self::REGISTRO_EGRESO_CREAR => 'Consumo registrado',
