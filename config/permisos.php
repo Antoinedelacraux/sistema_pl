@@ -17,10 +17,9 @@ return [
         1 => 'all',
 
         2 => [
-            'inicio' => ['ver' => true],
+            'inicio' => ['ver' => true, 'crear' => false, 'editar' => true, 'eliminar' => false],
             'programas' => ['ver' => true, 'crear' => false, 'editar' => false, 'eliminar' => false],
             'maestros' => ['ver' => true, 'crear' => false, 'editar' => false, 'eliminar' => false],
-            'resumen' => ['ver' => true, 'crear' => false, 'editar' => true, 'eliminar' => false],
             'inventario' => ['ver' => true, 'crear' => false, 'editar' => false, 'eliminar' => false],
             'materiales' => ['ver' => true, 'crear' => false, 'editar' => false, 'eliminar' => false],
             'familias' => ['ver' => true, 'crear' => false, 'editar' => false, 'eliminar' => false],
@@ -28,10 +27,9 @@ return [
         ],
 
         3 => [
-            'inicio' => ['ver' => true],
+            'inicio' => ['ver' => true, 'crear' => false, 'editar' => false, 'eliminar' => false],
             'programas' => ['ver' => true, 'crear' => false, 'editar' => false, 'eliminar' => false],
             'maestros' => ['ver' => true, 'crear' => false, 'editar' => false, 'eliminar' => false],
-            'resumen' => ['ver' => true, 'crear' => false, 'editar' => false, 'eliminar' => false],
             'inventario' => ['ver' => true, 'crear' => false, 'editar' => false, 'eliminar' => false],
             'materiales' => ['ver' => true, 'crear' => false, 'editar' => false, 'eliminar' => false],
             'familias' => ['ver' => true, 'crear' => false, 'editar' => false, 'eliminar' => false],

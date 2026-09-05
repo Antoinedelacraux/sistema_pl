@@ -3,7 +3,6 @@
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\InventarioController;
-use App\Http\Controllers\InicioController;
 use App\Http\Controllers\MaestroController;
 use App\Http\Controllers\MovimientoController;
 use App\Http\Controllers\ProgramaController;
@@ -21,7 +20,18 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware(['auth', 'usuario.activo'])->group(function () {
-    Route::get('/inicio', InicioController::class)->name('inicio');
+    Route::get('/inicio', [StockResumenController::class, 'index'])
+        ->middleware('permiso:inicio,ver')
+        ->name('inicio');
+    Route::get('/inicio/export/excel', [StockResumenController::class, 'exportExcel'])
+        ->middleware('permiso:inicio,ver')
+        ->name('inicio.export.excel');
+    Route::get('/inicio/export/pdf', [StockResumenController::class, 'exportPdf'])
+        ->middleware('permiso:inicio,ver')
+        ->name('inicio.export.pdf');
+    Route::redirect('/resumen', '/inicio');
+    Route::redirect('/resumen/export/excel', '/inicio/export/excel');
+    Route::redirect('/resumen/export/pdf', '/inicio/export/pdf');
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 
     Route::get('/programas', [ProgramaController::class, 'index'])
@@ -118,18 +128,6 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         ->whereNumber('nroFila')
         ->name('proveedor.destroy');
 
-    Route::get('/resumen', [StockResumenController::class, 'index'])
-        ->middleware('permiso:resumen,ver')
-        ->name('resumen.index');
-
-    Route::get('/resumen/export/excel', [StockResumenController::class, 'exportExcel'])
-        ->middleware('permiso:resumen,ver')
-        ->name('resumen.export.excel');
-
-    Route::get('/resumen/export/pdf', [StockResumenController::class, 'exportPdf'])
-        ->middleware('permiso:resumen,ver')
-        ->name('resumen.export.pdf');
-
     Route::get('/inventario', [InventarioController::class, 'index'])
         ->middleware('permiso:inventario,ver')
         ->name('inventario.index');
@@ -161,6 +159,10 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
     Route::post('/registro/ingreso/leer-xml', [MovimientoController::class, 'parseIngresoXml'])
         ->middleware('permiso:registro,crear')
         ->name('registro.ingreso.leer-xml');
+
+    Route::post('/registro/ingreso/leer-excel', [MovimientoController::class, 'parseIngresoExcel'])
+        ->middleware('permiso:registro,crear')
+        ->name('registro.ingreso.leer-excel');
 
     Route::post('/registro/ingreso', [MovimientoController::class, 'storeIngreso'])
         ->middleware('permiso:registro,crear')

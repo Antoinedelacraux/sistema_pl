@@ -52,9 +52,9 @@ class ResumenExportService
             $this->encabezados(),
             $this->filasExportables($filtros),
             $usuario,
-            'Resumen',
-            'resumen-stock',
-            'TablaResumen'
+            'Inicio',
+            'inicio-stock',
+            'TablaInicio'
         );
     }
 
@@ -63,14 +63,14 @@ class ResumenExportService
         $filas = $this->filasExportables($filtros);
 
         return DocumentoExportSupport::exportarPdf('exports.pdf-grid', [
-            'tituloDocumento' => 'Resumen',
-            'titulo' => 'Resumen de stock',
+            'tituloDocumento' => 'Inicio',
+            'titulo' => 'Inicio · stock por almacén',
             'filas' => $filas,
             'encabezados' => $this->encabezados(),
             'total' => count($filas),
             'generado' => now()->format('d/m/Y H:i'),
             'exportadoPor' => DocumentoExportSupport::nombreExportador($usuario),
-        ], 'resumen-stock');
+        ], 'inicio-stock');
     }
 
     /**

@@ -323,6 +323,7 @@
     window.registroConsumoMaterialesUrl = @json(route('registro.consumo.materiales'));
     window.registroConsumoHintUrl = @json(route('registro.consumo.hint'));
     window.registroIngresoLeerXmlUrl = @json(route('registro.ingreso.leer-xml'));
+    window.registroIngresoLeerExcelUrl = @json(route('registro.ingreso.leer-excel'));
     window.registroDetalleMovimientoUrl = @json(route('registro.movimiento.detalle', ['idMovimiento' => '__ID__']));
     window.registroDetalleTrasladoUrl = @json(route('registro.traslado.detalle', ['idTraslado' => '__ID__']));
     window.registroIngresoUpdateUrl = @json(route('registro.ingreso.update', ['idMovimiento' => '__ID__']));

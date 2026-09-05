@@ -21,8 +21,6 @@
 
         ['key' => 'inicio', 'label' => 'Inicio', 'route' => 'inicio', 'modulo' => 'inicio'],
 
-        ['key' => 'resumen', 'label' => 'Resumen', 'route' => 'resumen.index', 'modulo' => 'resumen'],
-
         ['key' => 'programas', 'label' => 'Receta', 'route' => 'programas.index', 'modulo' => 'programas'],
 
         ['key' => 'maestros', 'label' => 'Crud', 'route' => 'maestros.index', 'modulo' => 'maestros'],

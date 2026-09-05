@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"></noscript>
     <link rel="stylesheet" href="{{ asset('css/app.css') }}?v=17">
-    <link rel="stylesheet" href="{{ asset('css/responsive.css') }}?v=4">
+    <link rel="stylesheet" href="{{ asset('css/responsive.css') }}?v=5">
     @stack('head')
 </head>
 <body class="@yield('body-class', 'page-guest')">

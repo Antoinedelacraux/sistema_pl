@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Stock\ParseIngresoExcelRequest;
 use App\Http\Requests\Stock\ParseIngresoXmlRequest;
 use App\Http\Requests\Stock\StoreEgresoRequest;
 use App\Http\Requests\Stock\StoreIngresoRequest;
@@ -13,6 +14,7 @@ use App\Models\Stock\MovimientoStock;
 use App\Services\Auditoria\AuditoriaService;
 use App\Services\Stock\ConsumoRecetaService;
 use App\Services\Stock\GuiaXmlParserService;
+use App\Services\Stock\IngresoStockExcelParserService;
 use App\Services\Stock\MovimientoService;
 use App\Services\Stock\RegistroExportService;
 use App\Support\AuditoriaAccion;
@@ -31,6 +33,7 @@ class MovimientoController extends Controller
         private readonly MovimientoService $movimientoService,
         private readonly ConsumoRecetaService $consumoRecetaService,
         private readonly GuiaXmlParserService $guiaXmlParserService,
+        private readonly IngresoStockExcelParserService $ingresoStockExcelParserService,
         private readonly RegistroExportService $exportService,
         private readonly AuditoriaService $auditoria
     ) {}
@@ -140,6 +143,28 @@ class MovimientoController extends Controller
                 'lineas' => [],
                 'advertencias' => [],
             ], 422);
+        }
+
+        return response()->json($resultado);
+    }
+
+    public function parseIngresoExcel(ParseIngresoExcelRequest $request): JsonResponse
+    {
+        try {
+            $resultado = $this->ingresoStockExcelParserService->parse($request->file('archivo_excel'));
+        } catch (\RuntimeException $exception) {
+            return response()->json([
+                'ok' => false,
+                'error' => $exception->getMessage(),
+                'id_almacen' => null,
+                'codigo_almacen' => null,
+                'lineas' => [],
+                'advertencias' => [],
+            ], 422);
+        }
+
+        if (! ($resultado['ok'] ?? false)) {
+            return response()->json($resultado, 422);
         }
 
         return response()->json($resultado);

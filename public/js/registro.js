@@ -1247,6 +1247,90 @@
         limpiarLineaIngreso();
     }
 
+    function seleccionarAlmacenIngreso(idAlmacen) {
+        var select = document.getElementById('ingreso-id-almacen');
+        if (!select || !idAlmacen) {
+            return;
+        }
+        select.value = String(idAlmacen);
+    }
+
+    function aplicarLineasDesdeExcel(data) {
+        if (data.id_almacen) {
+            seleccionarAlmacenIngreso(data.id_almacen);
+        }
+        aplicarLineasDesdeXml(data.lineas || []);
+    }
+
+    function leerExcelIngreso(archivo) {
+        var url = window.registroIngresoLeerExcelUrl || '';
+        var csrf = document.querySelector('meta[name="csrf-token"]');
+
+        if (!url || !archivo) {
+            return;
+        }
+
+        mostrarEstadoXmlIngreso('Leyendo Excel de stock (SAFCO)...', 'loading');
+
+        var formData = new FormData();
+        formData.append('archivo_excel', archivo);
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrf ? csrf.getAttribute('content') : '',
+            },
+            body: formData,
+        })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    return { ok: response.ok, data: data };
+                });
+            })
+            .then(function (result) {
+                var data = result.data || {};
+
+                if (!result.ok || data.ok === false) {
+                    mostrarEstadoXmlIngreso(data.error || data.message || 'No se pudo leer el Excel.', 'error');
+                    return;
+                }
+
+                var aplicarExcel = function () {
+                    aplicarLineasDesdeExcel(data);
+                    var msg = (data.lineas || []).length + ' material(es) cargados para SAFCO';
+                    if (data.codigo_almacen) {
+                        msg += ' (' + data.codigo_almacen + ')';
+                    }
+                    if (Array.isArray(data.advertencias) && data.advertencias.length > 0) {
+                        msg += '. ' + data.advertencias.length + ' fila(s) omitida(s).';
+                    }
+                    mostrarEstadoXmlIngreso(msg, 'ok');
+                };
+
+                if (ingresoLineas.length > 0 && window.TalsaConfirm) {
+                    window.TalsaConfirm.show({
+                        title: 'Reemplazar materiales',
+                        message: 'Ya hay materiales agregados. ¿Deseas reemplazarlos por los del Excel?',
+                        confirmLabel: 'Sí, reemplazar',
+                        variant: 'warning',
+                    }).then(function (approved) {
+                        if (approved) {
+                            aplicarExcel();
+                        } else {
+                            mostrarEstadoXmlIngreso('Excel leído. Materiales no reemplazados.', 'warn');
+                        }
+                    });
+                    return;
+                }
+
+                aplicarExcel();
+            })
+            .catch(function () {
+                mostrarEstadoXmlIngreso('Error de conexión al leer el Excel.', 'error');
+            });
+    }
+
     function leerXmlIngreso(archivo) {
         var url = window.registroIngresoLeerXmlUrl || '';
         var csrf = document.querySelector('meta[name="csrf-token"]');
@@ -1348,6 +1432,19 @@
             }
 
             leerXmlIngreso(archivo);
+        });
+    }
+
+    var excelIngresoInput = document.getElementById('ingreso-archivo-excel');
+    if (excelIngresoInput) {
+        excelIngresoInput.addEventListener('change', function () {
+            var archivo = excelIngresoInput.files && excelIngresoInput.files[0];
+            if (!archivo) {
+                ocultarEstadoXmlIngreso();
+                return;
+            }
+
+            leerExcelIngreso(archivo);
         });
     }
 

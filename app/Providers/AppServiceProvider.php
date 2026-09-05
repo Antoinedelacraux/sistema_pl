@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -25,6 +26,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->configurePublicUrl();
+
         if (! $this->shouldLogQueries()) {
             return;
         }
@@ -32,6 +35,24 @@ class AppServiceProvider extends ServiceProvider
         DB::listen(function (QueryExecuted $query): void {
             Log::channel('queries')->debug($this->formatQueryLog($query));
         });
+    }
+
+    /**
+     * Evita mixed content (HTTPS página + HTTP CSS) detrás de Cloudflare Tunnel.
+     */
+    private function configurePublicUrl(): void
+    {
+        if ($this->app->runningInConsole()) {
+            return;
+        }
+
+        $request = request();
+        $forwarded = strtolower((string) $request->headers->get('X-Forwarded-Proto', ''));
+        $host = strtolower($request->getHost());
+
+        if ($request->secure() || $forwarded === 'https' || str_contains($host, 'trycloudflare.com')) {
+            URL::forceScheme('https');
+        }
     }
 
     private function shouldLogQueries(): bool

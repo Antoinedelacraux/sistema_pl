@@ -206,5 +206,5 @@
     window.proveedorColumnasKeys = @json(collect($columnasProveedor)->pluck('key', 'nombre'));
 </script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script src="{{ asset('js/proveedor.js') }}" defer></script>
+<script src="{{ asset('js/proveedor.js') }}?v=2" defer></script>
 @endpush

@@ -41,6 +41,11 @@
                         <input type="file" class="field__input field__input--file" id="ingreso-archivo-xml" accept=".xml,application/xml,text/xml">
                         <span class="field__hint registro-ingreso-archivos__hint">Lee guía, códigos proveedor y cantidades. Los mapea con la tabla Proveedor.</span>
                     </label>
+                    <label class="field registro-ingreso-archivos__col">
+                        <span class="field__label">Archivo Excel stock</span>
+                        <input type="file" class="field__input field__input--file" id="ingreso-archivo-excel" accept=".xlsx,.xls,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+                        <span class="field__hint registro-ingreso-archivos__hint">Carga stock inicial en almacén SAFCO (Idproducto, Descripción, STOCK, Observaciones).</span>
+                    </label>
                 </div>
                 <p class="field__hint registro-xml-lectura registro-ingreso-archivos__status" id="ingreso-xml-lectura-status" hidden></p>
                 <label class="field field--full">

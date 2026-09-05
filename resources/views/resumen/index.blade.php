@@ -1,42 +1,60 @@
 @extends('layouts.shell')
 
-@section('title', 'Resumen')
+@section('title', 'Inicio')
 
-@section('heading', 'Resumen de stock')
+@section('heading', 'Inicio')
 @section('crumbs', 'Stock · por almacén y material')
 
 @section('page')
 @php
     $exportParams = array_filter([
-        'almacen' => request('almacen', $filtros['almacen'] ?? null),
+        'programa' => request('programa', $filtros['programa'] ?? null),
+        'producto' => request('producto', $filtros['producto'] ?? null),
         'estado' => request('estado', $filtros['estado'] ?? null),
         'buscar' => request('buscar', $filtros['buscar'] ?? null),
     ], fn ($valor) => filled($valor));
+    $programaSeleccionado = (int) ($filtros['programa'] ?? 0);
 @endphp
 <div class="resumen-page">
 @include('partials.flash')
 
-@include('partials.kpis-resumen')
+{{-- @include('partials.kpis-resumen') --}}
 
 <section class="panel panel--resumen">
     <div class="resumen-toolbar">
         <form
             method="GET"
-            action="{{ route('resumen.index') }}"
+            action="{{ route('inicio') }}"
             class="resumen-filters"
             data-grid-filters
-            data-clear-url="{{ route('resumen.index') }}"
+            data-clear-url="{{ route('inicio') }}"
         >
             <div class="resumen-filters__main">
                 <label class="resumen-filters__field">
-                    <span class="resumen-filters__label">Almacén</span>
-                    <select id="resumen-filtro-almacen" name="almacen" class="resumen-filters__input">
+                    <span class="resumen-filters__label">Programa</span>
+                    <select id="inicio-filtro-programa" name="programa" class="resumen-filters__input">
                         <option value="">Todos</option>
-                        @foreach ($almacenes as $almacen)
-                            <option value="{{ $almacen->codigo }}" @selected(($filtros['almacen'] ?? '') === $almacen->codigo)>
-                                {{ $almacen->codigo }} — {{ $almacen->nomAlmacen }}
+                        @foreach ($programas as $programa)
+                            <option value="{{ $programa->idPrograma }}" @selected($programaSeleccionado === (int) $programa->idPrograma)>
+                                {{ $programa->nomPrograma }}
                             </option>
                         @endforeach
+                    </select>
+                </label>
+
+                <label class="resumen-filters__field">
+                    <span class="resumen-filters__label">Producto</span>
+                    <select id="inicio-filtro-producto" name="producto" class="resumen-filters__input" @disabled($programaSeleccionado <= 0)>
+                        @if ($programaSeleccionado <= 0)
+                            <option value="">Seleccione un programa</option>
+                        @else
+                            <option value="">Todos</option>
+                            @foreach ($productos as $producto)
+                                <option value="{{ $producto->idPresentacion }}" @selected((int) ($filtros['producto'] ?? 0) === (int) $producto->idPresentacion)>
+                                    {{ $producto->nomPresentacion }}
+                                </option>
+                            @endforeach
+                        @endif
                     </select>
                 </label>
 
@@ -69,15 +87,15 @@
             </div>
 
             @include('partials.export-actions', [
-                'pdfUrl' => route('resumen.export.pdf', $exportParams),
-                'excelUrl' => route('resumen.export.excel', $exportParams),
+                'pdfUrl' => route('inicio.export.pdf', $exportParams),
+                'excelUrl' => route('inicio.export.excel', $exportParams),
             ])
         </form>
     </div>
 
     <div class="grid-table-section">
         <div class="grid-table-head">
-            <p class="grid-table-count" id="resumen-contador">{{ number_format($filas->total()) }} materiales en resumen</p>
+            <p class="grid-table-count" id="resumen-contador">{{ number_format($filas->total()) }} materiales</p>
         </div>
 
         <div class="programas-grid-wrap resumen-grid-wrap">
@@ -133,5 +151,6 @@
 @endsection
 
 @push('scripts')
+<script src="{{ asset('js/inicio-filters.js') }}" defer></script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
 @endpush
