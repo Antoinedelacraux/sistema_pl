@@ -205,6 +205,10 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         ->middleware('permiso:registro,ver')
         ->name('registro.material-por-codigo');
 
+    Route::get('/registro/materiales-buscar', [MovimientoController::class, 'buscarMateriales'])
+        ->middleware('permiso:registro,ver')
+        ->name('registro.materiales.buscar');
+
     Route::get('/registro/stock-disponible', [MovimientoController::class, 'stockDisponible'])
         ->middleware('permiso:registro,ver')
         ->name('registro.stock-disponible');

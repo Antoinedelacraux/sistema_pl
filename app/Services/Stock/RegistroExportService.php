@@ -14,7 +14,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class RegistroExportService
 {
     public function __construct(
-        private readonly MovimientoService $movimientoService
+        private readonly MovimientoService $movimientoService,
+        private readonly RegistroMatrizSemanalExport $matrizSemanalExport
     ) {}
 
     /**
@@ -79,6 +80,12 @@ class RegistroExportService
     public function exportarExcel(string $tab, array $filtros, ?Usuario $usuario = null): StreamedResponse
     {
         $tab = $this->tabValida($tab);
+
+        if (in_array($tab, ['ingresos', 'consumos'], true)) {
+            $tipo = $tab === 'consumos' ? MovimientoStock::TIPO_EGRESO : MovimientoStock::TIPO_INGRESO;
+
+            return $this->matrizSemanalExport->exportar($tipo, $filtros, $usuario);
+        }
 
         return DocumentoExportSupport::exportarExcel(
             $this->encabezados($tab),

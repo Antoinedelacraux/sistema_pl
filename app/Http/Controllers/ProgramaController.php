@@ -29,11 +29,11 @@ class ProgramaController extends Controller
 
     public function index(Request $request): View
     {
-        $catalogos = $this->gridService->catalogos();
-        $filtros = $this->filtrosDesdeRequest($request);
+        $filtros = $this->gridService->normalizarFiltros($this->filtrosDesdeRequest($request));
         $filas = $this->gridService->filasPaginadas($filtros, $request);
 
-        return view('programas.index', array_merge($catalogos, [
+        return view('programas.index', array_merge($this->gridService->catalogos(), [
+            'catalogosFiltro' => $this->gridService->catalogosFiltro($filtros),
             'filas' => $filas,
             'filtros' => $filtros,
             'totalFilas' => $filas->total(),
@@ -88,13 +88,15 @@ class ProgramaController extends Controller
     }
 
     /**
-     * @param  array{insertadas: int, omitidas: int, total: int}  $resultado
+     * @param  array{insertadas: int, actualizadas: int, sin_cambios: int, omitidas: int, total: int}  $resultado
      */
     private function mensajeImportacion(array $resultado): string
     {
         return sprintf(
-            'Importación: %d nueva(s), %d ya existente(s) (omitida(s)). Total: %d.',
+            'Importación: %d nueva(s), %d actualizada(s), %d sin cambios, %d omitida(s). Total: %d.',
             $resultado['insertadas'],
+            $resultado['actualizadas'],
+            $resultado['sin_cambios'],
             $resultado['omitidas'],
             $resultado['total']
         );

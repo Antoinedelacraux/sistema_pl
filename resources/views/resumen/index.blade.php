@@ -12,8 +12,11 @@
         'producto' => request('producto', $filtros['producto'] ?? null),
         'estado' => request('estado', $filtros['estado'] ?? null),
         'buscar' => request('buscar', $filtros['buscar'] ?? null),
+        'cajas' => request('cajas', $filtros['cajas'] ?? null),
     ], fn ($valor) => filled($valor));
     $programaSeleccionado = (int) ($filtros['programa'] ?? 0);
+    $productoSeleccionado = (int) ($filtros['producto'] ?? 0);
+    $simulaCajas = $productoSeleccionado > 0 && ! empty($filtros['cajas']);
 @endphp
 <div class="resumen-page">
 @include('partials.flash')
@@ -82,6 +85,20 @@
                 </label>
 
                 <div class="resumen-filters__clear-wrap">
+                    <label class="resumen-filters__field resumen-filters__field--cajas">
+                        <span class="resumen-filters__label">Caj.</span>
+                        <input
+                            type="number"
+                            id="inicio-filtro-cajas"
+                            name="cajas"
+                            class="resumen-filters__input resumen-filters__input--cajas"
+                            min="0.01"
+                            step="0.01"
+                            placeholder="—"
+                            value="{{ $filtros['cajas'] ?? '' }}"
+                            title="Simular consumo para N cajas (requiere programa y producto específico)"
+                        >
+                    </label>
                     <button type="button" class="btn btn--outline btn--sm" id="resumen-limpiar" data-grid-filters-clear>Limpiar</button>
                 </div>
             </div>
@@ -103,25 +120,51 @@
                 <thead>
                     <tr>
                         <th class="programas-grid__th programas-grid__th--stack resumen-grid__th--code">Cód.<br>planeamiento</th>
+                        <th class="programas-grid__th programas-grid__th--stack resumen-grid__th--variedad">Variedad</th>
                         <th class="programas-grid__th programas-grid__th--stack resumen-grid__th--material">Material planeamiento</th>
                         @foreach ($almacenes as $almacen)
                             <th class="programas-grid__th programas-grid__th--num programas-grid__th--stack">Stock<br>{{ $almacen->codigo }}</th>
                         @endforeach
                         <th class="programas-grid__th programas-grid__th--num">Total</th>
+                        @if ($simulaCajas)
+                            <th class="programas-grid__th programas-grid__th--num programas-grid__th--stack" title="Cantidad necesaria para las cajas indicadas">Neces.<br>cajas</th>
+                        @endif
                         <th class="programas-grid__th programas-grid__th--num">Mínimo</th>
                         <th class="programas-grid__th programas-grid__th--num resumen-grid__th--estado">Estado</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($filas as $fila)
-                        <tr class="resumen-fila">
+                        @php
+                            $clasesFila = ['resumen-fila'];
+                            if ($fila->total <= 0) {
+                                $clasesFila[] = 'resumen-fila--stock-cero';
+                            }
+                        @endphp
+                        <tr @class($clasesFila)>
                             <td class="programas-grid__code">{{ $fila->material->CodigoPL }}</td>
+                            <td class="programas-grid__cell resumen-grid__variedad">{{ $fila->variedad !== '' ? $fila->variedad : '—' }}</td>
                             <td class="programas-grid__material">{{ $fila->material->nomMaterial }}</td>
                             @foreach ($almacenes as $almacen)
-                                @php $stockAlmacen = $fila->stocks[$almacen->codigo] ?? 0; @endphp
-                                <td class="programas-grid__qty resumen-stock-cell resumen-stock-cell--{{ $stockAlmacen <= 0 ? 'critico' : 'saludable' }}">{{ number_format($stockAlmacen, 2, '.', '') }}</td>
+                                @php
+                                    $stockAlmacen = $fila->stocks[$almacen->codigo] ?? 0;
+                                    $claseStock = 'programas-grid__qty resumen-stock-cell';
+                                    if ($simulaCajas && $fila->necesario > 0) {
+                                        $claseStock .= $stockAlmacen >= $fila->necesario
+                                            ? ' resumen-stock-cell--sim-ok'
+                                            : ' resumen-stock-cell--sim-falta';
+                                    } else {
+                                        $claseStock .= ' resumen-stock-cell--'.($stockAlmacen <= 0 ? 'critico' : 'saludable');
+                                    }
+                                @endphp
+                                <td class="{{ $claseStock }}">{{ number_format($stockAlmacen, 2, '.', '') }}</td>
                             @endforeach
                             <td class="programas-grid__qty resumen-total-cell resumen-stock-cell resumen-stock-cell--{{ $fila->estadoStock }}">{{ number_format($fila->total, 2, '.', '') }}</td>
+                            @if ($simulaCajas)
+                                <td class="programas-grid__qty resumen-necesario-cell">
+                                    {{ $fila->necesario > 0 ? number_format($fila->necesario, 2, '.', '') : '—' }}
+                                </td>
+                            @endif
                             <td class="programas-grid__qty">{{ number_format($fila->stockMinimo, 2, '.', '') }}</td>
                             <td>
                                 @if ($fila->estadoStock === 'critico')
@@ -137,7 +180,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ 5 + $almacenes->count() }}" class="data-table__empty">No hay materiales con esos filtros.</td>
+                            <td colspan="{{ 6 + $almacenes->count() + ($simulaCajas ? 1 : 0) }}" class="data-table__empty">No hay materiales con esos filtros.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -151,6 +194,6 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/inicio-filters.js') }}" defer></script>
+<script src="{{ asset('js/inicio-filters.js') }}?v=3" defer></script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
 @endpush

@@ -246,6 +246,41 @@ class ConsumoRecetaService
     }
 
     /**
+     * Calcula cantidades necesarias por material para N cajas (misma lógica que consumo).
+     *
+     * @return array<int, float> idMaterialPL => cantidad
+     */
+    public function proyectarNecesidadesPorCajas(int $idPrograma, int $idPresentacion, float $cajas): array
+    {
+        if ($idPrograma <= 0 || $idPresentacion <= 0 || $cajas <= 0) {
+            return [];
+        }
+
+        $receta = $this->materialesDePresentacion($idPrograma, $idPresentacion);
+        $lineasInput = [];
+
+        foreach ($receta as $item) {
+            if (empty($item['es_caja_factor'])) {
+                continue;
+            }
+
+            $lineasInput[] = [
+                'id_material_pl' => (int) $item['id_material_pl'],
+                'cantidad' => $cajas,
+            ];
+        }
+
+        $lineas = $this->resolverLineasConsumo($idPrograma, $idPresentacion, $lineasInput);
+        $mapa = [];
+
+        foreach ($lineas as $linea) {
+            $mapa[(int) $linea['id_material_pl']] = (float) $linea['cantidad'];
+        }
+
+        return $mapa;
+    }
+
+    /**
      * @param  array<string, mixed>  $item
      * @param  array<string, mixed>  $input
      */

@@ -317,6 +317,7 @@
 @endphp
 <script>
     window.registroMaterialUrl = @json(route('registro.material-por-codigo'));
+    window.registroMaterialesBuscarUrl = @json(route('registro.materiales.buscar'));
     window.registroStockUrl = @json(route('registro.stock-disponible'));
     window.registroConsumoProgramasUrl = @json(route('registro.consumo.programas'));
     window.registroConsumoPresentacionesUrl = @json(route('registro.consumo.presentaciones'));
@@ -338,5 +339,5 @@
 <script src="{{ asset('js/offline-queue.js') }}" defer></script>
 <script src="{{ asset('js/offline-sync-registro.js') }}?v=3" defer></script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script src="{{ asset('js/registro.js') }}?v=13" defer></script>
+<script src="{{ asset('js/registro.js') }}?v=15" defer></script>
 @endpush

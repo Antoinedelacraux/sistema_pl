@@ -6,6 +6,9 @@
 @section('crumbs', 'Planeamiento · pallets y conformación')
 
 @section('page')
+@php
+    $programaSeleccionado = (int) ($filtros['programa'] ?? 0);
+@endphp
 <div class="programas-page">
 @include('partials.flash')
 @include('programas._tabs')
@@ -23,9 +26,9 @@
                 <div class="receta-command__grid receta-command__grid--params">
                     <label class="receta-cmd-field">
                         <span class="receta-cmd-label">Programa</span>
-                        <select name="programa" class="receta-cmd-input">
+                        <select id="receta-filtro-programa" name="programa" class="receta-cmd-input">
                             <option value="">Todos</option>
-                            @foreach ($programas as $item)
+                            @foreach ($catalogosFiltro['programas'] as $item)
                                 <option value="{{ $item->idPrograma }}" @selected((string) ($filtros['programa'] ?? '') === (string) $item->idPrograma)>{{ $item->nomPrograma }}</option>
                             @endforeach
                         </select>
@@ -33,11 +36,15 @@
 
                     <label class="receta-cmd-field">
                         <span class="receta-cmd-label">Producto</span>
-                        <select name="presentacion" class="receta-cmd-input">
-                            <option value="">Todos</option>
-                            @foreach ($presentaciones as $item)
-                                <option value="{{ $item->idPresentacion }}" @selected((string) ($filtros['presentacion'] ?? '') === (string) $item->idPresentacion)>{{ $item->nomPresentacion }}</option>
-                            @endforeach
+                        <select id="receta-filtro-presentacion" name="presentacion" class="receta-cmd-input" @disabled($programaSeleccionado <= 0)>
+                            @if ($programaSeleccionado <= 0)
+                                <option value="">Seleccione un programa</option>
+                            @else
+                                <option value="">Todos</option>
+                                @foreach ($catalogosFiltro['presentaciones'] as $item)
+                                    <option value="{{ $item->idPresentacion }}" @selected((string) ($filtros['presentacion'] ?? '') === (string) $item->idPresentacion)>{{ $item->nomPresentacion }}</option>
+                                @endforeach
+                            @endif
                         </select>
                     </label>
 
@@ -120,6 +127,7 @@
 @if ($errors->any())
 <script>window.recetaParamOld = @json(old());</script>
 @endif
+<script src="{{ asset('js/receta-filters.js') }}?v=1" defer></script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
 <script src="{{ asset('js/receta-params.js') }}" defer></script>
 @endpush

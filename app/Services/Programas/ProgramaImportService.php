@@ -14,6 +14,8 @@ use App\Models\Programas\ProgramaFila;
 use App\Models\Programas\Situado;
 use App\Models\Programas\Uso;
 use App\Models\Programas\Variedad;
+use App\Support\FamiliaMaterialSupport;
+use App\Support\MaterialProgramaLookup;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -43,11 +45,17 @@ class ProgramaImportService
         'Mercado' => ['MERCADO', 'Mercado', 'Market'],
         'Cliente' => ['Client', 'Cliente', 'client'],
         'Programa' => ['Program', 'Programa', 'program', 'Producto', 'producto'],
-        'Presentación' => ['Product', 'Presentación', 'Presentacion', 'presentacion'],
+        'Presentación' => ['Product', 'Presentación', 'Presentacion', 'presentacion', 'Producto', 'producto'],
         'Variedad' => ['Variety', 'Variedad', 'variety'],
         'Material' => ['Material', 'Familia', 'familia'],
-        'Codigo Planificación' => ['Code', 'Codigo Planificación', 'Código de Planificación', 'Codigo Planificacion'],
-        'Material Descripcion' => ['Material Description', 'Material Descripcion', 'Material Descripción', 'Materiales'],
+        'Codigo Planificación' => [
+            'Code', 'Codigo Planificación', 'Código de Planificación', 'Codigo Planificacion',
+            'Código PL', 'Codigo PL', 'CodigoPL', 'Código Planeamiento', 'Codigo Planeamiento',
+        ],
+        'Material Descripcion' => [
+            'Material Description', 'Material Descripcion', 'Material Descripción', 'Materiales',
+            'Descripción material', 'Descripcion material', 'Descripcion Material',
+        ],
         'Observacion' => ['Observations', 'Observacion', 'Observación', 'Uso'],
         'Cantidad x Caja' => ['Cantidad x caja', 'Cantidad x Caja', 'CANTIDAD X CAJA', 'Cantidad X Caja'],
     ];
@@ -57,39 +65,54 @@ class ProgramaImportService
     private const OBSERVACION_VACIA = 'Oficial';
 
     /**
-     * Importa Receta desde Excel (solo agrega). No modifica Proveedor ni elimina filas existentes.
-     * Filas repetidas (mismo contenido) se omiten; catálogos y materiales PL solo se crean si no existen.
+     * Importa Receta desde Excel: inserta filas nuevas y actualiza existentes si cambió cantidad,
+     * descripción u otros datos. La clave de coincidencia es programa + producto + código PL + uso + familia.
      *
-     * @return array{leidas: int, insertadas: int, omitidas: int, total: int}
+     * @return array{leidas: int, insertadas: int, actualizadas: int, sin_cambios: int, omitidas: int, total: int}
      */
     public function importar(UploadedFile $archivo): array
     {
         $filasExcel = $this->leerExcel($archivo);
-        $fingerprintsExistentes = $this->fingerprintsExistentes();
+        $indiceExistentes = $this->indiceFilasExistentes();
 
         $insertadas = 0;
+        $actualizadas = 0;
+        $sinCambios = 0;
         $omitidas = 0;
 
         DB::transaction(function () use (
             $filasExcel,
-            $fingerprintsExistentes,
+            $indiceExistentes,
             &$insertadas,
+            &$actualizadas,
+            &$sinCambios,
             &$omitidas
         ) {
             $nroFila = (int) ProgramaFila::query()->max('nroFila');
 
             foreach ($filasExcel as $filaExcel) {
-                $fingerprint = $this->fingerprintDesdeExcel($filaExcel);
-
-                if (isset($fingerprintsExistentes[$fingerprint])) {
+                if (! $this->codigoPlanificacionValido($filaExcel['Codigo Planificación'])) {
                     $omitidas++;
 
                     continue;
                 }
 
+                $matchKey = $this->matchKeyDesdeExcel($filaExcel);
+                $existente = $indiceExistentes[$matchKey] ?? null;
+
+                if ($existente instanceof ProgramaFila) {
+                    if ($this->actualizarFila($existente, $filaExcel)) {
+                        $actualizadas++;
+                    } else {
+                        $sinCambios++;
+                    }
+
+                    continue;
+                }
+
                 $nroFila++;
-                $this->insertarFila($filaExcel, $nroFila);
-                $fingerprintsExistentes[$fingerprint] = true;
+                $nueva = $this->insertarFila($filaExcel, $nroFila);
+                $indiceExistentes[$matchKey] = $nueva;
                 $insertadas++;
             }
         });
@@ -99,6 +122,8 @@ class ProgramaImportService
         return [
             'leidas' => count($filasExcel),
             'insertadas' => $insertadas,
+            'actualizadas' => $actualizadas,
+            'sin_cambios' => $sinCambios,
             'omitidas' => $omitidas,
             'total' => ProgramaFila::query()->count(),
         ];
@@ -132,7 +157,9 @@ class ProgramaImportService
 
             foreach (self::COLUMNAS as $columna) {
                 $col = $mapaColumnas[$columna];
-                $valor = $this->valorCeldaTexto($hoja, $col.$numeroFila);
+                $comoEntero = $columna === 'Codigo Planificación';
+                $comoNumero = $comoEntero || $columna === 'Cantidad x Caja';
+                $valor = $this->valorCeldaTexto($hoja, $col.$numeroFila, $comoNumero, $comoEntero);
                 if ($valor !== '') {
                     $vacia = false;
                 }
@@ -288,7 +315,7 @@ class ProgramaImportService
         );
     }
 
-    private function valorCeldaTexto(Worksheet $hoja, string $celda): string
+    private function valorCeldaTexto(Worksheet $hoja, string $celda, bool $comoNumero = false, bool $comoEntero = false): string
     {
         $cell = $hoja->getCell($celda);
 
@@ -299,13 +326,24 @@ class ProgramaImportService
             }
         }
 
-        foreach ([$cell->getFormattedValue(), $cell->getCalculatedValue(), $cell->getValue()] as $valor) {
-            if ($valor === null) {
+        $valor = $cell->getCalculatedValue();
+        if ($comoNumero && is_numeric($valor)) {
+            return $comoEntero
+                ? MaterialProgramaLookup::normalizarCodigo(sprintf('%.0f', (float) $valor))
+                : (string) $valor;
+        }
+
+        foreach ([$cell->getFormattedValue(), $cell->getCalculatedValue(), $cell->getValue()] as $valorCandidato) {
+            if ($valorCandidato === null) {
                 continue;
             }
 
-            $texto = trim((string) $valor);
+            $texto = trim((string) $valorCandidato);
             if ($texto !== '') {
+                if ($comoEntero) {
+                    return MaterialProgramaLookup::normalizarCodigo($texto);
+                }
+
                 return $texto;
             }
         }
@@ -341,9 +379,9 @@ class ProgramaImportService
     }
 
     /**
-     * @return array<string, true>
+     * @return array<string, ProgramaFila>
      */
-    private function fingerprintsExistentes(): array
+    private function indiceFilasExistentes(): array
     {
         $mapa = [];
 
@@ -355,7 +393,10 @@ class ProgramaImportService
             ->orderBy('idProgramaFila')
             ->chunk(300, function ($filas) use (&$mapa) {
                 foreach ($filas as $fila) {
-                    $mapa[$this->fingerprintDesdeFila($fila)] = true;
+                    $clave = $this->matchKeyDesdeFila($fila);
+                    if (! isset($mapa[$clave])) {
+                        $mapa[$clave] = $fila;
+                    }
                 }
             });
 
@@ -365,7 +406,7 @@ class ProgramaImportService
     /**
      * @param  array<string, string>  $filaExcel
      */
-    private function fingerprintDesdeExcel(array $filaExcel): string
+    private function matchKeyDesdeExcel(array $filaExcel): string
     {
         return $this->armarFingerprint([
             $filaExcel['Mercado'],
@@ -373,15 +414,13 @@ class ProgramaImportService
             $filaExcel['Programa'],
             $filaExcel['Variedad'],
             $filaExcel['Presentación'],
-            $filaExcel['Codigo Planificación'],
-            $filaExcel['Material Descripcion'],
-            $this->normalizarCantidad($filaExcel['Cantidad x Caja']),
+            MaterialProgramaLookup::normalizarCodigo($filaExcel['Codigo Planificación']),
             $this->valorObservacion($filaExcel['Observacion']),
-            $filaExcel['Material'],
+            $this->normalizarFamiliaImport($filaExcel['Material']),
         ]);
     }
 
-    private function fingerprintDesdeFila(ProgramaFila $fila): string
+    private function matchKeyDesdeFila(ProgramaFila $fila): string
     {
         return $this->armarFingerprint([
             $fila->mercado?->nomMercado,
@@ -389,12 +428,17 @@ class ProgramaImportService
             $fila->programa?->nomPrograma,
             $fila->variedad?->nomVariedad,
             $fila->presentacion?->nomPresentacion,
-            $fila->material?->CodigoPL,
-            $fila->material?->nomMaterial,
-            $this->normalizarCantidad((string) ($fila->cantidadCaja?->cantidad ?? '0')),
+            MaterialProgramaLookup::normalizarCodigo((string) ($fila->material?->CodigoPL ?? '')),
             $fila->uso?->nomUso,
-            $fila->familia?->nomFamilia,
+            $this->normalizarFamiliaImport((string) ($fila->familia?->nomFamilia ?? '')),
         ]);
+    }
+
+    private function codigoPlanificacionValido(string $codigo): bool
+    {
+        $codigo = MaterialProgramaLookup::normalizarCodigo($codigo);
+
+        return $codigo !== '' && $codigo !== '-';
     }
 
     /**
@@ -423,7 +467,44 @@ class ProgramaImportService
     /**
      * @param  array<string, string>  $filaExcel
      */
-    private function insertarFila(array $filaExcel, int $nroFila): void
+    private function insertarFila(array $filaExcel, int $nroFila): ProgramaFila
+    {
+        return ProgramaFila::query()->create($this->datosFilaDesdeExcel($filaExcel, $nroFila));
+    }
+
+    /**
+     * @param  array<string, string>  $filaExcel
+     */
+    private function actualizarFila(ProgramaFila $fila, array $filaExcel): bool
+    {
+        $nomMaterialAntes = $fila->material?->nomMaterial;
+        $datos = $this->datosFilaDesdeExcel($filaExcel, (int) $fila->nroFila);
+        unset($datos['nroFila']);
+
+        $material = MaterialProgramaPL::query()->find($datos['idMaterialPL']);
+        $materialCambio = $material && $nomMaterialAntes !== $material->nomMaterial;
+
+        $cambioFila = false;
+        foreach ($datos as $campo => $valor) {
+            if ((string) $fila->getAttribute($campo) !== (string) $valor) {
+                $cambioFila = true;
+                break;
+            }
+        }
+
+        if ($cambioFila) {
+            $fila->update($datos);
+            $fila->refresh();
+        }
+
+        return $cambioFila || $materialCambio;
+    }
+
+    /**
+     * @param  array<string, string>  $filaExcel
+     * @return array<string, int|string>
+     */
+    private function datosFilaDesdeExcel(array $filaExcel, int $nroFila): array
     {
         $material = $this->resolverMaterialProgramaPl(
             trim($filaExcel['Codigo Planificación']),
@@ -436,7 +517,7 @@ class ProgramaImportService
             ['Estado' => Estado::ACTIVO]
         );
 
-        ProgramaFila::query()->create([
+        return [
             'nroFila' => $nroFila,
             'idMercado' => $this->catalogoId(Mercado::class, 'nomMercado', $filaExcel['Mercado']),
             'idCliente' => $this->catalogoId(Cliente::class, 'nomCliente', $filaExcel['Cliente']),
@@ -447,9 +528,9 @@ class ProgramaImportService
             'idCantidadCaja' => $cantidad->idCantidadCaja,
             'idUso' => $this->catalogoId(Uso::class, 'nomUso', $this->valorObservacion($filaExcel['Observacion'])),
             'idSituado' => $this->catalogoId(Situado::class, 'nomSituado', self::SITUADO_IMPORT_DEFAULT),
-            'idFamilia' => $this->catalogoId(Familia::class, 'nomFamilia', $filaExcel['Material']),
+            'idFamilia' => $this->catalogoId(Familia::class, 'nomFamilia', $this->normalizarFamiliaImport($filaExcel['Material'])),
             'Estado' => Estado::ACTIVO,
-        ]);
+        ];
     }
 
     private function valorObservacion(string $valor): string
@@ -459,24 +540,27 @@ class ProgramaImportService
         return $valor !== '' ? $valor : self::OBSERVACION_VACIA;
     }
 
-    /** Solo crea MaterialProgramaPL si el código PL no existe; no actualiza existentes. */
+    private function normalizarFamiliaImport(string $valor): string
+    {
+        $valor = trim($valor);
+        $norm = FamiliaMaterialSupport::normalizar($valor);
+
+        if (in_array($norm, ['cajas', 'caja'], true)) {
+            return 'Box';
+        }
+
+        return $valor;
+    }
+
+    /** Reutiliza o crea MaterialProgramaPL; en reimportación actualiza la descripción. */
     private function resolverMaterialProgramaPl(string $codigo, string $descripcion): MaterialProgramaPL
     {
-        if ($codigo === '') {
+        $codigo = MaterialProgramaLookup::normalizarCodigo($codigo);
+        if ($codigo === '' || $codigo === '-') {
             throw new InvalidArgumentException('Código de planificación vacío.');
         }
 
-        $existente = MaterialProgramaPL::query()->where('CodigoPL', $codigo)->first();
-        if ($existente) {
-            return $existente;
-        }
-
-        return MaterialProgramaPL::query()->create([
-            'CodigoPL' => $codigo,
-            'nomMaterial' => $descripcion,
-            'fechaRegistro' => now()->toDateString(),
-            'Estado' => Estado::ACTIVO,
-        ]);
+        return MaterialProgramaLookup::resolverPorCodigo($codigo, $descripcion, reactivar: true, actualizarNombre: true);
     }
 
     /**

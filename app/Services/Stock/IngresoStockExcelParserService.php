@@ -3,8 +3,8 @@
 namespace App\Services\Stock;
 
 use App\Models\Programas\Familia;
-use App\Models\Programas\MaterialProgramaPL;
 use App\Models\Stock\Almacen;
+use App\Support\MaterialProgramaLookup;
 use Illuminate\Http\UploadedFile;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -216,12 +216,7 @@ class IngresoStockExcelParserService
 
     private function normalizarCodigo(string $codigo): string
     {
-        $codigo = trim($codigo);
-        if ($codigo === '' || $codigo === '-' || $codigo === '—') {
-            return '-';
-        }
-
-        return $codigo;
+        return MaterialProgramaLookup::normalizarCodigo($codigo);
     }
 
     private function parseCantidad(string $valor): float
@@ -256,13 +251,9 @@ class IngresoStockExcelParserService
             );
         }
 
-        $material = MaterialProgramaPL::query()->updateOrCreate(
-            ['CodigoPL' => $codigo],
-            [
-                'nomMaterial' => $descripcion !== '' ? $descripcion : $codigo,
-                'fechaRegistro' => now()->toDateString(),
-                'Estado' => 1,
-            ]
+        $material = MaterialProgramaLookup::resolverPorCodigo(
+            $codigo,
+            $descripcion !== '' ? $descripcion : $codigo
         );
 
         return [

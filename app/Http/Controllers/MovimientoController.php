@@ -466,6 +466,16 @@ class MovimientoController extends Controller
         ]);
     }
 
+    public function buscarMateriales(Request $request): JsonResponse
+    {
+        return response()->json([
+            'materiales' => $this->movimientoService->buscarMateriales(
+                (string) $request->query('q', ''),
+                (int) $request->query('limite', 50)
+            ),
+        ]);
+    }
+
     public function stockDisponible(Request $request): JsonResponse
     {
         $idMaterial = (int) $request->query('id_material_pl', 0);

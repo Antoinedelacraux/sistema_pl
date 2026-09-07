@@ -71,6 +71,23 @@ class StockResumenController extends Controller
             'producto' => $producto,
             'estado' => $request->query('estado'),
             'buscar' => trim((string) $request->query('buscar', '')),
+            'cajas' => $this->cajasDesdeRequest($request, $programa, $producto),
         ];
+    }
+
+    private function cajasDesdeRequest(Request $request, ?int $programa, ?int $producto): ?float
+    {
+        if ($programa === null || $producto === null) {
+            return null;
+        }
+
+        $cajas = $request->query('cajas');
+        if ($cajas === null || $cajas === '' || ! is_numeric($cajas)) {
+            return null;
+        }
+
+        $valor = (float) $cajas;
+
+        return $valor > 0 ? $valor : null;
     }
 }

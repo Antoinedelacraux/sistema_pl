@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    RESPONSIVE — cargar después de app.css
    ============================================================ */
 
@@ -26,7 +26,8 @@
     }
 
     .panel--proveedor .receta-command__grid {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto auto;
+        grid-template-rows: auto;
     }
 
     .panel--programas .receta-cmd-field--search {
@@ -34,7 +35,8 @@
     }
 
     .panel--proveedor .receta-cmd-field--search {
-        grid-column: 1 / -1;
+        grid-column: auto;
+        grid-row: auto;
     }
 
     .panel--programas .receta-cmd-clear {
@@ -42,7 +44,8 @@
     }
 
     .panel--proveedor .receta-cmd-clear {
-        grid-column: 1;
+        grid-column: 3;
+        grid-row: 1;
     }
 
     .panel--receta-params .receta-command__grid--params {
@@ -60,7 +63,18 @@
     }
 
     .panel--proveedor .receta-cmd-export {
-        grid-column: 2 / -1;
+        grid-column: 4;
+        grid-row: 1;
+    }
+
+    .panel--proveedor .grid-table-section .proveedor-grid-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .panel--proveedor .proveedor-grid {
+        min-width: 960px;
+        table-layout: auto;
     }
 
     .panel--programas .receta-command__aside,
@@ -131,11 +145,20 @@
 
     .panel--maestros .maestros-toolbar {
         flex-wrap: wrap;
-        align-items: stretch;
+        align-items: flex-end;
     }
 
     .panel--maestros .maestros-filters {
         flex: 1 1 280px;
+        min-width: 0;
+    }
+
+    .panel--maestros .maestros-filters__field--search {
+        max-width: none;
+    }
+
+    .panel--maestros .maestros-toolbar > .btn {
+        margin-left: auto;
     }
 }
 
@@ -294,19 +317,106 @@
         padding: 10px;
     }
 
-    .panel--programas .receta-command__grid,
-    .panel--proveedor .receta-command__grid {
+    .panel--programas .receta-command__grid {
         grid-template-columns: 1fr;
         gap: 8px;
     }
 
     .panel--programas .receta-cmd-field--search,
     .panel--programas .receta-cmd-clear,
-    .panel--programas .receta-cmd-export,
-    .panel--proveedor .receta-cmd-field--search,
-    .panel--proveedor .receta-cmd-clear,
-    .panel--proveedor .receta-cmd-export {
+    .panel--programas .receta-cmd-export {
         grid-column: 1 / -1;
+    }
+
+    /* Proveedor: Material | Buscar / Limpiar | Export en filas densas */
+    .panel--proveedor .receta-command__grid {
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+            "familia familia"
+            "search clear"
+            "export export";
+        gap: 8px;
+        align-items: end;
+    }
+
+    .panel--proveedor .receta-command__grid > .receta-cmd-field:not(.receta-cmd-field--search) {
+        grid-area: familia;
+        grid-column: auto;
+        grid-row: auto;
+    }
+
+    .panel--proveedor .receta-cmd-field--search {
+        grid-area: search;
+        grid-column: auto;
+        grid-row: auto;
+        min-width: 0;
+    }
+
+    .panel--proveedor .receta-cmd-clear {
+        grid-area: clear;
+        grid-column: auto;
+        grid-row: auto;
+        align-items: flex-end;
+    }
+
+    .panel--proveedor .receta-cmd-export {
+        grid-area: export;
+        grid-column: auto;
+        grid-row: auto;
+        justify-content: flex-start;
+    }
+
+    .panel--proveedor .receta-cmd-clear .btn {
+        width: auto;
+        min-width: 84px;
+        white-space: nowrap;
+    }
+
+    .panel--proveedor .receta-command__aside {
+        display: grid;
+        grid-template-columns: auto 1fr 1fr;
+        gap: 8px;
+        align-items: stretch;
+    }
+
+    .panel--proveedor .receta-command__stat {
+        flex: none;
+        min-width: 72px;
+        min-height: 0;
+        padding: 6px 8px;
+    }
+
+    .panel--proveedor .receta-command__stat-value {
+        font-size: 16px;
+    }
+
+    .panel--proveedor .receta-command__aside > .btn {
+        flex: none;
+        width: 100%;
+        justify-content: center;
+        min-height: 36px;
+    }
+
+    .panel--proveedor .grid-table-section .proveedor-grid-wrap {
+        padding: 0 8px 8px;
+        max-height: calc(100dvh - 300px);
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .panel--proveedor .proveedor-grid {
+        min-width: 880px;
+        table-layout: auto;
+    }
+
+    .panel--proveedor .proveedor-grid .maestros-grid__action-btn,
+    .panel--proveedor .proveedor-grid .icon-action {
+        width: 36px;
+        height: 36px;
+    }
+
+    .panel--proveedor .grid-table-head {
+        padding: 0 10px;
     }
 
     .panel--receta-params .receta-command__grid--params {
@@ -320,13 +430,11 @@
         grid-row: auto;
     }
 
-    .panel--programas .receta-cmd-clear .btn,
-    .panel--proveedor .receta-cmd-clear .btn {
+    .panel--programas .receta-cmd-clear .btn {
         width: 100%;
     }
 
-    .panel--programas .receta-cmd-export,
-    .panel--proveedor .receta-cmd-export {
+    .panel--programas .receta-cmd-export {
         justify-content: flex-start;
     }
 
@@ -362,13 +470,30 @@
     .modal-proveedor-block__grid {
         grid-template-columns: 1fr;
     }
+    .panel--proveedor .modal__panel--wide,
+    #proveedor-modal-agregar .modal__panel,
+    #proveedor-modal-columnas .modal__panel {
+        width: calc(100vw - 20px);
+        max-width: 100%;
+        margin: 10px;
+        max-height: calc(100dvh - 20px);
+        overflow: auto;
+    }
 
     .topbar {
         flex-direction: row;
         align-items: center;
-        flex-wrap: wrap;
-        padding: 14px 16px;
-        gap: 12px;
+        flex-wrap: nowrap;
+        padding: 10px 12px;
+        gap: 8px;
+    }
+
+    .topbar__crumbs {
+        display: none;
+    }
+
+    .topbar__title {
+        font-size: 18px;
     }
 
     .topbar__lead {
@@ -436,47 +561,75 @@
     }
 
     .panel--maestros .maestros-tabs {
-        padding: 12px 12px 0;
+        position: relative;
+        padding: 10px 10px 0;
+    }
+
+    .panel--maestros .maestros-tabs::after {
+        content: "";
+        position: absolute;
+        top: 10px;
+        right: 0;
+        bottom: 0;
+        width: 28px;
+        pointer-events: none;
+        background: linear-gradient(90deg, transparent, var(--app-surface, #fff) 70%);
     }
 
     .panel--maestros .maestros-tabs__btn {
-        min-height: 34px;
-        padding: 0 12px;
+        min-height: 32px;
+        padding: 0 11px;
         font-size: 12px;
     }
 
     .panel--maestros .maestros-toolbar {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
-        padding: 12px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+            "search clear"
+            "add add";
+        align-items: end;
+        gap: 8px;
+        padding: 10px 12px;
     }
 
     .panel--maestros .maestros-filters {
-        flex-direction: column;
-        align-items: stretch;
-        width: 100%;
+        display: contents;
     }
 
     .panel--maestros .maestros-filters__field--search {
+        grid-area: search;
+        flex: 0 0 auto;
         max-width: none;
         min-width: 0;
-        width: 100%;
+        width: auto;
+    }
+
+    .panel--maestros .maestros-filters__clear-wrap {
+        grid-area: clear;
+        width: auto;
+        display: flex;
+        align-items: flex-end;
     }
 
     .panel--maestros .maestros-filters__clear-wrap .btn {
-        width: 100%;
+        width: auto;
+        min-width: 84px;
+        white-space: nowrap;
     }
 
     .panel--maestros .maestros-toolbar > .btn {
+        grid-area: add;
         width: 100%;
         justify-content: center;
+        margin-left: 0;
     }
 
     .panel--maestros .grid-table-section .maestros-grid-wrap {
-        padding: 0 10px;
-        max-height: calc(100dvh - 300px);
-        overflow: visible;
+        padding: 0 10px 10px;
+        max-height: calc(100dvh - 240px);
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .panel--maestros .grid-table-head {
@@ -490,26 +643,36 @@
     .panel--maestros .maestros-grid,
     .panel--maestros .maestros-grid tbody {
         display: block;
+        width: 100%;
     }
 
     .panel--maestros .maestros-grid tr {
-        display: flex;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "nombre actions"
+            "estado actions";
         align-items: center;
-        gap: 8px 12px;
-        padding: 12px 10px;
+        column-gap: 10px;
+        row-gap: 4px;
+        padding: 10px 8px;
         border-bottom: 1px solid var(--line);
+        background: var(--app-surface);
     }
 
     .panel--maestros .maestros-grid tr:has(.data-table__empty) {
         display: block;
         padding: 0;
+        background: transparent;
     }
 
     .panel--maestros .maestros-grid td {
         display: block;
         padding: 0;
         border: 0;
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
     }
 
     .panel--maestros .maestros-grid .data-table__empty {
@@ -518,26 +681,33 @@
     }
 
     .panel--maestros .maestros-grid__nombre {
-        flex: 1 1 calc(100% - 88px);
-        min-width: 0;
-        font-size: 14px;
-        line-height: 1.35;
+        grid-area: nombre;
+        font-size: 13.5px;
+        line-height: 1.25;
         word-break: break-word;
     }
 
     .panel--maestros .maestros-grid__cell-center {
-        flex: 1 1 100%;
-        width: auto;
-        min-width: 0;
+        grid-area: estado;
         text-align: left;
+        justify-self: start;
     }
 
     .panel--maestros .maestros-grid__actions {
-        flex: 0 0 auto;
-        width: auto;
-        min-width: 0;
-        max-width: none;
-        margin-left: auto;
+        grid-area: actions;
+        align-self: center;
+        justify-self: end;
+        margin-left: 0;
+    }
+
+    .panel--maestros .maestros-grid__action-group {
+        gap: 8px;
+    }
+
+    .panel--maestros .maestros-grid__action-slot,
+    .panel--maestros .maestros-grid .maestros-grid__action-btn {
+        width: 40px;
+        height: 40px;
     }
 
     .panel--maestros .maestros-grid__th--nombre,
@@ -545,6 +715,27 @@
     .panel--maestros .maestros-grid__th--actions {
         width: auto;
         min-width: 0;
+    }
+
+    .panel--maestros .maestros-filters__clear-wrap {
+        width: auto;
+    }
+
+    #maestros-modal .modal__panel {
+        width: calc(100vw - 24px);
+        max-width: 420px;
+        margin: 12px;
+    }
+
+    #maestros-modal .modal__foot {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    #maestros-modal .modal__foot .btn {
+        flex: 1 1 auto;
+        min-width: 120px;
+        justify-content: center;
     }
 
     .usuarios-hero {
@@ -652,6 +843,46 @@
 }
 
 @media (max-width: 480px) {
+    .panel--maestros .maestros-tabs {
+        padding: 8px 8px 0;
+    }
+
+    .panel--maestros .maestros-tabs__btn {
+        min-height: 30px;
+        padding: 0 9px;
+        font-size: 11px;
+    }
+
+    .panel--maestros .maestros-toolbar {
+        gap: 6px;
+        padding: 8px 10px;
+    }
+
+    .panel--maestros .maestros-grid-wrap {
+        max-height: calc(100dvh - 220px);
+    }
+
+    .panel--proveedor .receta-command__aside {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .panel--proveedor .receta-command__stat {
+        grid-column: 1 / -1;
+    }
+
+    .panel--proveedor .proveedor-grid {
+        min-width: 820px;
+    }
+
+    .panel--proveedor .grid-table-section .proveedor-grid-wrap {
+        max-height: calc(100dvh - 280px);
+    }
+
+    .topbar__actions .btn--outline,
+    .topbar__actions a.btn {
+        padding-inline: 8px;
+        font-size: 12px;
+    }
     .registro-consumo-extra__field {
         flex: 1 1 100%;
     }

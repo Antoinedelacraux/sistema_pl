@@ -32,6 +32,9 @@ class Usuario extends Authenticatable
         'Password',
     ];
 
+    /** @var array<string, UsuarioPermiso>|null */
+    private ?array $permisosPorModuloCache = null;
+
     public function persona(): BelongsTo
     {
         return $this->belongsTo(Persona::class, 'idPersona', 'idPersona');
@@ -73,9 +76,7 @@ class Usuario extends Authenticatable
             return false;
         }
 
-        $permiso = $this->permisos()
-            ->whereHas('modulo', fn ($q) => $q->where('codigo', $modulo))
-            ->first();
+        $permiso = $this->permisoPorModulo($modulo);
 
         if (! $permiso) {
             return false;
@@ -94,7 +95,32 @@ class Usuario extends Authenticatable
     {
         return $this->puede($modulo, PermisoAccion::VER);
     }
+
+    /**
+     * Carga todos los permisos del usuario una sola vez por request
+     * (sidebar + middleware + flags de vista).
+     */
+    private function permisoPorModulo(string $modulo): ?UsuarioPermiso
+    {
+        if ($this->permisosPorModuloCache === null) {
+            $this->permisosPorModuloCache = [];
+
+            $permisos = $this->relationLoaded('permisos')
+                ? $this->permisos
+                : $this->permisos()->with(['modulo:idModulo,codigo'])->get();
+
+            if ($permisos->isNotEmpty() && ! $permisos->first()->relationLoaded('modulo')) {
+                $permisos->load(['modulo:idModulo,codigo']);
+            }
+
+            foreach ($permisos as $permiso) {
+                $codigo = $permiso->modulo?->codigo;
+                if (is_string($codigo) && $codigo !== '') {
+                    $this->permisosPorModuloCache[$codigo] = $permiso;
+                }
+            }
+        }
+
+        return $this->permisosPorModuloCache[$modulo] ?? null;
+    }
 }
-
-
-

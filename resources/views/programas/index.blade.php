@@ -15,6 +15,7 @@
         'presentacion' => request('presentacion'),
         'buscar' => request('buscar'),
     ], fn ($valor) => filled($valor));
+    $programaSeleccionado = (int) ($filtros['programa'] ?? 0);
 @endphp
 <div class="programas-page">
 @include('partials.flash')
@@ -35,7 +36,7 @@
                         <span class="receta-cmd-label">Mercado</span>
                         <select id="receta-filtro-mercado" name="mercado" class="receta-cmd-input">
                             <option value="">Todos</option>
-                            @foreach ($mercados as $item)
+                            @foreach ($catalogosFiltro['mercados'] as $item)
                                 <option value="{{ $item->idMercado }}" @selected((string) ($filtros['mercado'] ?? '') === (string) $item->idMercado)>{{ $item->nomMercado }}</option>
                             @endforeach
                         </select>
@@ -45,7 +46,7 @@
                         <span class="receta-cmd-label">Cliente</span>
                         <select id="receta-filtro-cliente" name="cliente" class="receta-cmd-input">
                             <option value="">Todos</option>
-                            @foreach ($clientes as $item)
+                            @foreach ($catalogosFiltro['clientes'] as $item)
                                 <option value="{{ $item->idCliente }}" @selected((string) ($filtros['cliente'] ?? '') === (string) $item->idCliente)>{{ $item->nomCliente }}</option>
                             @endforeach
                         </select>
@@ -55,7 +56,7 @@
                         <span class="receta-cmd-label">Programa</span>
                         <select id="receta-filtro-programa" name="programa" class="receta-cmd-input">
                             <option value="">Todos</option>
-                            @foreach ($programas as $item)
+                            @foreach ($catalogosFiltro['programas'] as $item)
                                 <option value="{{ $item->idPrograma }}" @selected((string) ($filtros['programa'] ?? '') === (string) $item->idPrograma)>{{ $item->nomPrograma }}</option>
                             @endforeach
                         </select>
@@ -63,11 +64,15 @@
 
                     <label class="receta-cmd-field">
                         <span class="receta-cmd-label">Producto</span>
-                        <select id="receta-filtro-presentacion" name="presentacion" class="receta-cmd-input">
-                            <option value="">Todos</option>
-                            @foreach ($presentaciones as $item)
-                                <option value="{{ $item->idPresentacion }}" @selected((string) ($filtros['presentacion'] ?? '') === (string) $item->idPresentacion)>{{ $item->nomPresentacion }}</option>
-                            @endforeach
+                        <select id="receta-filtro-presentacion" name="presentacion" class="receta-cmd-input" @disabled($programaSeleccionado <= 0)>
+                            @if ($programaSeleccionado <= 0)
+                                <option value="">Seleccione un programa</option>
+                            @else
+                                <option value="">Todos</option>
+                                @foreach ($catalogosFiltro['presentaciones'] as $item)
+                                    <option value="{{ $item->idPresentacion }}" @selected((string) ($filtros['presentacion'] ?? '') === (string) $item->idPresentacion)>{{ $item->nomPresentacion }}</option>
+                                @endforeach
+                            @endif
                         </select>
                     </label>
 
@@ -75,7 +80,7 @@
                         <span class="receta-cmd-label">Material</span>
                         <select id="receta-filtro-familia" name="familia" class="receta-cmd-input">
                             <option value="">Todos</option>
-                            @foreach ($familias as $item)
+                            @foreach ($catalogosFiltro['familias'] as $item)
                                 <option value="{{ $item->idFamilia }}" @selected((string) ($filtros['familia'] ?? '') === (string) $item->idFamilia)>{{ $item->nomFamilia }}</option>
                             @endforeach
                         </select>
@@ -244,6 +249,7 @@
     window.recetaMaterialUrl = @json(route('programas.material-por-codigo'));
     window.recetaEditarImagenId = @json(session('receta_editar_imagen'));
 </script>
+<script src="{{ asset('js/receta-filters.js') }}?v=1" defer></script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
 <script src="{{ asset('js/receta.js') }}?v=5" defer></script>
 <script>

@@ -21,18 +21,26 @@ class ProgramaPresentacionParamController extends Controller
 
     public function index(Request $request): View
     {
-        $filtros = [
+        $filtros = $this->gridService->normalizarFiltros([
             'programa' => $request->query('programa'),
             'presentacion' => $request->query('presentacion'),
-            'buscar' => trim((string) $request->query('buscar', '')),
-        ];
+            'q' => trim((string) $request->query('buscar', '')),
+        ]);
 
-        $combinaciones = $this->paramService->listarPaginado($filtros, $request);
-        $catalogos = $this->gridService->catalogos();
+        $combinaciones = $this->paramService->listarPaginado([
+            'programa' => $filtros['programa'],
+            'presentacion' => $filtros['presentacion'],
+            'buscar' => $filtros['q'],
+        ], $request);
 
-        return view('programas.presentacion_params', array_merge($catalogos, [
+        return view('programas.presentacion_params', array_merge($this->gridService->catalogos(), [
+            'catalogosFiltro' => $this->gridService->catalogosFiltro($filtros),
             'combinaciones' => $combinaciones,
-            'filtros' => $filtros,
+            'filtros' => [
+                'programa' => $filtros['programa'],
+                'presentacion' => $filtros['presentacion'],
+                'buscar' => $filtros['q'],
+            ],
             'puedeEditar' => $request->user()?->puede('programas', 'editar') ?? false,
             'activeNav' => 'programas',
             'recetaTab' => 'params',

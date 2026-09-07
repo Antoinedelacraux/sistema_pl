@@ -22,6 +22,7 @@ class ResumenExportService
     {
         $columnas = ExportText::tituloPalabrasLista([
             'Código Planeamiento',
+            'Variedad',
             'Material Planeamiento',
         ]);
 
@@ -80,6 +81,7 @@ class ResumenExportService
     {
         $datos = [
             $fila->material->CodigoPL,
+            $fila->variedad !== '' ? $fila->variedad : '—',
             $fila->material->nomMaterial,
         ];
 

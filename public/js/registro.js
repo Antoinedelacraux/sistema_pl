@@ -1,5 +1,6 @@
 (function () {
     var materialUrl = window.registroMaterialUrl || '';
+    var materialesBuscarUrl = window.registroMaterialesBuscarUrl || '';
     var materialesMap = window.registroMaterialesMap || {};
     var stockUrl = window.registroStockUrl || '';
     var consumoProgramasUrl = window.registroConsumoProgramasUrl || '';
@@ -80,11 +81,8 @@
             submitBtn.textContent = tipo === 'ingreso' ? 'Guardar ingreso' : 'Guardar';
         }
 
-        if (tipo === 'ingreso' && typeof ingresoLineas !== 'undefined') {
-            ingresoLineas = [];
-            renderIngresoPreview();
-            limpiarLineaIngreso();
-            ocultarEstadoXmlIngreso();
+        if (tipo === 'ingreso' && typeof resetIngresoModalState === 'function') {
+            resetIngresoModalState();
         }
 
         if (tipo === 'egreso') {
@@ -720,7 +718,54 @@
         cargarMaterialesConsumo(programa.value, presentacion.value);
     }
 
-    function ensureMaterialOption(select, idMaterial, codigoPl, nomMaterialPl) {
+    function poblarSelectMateriales(select, items) {
+        if (!select) {
+            return;
+        }
+
+        var seleccionado = select.value;
+        select.innerHTML = '<option value="">Seleccionar material</option>';
+
+        (Array.isArray(items) ? items : []).forEach(function (item) {
+            if (!item || !item.id_material_pl) {
+                return;
+            }
+            ensureMaterialOption(
+                select,
+                item.id_material_pl,
+                item.codigo_pl || '',
+                item.nom_material || '',
+                true
+            );
+        });
+
+        if (seleccionado && select.querySelector('option[value="' + seleccionado + '"]')) {
+            select.value = seleccionado;
+        }
+    }
+
+    function buscarMaterialesPicker(prefix, termino) {
+        var select = document.querySelector('[data-material-select="' + prefix + '"]');
+        if (!select || !materialesBuscarUrl || prefix === 'egreso') {
+            return Promise.resolve();
+        }
+
+        var q = String(termino || '').trim();
+        if (q !== '' && q.length < 2) {
+            return Promise.resolve();
+        }
+
+        var url = materialesBuscarUrl + '?q=' + encodeURIComponent(q) + '&limite=50';
+
+        return fetch(url, { headers: { Accept: 'application/json' } })
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                poblarSelectMateriales(select, data.materiales || []);
+            })
+            .catch(function () {});
+    }
+
+    function ensureMaterialOption(select, idMaterial, codigoPl, nomMaterialPl, soloAgregar) {
         if (!select || !idMaterial) {
             return;
         }
@@ -739,7 +784,9 @@
         option.setAttribute('data-codigo-pl', codigoPl || '');
         option.setAttribute('data-nom-material-pl', nomMaterialPl || '');
         option.textContent = (codigoPl || value) + (nomMaterialPl ? ' — ' + nomMaterialPl : '');
-        select.value = value;
+        if (!soloAgregar) {
+            select.value = value;
+        }
 
         materialesMap[value] = {
             codigo: codigoPl || (materialesMap[value] && materialesMap[value].codigo) || '',
@@ -774,12 +821,36 @@
         var searchInput = document.querySelector('[data-material-search="' + prefix + '"]');
         var select = document.querySelector('[data-material-select="' + prefix + '"]');
 
-        if (!searchInput || !select || !materialUrl) {
+        if (!searchInput || !select) {
             return;
         }
 
         var codigo = searchInput.value.trim();
-        if (codigo.length < 4) {
+        if (codigo.length >= 2 && materialesBuscarUrl) {
+            buscarMaterialesPicker(prefix, codigo).then(function () {
+                if (codigo.length >= 4 && materialUrl) {
+                    fetch(materialUrl + '?codigo=' + encodeURIComponent(codigo), {
+                        headers: { Accept: 'application/json' },
+                    })
+                        .then(function (response) { return response.json(); })
+                        .then(function (data) {
+                            if (data.encontrado) {
+                                ensureMaterialOption(
+                                    select,
+                                    data.id_material_pl,
+                                    data.codigo_pl || '',
+                                    data.nom_material || ''
+                                );
+                                syncMaterial(prefix);
+                            }
+                        })
+                        .catch(function () {});
+                }
+            });
+            return;
+        }
+
+        if (!materialUrl || codigo.length < 4) {
             return;
         }
 
@@ -851,6 +922,15 @@
             var prefix = select.getAttribute('data-material-select');
             syncMaterial(prefix);
         });
+
+        var prefix = select.getAttribute('data-material-select');
+        if (prefix === 'ingreso' || prefix === 'traslado') {
+            select.addEventListener('focus', function () {
+                if (select.options.length <= 1) {
+                    buscarMaterialesPicker(prefix, '');
+                }
+            });
+        }
     });
 
     document.querySelectorAll('[data-material-search]').forEach(function (input) {
@@ -911,10 +991,6 @@
     var abrirEgreso = document.getElementById('registro-abrir-egreso');
     var abrirTraslado = document.getElementById('registro-abrir-traslado');
 
-    if (abrirIngreso) abrirIngreso.addEventListener('click', function () {
-        resetModalCreacion('ingreso');
-        abrirModal('ingreso');
-    });
     if (abrirEgreso) abrirEgreso.addEventListener('click', function () {
         resetModalCreacion('egreso');
         respaldarProgramasConsumo();
@@ -925,6 +1001,7 @@
     if (abrirTraslado) abrirTraslado.addEventListener('click', function () {
         resetModalCreacion('traslado');
         abrirModal('traslado');
+        buscarMaterialesPicker('traslado', '');
     });
 
     document.querySelectorAll('[data-cerrar-modal-registro]').forEach(function (node) {
@@ -1214,9 +1291,26 @@
             return;
         }
 
+        if (tipo === 'ok') {
+            tipo = 'success';
+        }
+
         status.hidden = false;
         status.textContent = mensaje;
         status.className = 'field__hint registro-xml-lectura registro-ingreso-archivos__status' + (tipo ? ' is-' + tipo : '');
+    }
+
+    function resetIngresoModalState() {
+        ingresoLineas = [];
+        renderIngresoPreview();
+        limpiarLineaIngreso();
+        ocultarEstadoXmlIngreso();
+        ['ingreso-archivo-pdf', 'ingreso-archivo-xml', 'ingreso-archivo-excel'].forEach(function (id) {
+            var input = document.getElementById(id);
+            if (input) {
+                input.value = '';
+            }
+        });
     }
 
     function ocultarEstadoXmlIngreso() {
@@ -1305,7 +1399,7 @@
                     if (Array.isArray(data.advertencias) && data.advertencias.length > 0) {
                         msg += '. ' + data.advertencias.length + ' fila(s) omitida(s).';
                     }
-                    mostrarEstadoXmlIngreso(msg, 'ok');
+                    mostrarEstadoXmlIngreso(msg, 'success');
                 };
 
                 if (ingresoLineas.length > 0 && window.TalsaConfirm) {
@@ -1449,6 +1543,14 @@
     }
 
     restaurarLineasIngresoOld();
+
+    if (abrirIngreso) {
+        abrirIngreso.addEventListener('click', function () {
+            resetModalCreacion('ingreso');
+            abrirModal('ingreso');
+            buscarMaterialesPicker('ingreso', '');
+        });
+    }
 
     /* ── Detalle de operación ── */
     var detalleMovimientoUrl = window.registroDetalleMovimientoUrl || '';
@@ -1853,9 +1955,6 @@
     document.addEventListener('registro-offline-queued', function (event) {
         var tipo = event.detail && event.detail.tipo;
         if (tipo === 'ingreso') {
-            ingresoLineas = [];
-            renderIngresoPreview();
-            limpiarLineaIngreso();
             resetModalCreacion('ingreso');
             cerrarModal('ingreso');
         } else if (tipo === 'egreso') {
