@@ -5,9 +5,11 @@ namespace App\Services\Stock;
 use App\Models\Estado;
 use App\Models\Programas\ProgramaCatalogo;
 use App\Models\Programas\ProgramaFila;
+use App\Models\Programas\ProgramaGeneral;
 use App\Models\Programas\ProgramaPresentacionParam;
 use App\Models\Programas\Presentacion;
 use App\Models\Stock\MovimientoStock;
+use App\Support\CantidadCajaSupport;
 use App\Support\FamiliaMaterialSupport;
 use App\Support\UsoObservacionSupport;
 use Illuminate\Support\Collection;
@@ -16,19 +18,53 @@ use Illuminate\Support\Facades\Cache;
 class ConsumoRecetaService
 {
     /**
-     * @return Collection<int, ProgramaCatalogo>
+     * @return Collection<int, ProgramaGeneral>
      */
-    public function programasDisponibles(): Collection
+    public function programasGeneralesDisponibles(): Collection
     {
-        return Cache::remember('catalogo.programas_consumo', 60, function () {
-            return ProgramaCatalogo::query()
+        return Cache::remember('catalogo.programas_generales_consumo', 60, function () {
+            $idsGeneral = ProgramaCatalogo::query()
                 ->activo()
                 ->whereIn('idPrograma', ProgramaFila::query()
                     ->select('idPrograma')
                     ->where('Estado', Estado::ACTIVO)
                     ->distinct())
+                ->whereNotNull('idProgramaGeneral')
+                ->distinct()
+                ->pluck('idProgramaGeneral');
+
+            return ProgramaGeneral::query()
+                ->activo()
+                ->whereIn('idProgramaGeneral', $idsGeneral)
+                ->orderBy('nombre')
+                ->get(['idProgramaGeneral', 'nombre', 'CodigoProGeneral']);
+        });
+    }
+
+    /**
+     * @return Collection<int, ProgramaCatalogo>
+     */
+    public function programasDisponibles(?int $idProgramaGeneral = null): Collection
+    {
+        $cacheKey = $idProgramaGeneral !== null && $idProgramaGeneral > 0
+            ? 'catalogo.programas_consumo.pg.'.$idProgramaGeneral
+            : 'catalogo.programas_consumo';
+
+        return Cache::remember($cacheKey, 60, function () use ($idProgramaGeneral) {
+            $query = ProgramaCatalogo::query()
+                ->activo()
+                ->whereIn('idPrograma', ProgramaFila::query()
+                    ->select('idPrograma')
+                    ->where('Estado', Estado::ACTIVO)
+                    ->distinct());
+
+            if ($idProgramaGeneral !== null && $idProgramaGeneral > 0) {
+                $query->where('idProgramaGeneral', $idProgramaGeneral);
+            }
+
+            return $query
                 ->orderBy('nomPrograma')
-                ->get(['idPrograma', 'nomPrograma']);
+                ->get(['idPrograma', 'nomPrograma', 'idProgramaGeneral']);
         });
     }
 
@@ -67,7 +103,8 @@ class ConsumoRecetaService
      *   usa_pallets: bool,
      *   ya_sacado: float,
      *   faltante: float,
-     *   stock: float|null
+     *   stock: float|null,
+     *   decimales_cantidad: int
      * }>
      */
     public function materialesDePresentacion(
@@ -122,8 +159,9 @@ class ConsumoRecetaService
                     'es_caja_factor' => FamiliaMaterialSupport::esCajas($familia),
                     'usa_pallets' => FamiliaMaterialSupport::usaPallets($familia),
                     'ya_sacado' => $yaSacado,
-                    'faltante' => $this->faltantePorSacar($necesario, $yaSacado),
+                    'faltante' => $this->faltantePorSacar($necesario, $yaSacado, $familia),
                     'stock' => $stocks[$idMaterial] ?? null,
+                    'decimales_cantidad' => CantidadCajaSupport::decimales($familia),
                 ];
             })
             ->sortBy(function (array $item) {
@@ -220,7 +258,7 @@ class ConsumoRecetaService
             $totalOverride = trim((string) ($input['total'] ?? ''));
 
             if ($totalOverride !== '' && is_numeric($totalOverride) && (float) $totalOverride > 0) {
-                $cantidad = round((float) $totalOverride, 2);
+                $cantidad = CantidadCajaSupport::redondear((float) $totalOverride, $item['nom_familia'] ?? null);
             } else {
                 $cantidad = $this->calcularCantidadMaterial(
                     $item,
@@ -291,8 +329,10 @@ class ConsumoRecetaService
         float $pallets,
         float $conformacion
     ): float {
-        if (FamiliaMaterialSupport::esCajas($item['nom_familia'] ?? null)) {
-            return round($this->baseCantidad($item, $input), 2);
+        $nomFamilia = $item['nom_familia'] ?? null;
+
+        if (FamiliaMaterialSupport::esCajas($nomFamilia)) {
+            return CantidadCajaSupport::redondear($this->baseCantidad($item, $input), $nomFamilia);
         }
 
         $factorCaja = $this->factorCajaParaItem($item, $factoresCajas);
@@ -300,10 +340,10 @@ class ConsumoRecetaService
         if (! empty($item['usa_pallets'])) {
             $conf = max($conformacion, 0.00001);
 
-            return round(($pallets / $conf) * $factorCaja, 2);
+            return CantidadCajaSupport::redondear(($pallets / $conf) * $factorCaja, $nomFamilia);
         }
 
-        return round($this->baseCantidad($item, $input) * $factorCaja, 2);
+        return CantidadCajaSupport::redondear($this->baseCantidad($item, $input) * $factorCaja, $nomFamilia);
     }
 
     /**
@@ -491,7 +531,7 @@ class ConsumoRecetaService
             ->all();
     }
 
-    public function faltantePorSacar(float $necesario, float $yaSacado): float
+    public function faltantePorSacar(float $necesario, float $yaSacado, ?string $nomFamilia = null): float
     {
         if ($necesario <= 0) {
             return 0.0;
@@ -499,10 +539,12 @@ class ConsumoRecetaService
 
         $resto = fmod($yaSacado, $necesario);
         if ($resto < 0.00001) {
-            return $yaSacado < 0.00001 ? round($necesario, 2) : 0.0;
+            return $yaSacado < 0.00001
+                ? CantidadCajaSupport::redondear($necesario, $nomFamilia)
+                : 0.0;
         }
 
-        return round($necesario - $resto, 2);
+        return CantidadCajaSupport::redondear($necesario - $resto, $nomFamilia);
     }
 
     /**
@@ -523,12 +565,19 @@ class ConsumoRecetaService
         $necesario = $this->cantidadPorCaja($idPrograma, $idPresentacion, $idMaterialPL);
         $yaSacado = $this->cantidadSacada($idPrograma, $idPresentacion, $idMaterialPL, $excluirIdsMovimiento);
         $stock = app(MovimientoService::class)->stockDisponible($idMaterialPL, $idAlmacen);
+        $fila = ProgramaFila::query()
+            ->with('familia')
+            ->where('idPrograma', $idPrograma)
+            ->where('idPresentacion', $idPresentacion)
+            ->where('idMaterialPL', $idMaterialPL)
+            ->where('Estado', Estado::ACTIVO)
+            ->first();
 
         return [
             'stock' => $stock,
             'cantidad_por_caja' => $necesario,
             'ya_sacado' => $yaSacado,
-            'faltante' => $this->faltantePorSacar($necesario, $yaSacado),
+            'faltante' => $this->faltantePorSacar($necesario, $yaSacado, $fila?->familia?->nomFamilia),
         ];
     }
 }

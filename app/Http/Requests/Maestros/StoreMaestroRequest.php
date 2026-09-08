@@ -31,7 +31,7 @@ class StoreMaestroRequest extends FormRequest
         $tab = MaestrosCatalogo::normalizarTab($this->route('tab'));
         $definicion = MaestrosCatalogo::definicion($tab);
 
-        return [
+        $rules = [
             'nombre' => [
                 'required',
                 'string',
@@ -40,6 +40,19 @@ class StoreMaestroRequest extends FormRequest
                     ->where(fn ($query) => $query->where('Estado', Estado::ACTIVO)),
             ],
         ];
+
+        if (in_array('CodigoProGeneral', $definicion['extraFields'] ?? [], true)) {
+            $rules['CodigoProGeneral'] = [
+                'required', 'string', 'max:50',
+                Rule::unique('ProgramaGeneral', 'CodigoProGeneral'),
+            ];
+        }
+
+        if (in_array('fecha', $definicion['extraFields'] ?? [], true)) {
+            $rules['fecha'] = ['nullable', 'date'];
+        }
+
+        return $rules;
     }
 
     /**
@@ -52,6 +65,8 @@ class StoreMaestroRequest extends FormRequest
 
         return [
             'nombre' => 'nombre de '.$label,
+            'CodigoProGeneral' => 'código',
+            'fecha' => 'fecha',
         ];
     }
 

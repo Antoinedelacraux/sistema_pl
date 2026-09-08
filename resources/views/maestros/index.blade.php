@@ -10,6 +10,8 @@
     $tabActiva = $tab;
     $columnaNombre = $definicion['nombre'];
     $pk = $definicion['pk'];
+    $extraFields = $definicion['extraFields'] ?? [];
+    $tieneExtras = count($extraFields) > 0;
 @endphp
 <div class="maestros-page">
 @include('partials.flash')
@@ -76,7 +78,13 @@
             <table class="programas-grid maestros-grid">
                 <thead>
                     <tr>
+                        @if (in_array('CodigoProGeneral', $extraFields))
+                            <th class="programas-grid__th" style="width:120px">Código</th>
+                        @endif
                         <th class="programas-grid__th maestros-grid__th--nombre">Nombre</th>
+                        @if (in_array('fecha', $extraFields))
+                            <th class="programas-grid__th" style="width:120px">Fecha</th>
+                        @endif
                         <th class="programas-grid__th maestros-grid__th--estado">Estado</th>
                         @if ($puedeEditar || $puedeEliminar)
                             <th class="programas-grid__th maestros-grid__th--actions">Acciones</th>
@@ -90,7 +98,13 @@
                             $estaActivo = $registro->estaActivo();
                         @endphp
                         <tr>
+                            @if (in_array('CodigoProGeneral', $extraFields))
+                                <td class="maestros-grid__nombre" style="font-variant-numeric:tabular-nums;font-size:11px">{{ $registro->CodigoProGeneral }}</td>
+                            @endif
                             <td class="maestros-grid__nombre">{{ $nombreRegistro }}</td>
+                            @if (in_array('fecha', $extraFields))
+                                <td class="maestros-grid__cell-center" style="font-size:11px;white-space:nowrap">{{ $registro->fecha ? $registro->fecha->format('d/m/Y') : '—' }}</td>
+                            @endif
                             <td class="maestros-grid__cell-center">
                                 @if ($estaActivo)
                                     <span class="stock-badge stock-badge--ok">Activo</span>
@@ -110,6 +124,12 @@
                                                     data-id="{{ $registro->{$pk} }}"
                                                     data-nombre="{{ $nombreRegistro }}"
                                                     data-estado="{{ $estaActivo ? 1 : 0 }}"
+                                                    @if (in_array('CodigoProGeneral', $extraFields))
+                                                        data-codigo="{{ $registro->CodigoProGeneral }}"
+                                                    @endif
+                                                    @if (in_array('fecha', $extraFields))
+                                                        data-fecha="{{ $registro->fecha ? $registro->fecha->format('Y-m-d') : '' }}"
+                                                    @endif
                                                     title="Editar"
                                                     aria-label="Editar {{ $nombreRegistro }}"
                                                 >
@@ -176,7 +196,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ ($puedeEditar || $puedeEliminar) ? 3 : 2 }}" class="data-table__empty">
+                            <td colspan="{{ ($puedeEditar || $puedeEliminar) ? 3 + count($extraFields) : 2 + count($extraFields) }}" class="data-table__empty">
                                 No hay {{ strtolower($definicion['labelPlural']) }} con ese filtro.
                             </td>
                         </tr>

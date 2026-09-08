@@ -23,7 +23,6 @@ final class FamiliaMaterialSupport
             'pallets',
             'tapas',
             'parihuelas',
-            'termografos',
             'temperature recorder',
         ], true);
     }

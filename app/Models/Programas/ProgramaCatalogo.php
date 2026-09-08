@@ -4,6 +4,7 @@ namespace App\Models\Programas;
 
 use App\Models\Concerns\HasEstado;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProgramaCatalogo extends Model
 {
@@ -15,5 +16,10 @@ class ProgramaCatalogo extends Model
 
     public $timestamps = false;
 
-    protected $fillable = ['nomPrograma', 'Estado'];
+    protected $fillable = ['nomPrograma', 'idProgramaGeneral', 'Estado'];
+
+    public function programaGeneral(): BelongsTo
+    {
+        return $this->belongsTo(ProgramaGeneral::class, 'idProgramaGeneral', 'idProgramaGeneral');
+    }
 }

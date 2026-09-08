@@ -26,9 +26,17 @@ class AuditoriaAccion
 
     public const PROGRAMA_CREAR = 'programa.crear';
 
+    public const PROGRAMA_VACIAR = 'programa.vaciar';
+
     public const PROGRAMA_IMAGEN_ACTUALIZAR = 'programa.imagen.actualizar';
 
     public const PROGRAMA_PARAM_GUARDAR = 'programa.param.guardar';
+
+    public const MRP_IMPORTAR = 'mrp.importar';
+
+    public const MRP_VACIAR = 'mrp.vaciar';
+
+    public const MRP_PLAN_ACTUALIZAR = 'mrp.plan.actualizar';
 
     public const REGISTRO_INGRESO_CREAR = 'registro.ingreso.crear';
 
@@ -63,8 +71,12 @@ class AuditoriaAccion
             self::PROVEEDOR_ACTUALIZAR => 'Proveedor actualizado',
             self::PROVEEDOR_ELIMINAR => 'Proveedor eliminado',
             self::PROGRAMA_CREAR => 'Receta creada',
+            self::PROGRAMA_VACIAR => 'Receta vaciada',
             self::PROGRAMA_IMAGEN_ACTUALIZAR => 'Imagen de receta actualizada',
             self::PROGRAMA_PARAM_GUARDAR => 'Parámetros de presentación guardados',
+            self::MRP_IMPORTAR => 'Plan MRP importado',
+            self::MRP_VACIAR => 'Plan MRP vaciado',
+            self::MRP_PLAN_ACTUALIZAR => 'Plan de consumo actualizado',
             self::REGISTRO_INGRESO_CREAR => 'Ingreso registrado',
             self::REGISTRO_INGRESO_ACTUALIZAR => 'Ingreso actualizado',
             self::REGISTRO_EGRESO_CREAR => 'Consumo registrado',

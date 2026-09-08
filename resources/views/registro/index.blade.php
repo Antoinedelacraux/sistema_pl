@@ -296,8 +296,16 @@
 
 @push('scripts')
 @php
+    $idProgramaOld = old('id_programa');
+    $idProgramaGeneralOld = old('id_programa_general');
+    if (! $idProgramaGeneralOld && $idProgramaOld) {
+        $programaOld = collect($programas ?? [])->firstWhere('idPrograma', (int) $idProgramaOld);
+        $idProgramaGeneralOld = $programaOld?->idProgramaGeneral;
+    }
+
     $registroConsumoOld = [
-        'id_programa' => old('id_programa'),
+        'id_programa_general' => $idProgramaGeneralOld,
+        'id_programa' => $idProgramaOld,
         'id_presentacion' => old('id_presentacion'),
         'id_material_pl' => old('id_material_pl'),
         'id_almacen' => old('id_almacen'),
@@ -305,6 +313,14 @@
         'conformacion_dentro' => old('conformacion_dentro'),
         'pallets_fuera' => old('pallets_fuera'),
     ];
+
+    $registroProgramasPorGeneral = collect($programas ?? [])
+        ->groupBy(fn ($programa) => (string) ($programa->idProgramaGeneral ?? ''))
+        ->map(fn ($grupo) => $grupo->map(fn ($programa) => [
+            'id_programa' => $programa->idPrograma,
+            'nom_programa' => $programa->nomPrograma,
+        ])->values())
+        ->all();
 
     $registroMaterialesMap = collect($materiales ?? [])->mapWithKeys(function ($m) {
         return [
@@ -333,6 +349,7 @@
     window.registroTabActiva = @json($tabActiva);
     window.registroIngresoLineasOld = @json(old('lineas', []));
     window.registroConsumoOld = @json($registroConsumoOld);
+    window.registroConsumoProgramasPorGeneral = @json($registroProgramasPorGeneral);
     window.registroMaterialesMap = @json($registroMaterialesMap);
     window.registroOfflineCsrfUrl = @json(route('registro.offline.csrf'));
 </script>

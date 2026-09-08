@@ -8,51 +8,38 @@
 @section('page')
 @php
     $exportParams = array_filter([
-        'mercado' => request('mercado'),
-        'cliente' => request('cliente'),
+        'programa_general' => request('programa_general'),
         'familia' => request('familia'),
         'programa' => request('programa'),
-        'presentacion' => request('presentacion'),
         'buscar' => request('buscar'),
     ], fn ($valor) => filled($valor));
-    $programaSeleccionado = (int) ($filtros['programa'] ?? 0);
 @endphp
 <div class="programas-page">
 @include('partials.flash')
 @include('programas._tabs', ['recetaTab' => 'materiales'])
 
 <section class="panel panel--programas">
-    <div class="receta-command">
-        <div class="receta-command__shell">
+    <div class="receta-toolbar">
+        <div class="receta-toolbar__shell">
             <form
                 method="GET"
                 action="{{ route('programas.index') }}"
-                class="receta-command__form"
+                class="receta-filters"
                 data-grid-filters
                 data-clear-url="{{ route('programas.index') }}"
             >
-                <div class="receta-command__grid">
-                    <label class="receta-cmd-field">
-                        <span class="receta-cmd-label">Mercado</span>
-                        <select id="receta-filtro-mercado" name="mercado" class="receta-cmd-input">
+                <div class="receta-filters__main">
+                    <label class="receta-cmd-field receta-filters__field">
+                        <span class="receta-cmd-label">Prog. General</span>
+                        <select id="receta-filtro-programa-general" name="programa_general" class="receta-cmd-input">
                             <option value="">Todos</option>
-                            @foreach ($catalogosFiltro['mercados'] as $item)
-                                <option value="{{ $item->idMercado }}" @selected((string) ($filtros['mercado'] ?? '') === (string) $item->idMercado)>{{ $item->nomMercado }}</option>
+                            @foreach ($catalogosFiltro['programasGenerales'] as $item)
+                                <option value="{{ $item->idProgramaGeneral }}" @selected((string) ($filtros['programa_general'] ?? '') === (string) $item->idProgramaGeneral)>{{ $item->nombre }}</option>
                             @endforeach
                         </select>
                     </label>
 
-                    <label class="receta-cmd-field">
-                        <span class="receta-cmd-label">Cliente</span>
-                        <select id="receta-filtro-cliente" name="cliente" class="receta-cmd-input">
-                            <option value="">Todos</option>
-                            @foreach ($catalogosFiltro['clientes'] as $item)
-                                <option value="{{ $item->idCliente }}" @selected((string) ($filtros['cliente'] ?? '') === (string) $item->idCliente)>{{ $item->nomCliente }}</option>
-                            @endforeach
-                        </select>
-                    </label>
-
-                    <label class="receta-cmd-field">
+                    <label class="receta-cmd-field receta-filters__field">
                         <span class="receta-cmd-label">Programa</span>
                         <select id="receta-filtro-programa" name="programa" class="receta-cmd-input">
                             <option value="">Todos</option>
@@ -62,21 +49,7 @@
                         </select>
                     </label>
 
-                    <label class="receta-cmd-field">
-                        <span class="receta-cmd-label">Producto</span>
-                        <select id="receta-filtro-presentacion" name="presentacion" class="receta-cmd-input" @disabled($programaSeleccionado <= 0)>
-                            @if ($programaSeleccionado <= 0)
-                                <option value="">Seleccione un programa</option>
-                            @else
-                                <option value="">Todos</option>
-                                @foreach ($catalogosFiltro['presentaciones'] as $item)
-                                    <option value="{{ $item->idPresentacion }}" @selected((string) ($filtros['presentacion'] ?? '') === (string) $item->idPresentacion)>{{ $item->nomPresentacion }}</option>
-                                @endforeach
-                            @endif
-                        </select>
-                    </label>
-
-                    <label class="receta-cmd-field">
+                    <label class="receta-cmd-field receta-filters__field">
                         <span class="receta-cmd-label">Material</span>
                         <select id="receta-filtro-familia" name="familia" class="receta-cmd-input">
                             <option value="">Todos</option>
@@ -86,7 +59,7 @@
                         </select>
                     </label>
 
-                    <label class="receta-cmd-field receta-cmd-field--search">
+                    <label class="receta-cmd-field receta-filters__field receta-filters__field--search">
                         <span class="receta-cmd-label">Buscar</span>
                         <input
                             type="search"
@@ -99,42 +72,51 @@
                         >
                     </label>
 
-                    <div class="receta-cmd-clear">
+                    <div class="receta-filters__clear">
                         <button type="button" class="btn btn--outline btn--sm" id="receta-limpiar" data-grid-filters-clear>Limpiar</button>
                     </div>
-
-                    <div class="receta-cmd-export">
-                        @include('partials.export-actions', [
-                            'pdfUrl' => route('programas.export.pdf', $exportParams),
-                            'excelUrl' => route('programas.export.excel', $exportParams),
-                            'class' => 'receta-cmd-export-inner',
-                        ])
-                    </div>
                 </div>
+
+                @include('partials.export-actions', [
+                    'pdfUrl' => route('programas.export.pdf', $exportParams),
+                    'excelUrl' => route('programas.export.excel', $exportParams),
+                    'class' => 'receta-cmd-export-inner receta-filters__export',
+                ])
             </form>
 
-            <aside class="receta-command__aside">
-                <div class="receta-command__stat" aria-live="polite">
-                    <span class="receta-command__stat-value">{{ number_format($totalProgramas) }}</span>
-                    <span class="receta-command__stat-label">programas</span>
+            <div class="receta-toolbar__aside">
+                <div class="receta-toolbar__stat" aria-live="polite">
+                    <span class="receta-toolbar__stat-value">{{ number_format($totalProgramas) }}</span>
+                    <span class="receta-toolbar__stat-label">programas</span>
                 </div>
                 @if ($puedeCrear)
-                    <form method="POST" action="{{ route('programas.import') }}" enctype="multipart/form-data" class="receta-import-form" id="receta-import-form">
-                        @csrf
-                        <input type="file" name="archivo_excel" id="receta-archivo-excel" class="receta-import-form__file" accept=".xlsx,.xlsm,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
-                        <button type="button" class="btn btn--outline btn--sm" id="receta-importar-excel">Importar Excel</button>
-                    </form>
-                    <button type="button" class="btn btn--purple btn--sm" id="receta-abrir-modal">Agregar</button>
+                    <div class="receta-toolbar__actions">
+                        <form
+                            method="POST"
+                            action="{{ route('programas.vaciar') }}"
+                            class="receta-vaciar-form"
+                            id="receta-vaciar-form"
+                            data-confirm="Se eliminarán todas las filas de la receta y los parámetros de pallets/conformación. Los catálogos no se borran. Después deberá importar el Excel nuevamente."
+                            data-confirm-title="Vaciar receta"
+                            data-confirm-ok="Sí, vaciar receta"
+                            data-confirm-variant="danger"
+                        >
+                            @csrf
+                            <button type="submit" class="btn btn--outline btn--sm" id="receta-vaciar">Vaciar</button>
+                        </form>
+                        <form method="POST" action="{{ route('programas.import') }}" enctype="multipart/form-data" class="receta-import-form" id="receta-import-form">
+                            @csrf
+                            <input type="file" name="archivo_excel" id="receta-archivo-excel" class="receta-import-form__file" accept=".xlsx,.xlsm,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+                            <button type="button" class="btn btn--outline btn--sm" id="receta-importar-excel">Importar Excel</button>
+                        </form>
+                        <button type="button" class="btn btn--purple btn--sm" id="receta-abrir-modal">Agregar</button>
+                    </div>
                 @endif
-            </aside>
+            </div>
         </div>
     </div>
 
     <div class="grid-table-section">
-        <div class="grid-table-head">
-            <p class="grid-table-count" id="receta-contador" data-total="{{ $totalFilas }}">{{ number_format($totalFilas) }} registros en receta</p>
-        </div>
-
         <div class="programas-grid-wrap">
             <table class="programas-grid">
             <thead>
@@ -142,6 +124,8 @@
                     <th class="programas-grid__th programas-grid__th--num">#</th>
                     <th class="programas-grid__th programas-grid__th--stack">Mercado</th>
                     <th class="programas-grid__th programas-grid__th--stack">Cliente</th>
+                    <th class="programas-grid__th programas-grid__th--stack">Prog.<br>General</th>
+                    <th class="programas-grid__th programas-grid__th--stack">Cód.<br>PG</th>
                     <th class="programas-grid__th programas-grid__th--stack">Programa</th>
                     <th class="programas-grid__th programas-grid__th--stack">Variedad</th>
                     <th class="programas-grid__th programas-grid__th--stack">Producto</th>
@@ -167,10 +151,12 @@
                         <td class="programas-grid__num">{{ $fila->nroFila }}</td>
                         <td class="programas-grid__cell programas-grid__cell--short">{{ $fila->mercado?->nomMercado }}</td>
                         <td class="programas-grid__cell">{{ $fila->cliente?->nomCliente }}</td>
+                        <td class="programas-grid__cell">{{ $fila->programa?->programaGeneral?->nombre ?? '—' }}</td>
+                        <td class="programas-grid__code programas-grid__code-pg">{{ $fila->programa?->programaGeneral?->CodigoProGeneral ?? '—' }}</td>
                         <td class="programas-grid__cell">{{ $fila->programa?->nomPrograma }}</td>
                         <td class="programas-grid__cell">{{ $fila->variedad?->nomVariedad }}</td>
                         <td class="programas-grid__cell">{{ $fila->presentacion?->nomPresentacion }}</td>
-                        <td class="programas-grid__cell programas-grid__cell--short">{{ $fila->familia?->nomFamilia }}</td>
+                        <td class="programas-grid__cell programas-grid__cell--familia">{{ $fila->familia?->nomFamilia }}</td>
                         <td class="programas-grid__code">{{ $fila->material?->CodigoPL }}</td>
                         <td class="programas-grid__material">{{ $fila->material?->nomMaterial }}</td>
                         <td class="programas-grid__cell programas-grid__cell--obsr">
@@ -180,7 +166,7 @@
                                 —
                             @endif
                         </td>
-                        <td class="programas-grid__qty">{{ number_format((float) $fila->cantidadCaja?->cantidad, 2, '.', '') }}</td>
+                        <td class="programas-grid__qty">{{ \App\Support\CantidadCajaSupport::formatear($fila->cantidadCaja?->cantidad !== null ? (float) $fila->cantidadCaja->cantidad : null, $fila->familia?->nomFamilia) }}</td>
                         <td class="programas-grid__cell programas-grid__cell--img">
                             <div class="receta-imagen-cell">
                                 @if ($urlImagen = $fila->imagenUrl())
@@ -215,7 +201,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="12" class="data-table__empty">No hay registros con esos filtros.</td>
+                        <td colspan="14" class="data-table__empty">No hay registros con esos filtros.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -249,7 +235,7 @@
     window.recetaMaterialUrl = @json(route('programas.material-por-codigo'));
     window.recetaEditarImagenId = @json(session('receta_editar_imagen'));
 </script>
-<script src="{{ asset('js/receta-filters.js') }}?v=1" defer></script>
+<script src="{{ asset('js/receta-filters.js') }}?v=2" defer></script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
 <script src="{{ asset('js/receta.js') }}?v=5" defer></script>
 <script>

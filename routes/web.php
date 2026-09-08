@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\InventarioController;
 use App\Http\Controllers\MaestroController;
+use App\Http\Controllers\MrpController;
 use App\Http\Controllers\MovimientoController;
 use App\Http\Controllers\ProgramaController;
 use App\Http\Controllers\ProgramaPresentacionParamController;
@@ -41,6 +42,26 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
     Route::post('/programas/import', [ProgramaController::class, 'importExcel'])
         ->middleware('permiso:programas,crear')
         ->name('programas.import');
+
+    Route::post('/programas/vaciar', [ProgramaController::class, 'vaciarReceta'])
+        ->middleware('permiso:programas,crear')
+        ->name('programas.vaciar');
+
+    Route::get('/mrp', [MrpController::class, 'index'])
+        ->middleware('permiso:mrp,ver')
+        ->name('mrp.index');
+
+    Route::post('/mrp/import', [MrpController::class, 'importExcel'])
+        ->middleware('permiso:mrp,crear')
+        ->name('mrp.import');
+
+    Route::post('/mrp/vaciar', [MrpController::class, 'vaciarPlan'])
+        ->middleware('permiso:mrp,crear')
+        ->name('mrp.vaciar');
+
+    Route::put('/mrp/plan', [MrpController::class, 'updatePlan'])
+        ->middleware('permiso:mrp,editar')
+        ->name('mrp.plan.update');
 
     Route::post('/programas', [ProgramaController::class, 'store'])
         ->middleware('permiso:programas,crear')

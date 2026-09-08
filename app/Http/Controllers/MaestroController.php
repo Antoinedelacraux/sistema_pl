@@ -40,9 +40,11 @@ class MaestroController extends Controller
     public function store(StoreMaestroRequest $request, string $tab): RedirectResponse
     {
         $tab = MaestrosCatalogo::normalizarTab($tab);
+        $definicion = MaestrosCatalogo::definicion($tab);
+        $extras = $this->extrasValidados($request->validated(), $definicion['extraFields'] ?? []);
 
         try {
-            $this->catalogoService->crear($tab, $request->validated('nombre'));
+            $this->catalogoService->crear($tab, $request->validated('nombre'), $extras);
         } catch (InvalidArgumentException $exception) {
             return redirect()
                 ->route('maestros.index', ['tab' => $tab])
@@ -52,13 +54,15 @@ class MaestroController extends Controller
 
         return redirect()
             ->route('maestros.index', ['tab' => $tab])
-            ->with('status', MaestrosCatalogo::definicion($tab)['label'].' creado correctamente.');
+            ->with('status', $definicion['label'].' creado correctamente.');
     }
 
     public function update(UpdateMaestroRequest $request, string $tab, int $id): RedirectResponse
     {
         $tab = MaestrosCatalogo::normalizarTab($tab);
+        $definicion = MaestrosCatalogo::definicion($tab);
         $datos = $request->validated();
+        $extras = $this->extrasValidados($datos, $definicion['extraFields'] ?? []);
 
         if ((int) $datos['estado'] === 0 && ($mensaje = $this->catalogoService->mensajeEnUso($tab, $id)) !== null) {
             return redirect()
@@ -66,7 +70,7 @@ class MaestroController extends Controller
                 ->withErrors(['estado' => $mensaje]);
         }
 
-        $this->catalogoService->actualizar($tab, $id, $datos['nombre'], (int) $datos['estado']);
+        $this->catalogoService->actualizar($tab, $id, $datos['nombre'], (int) $datos['estado'], $extras);
 
         return redirect()
             ->route('maestros.index', ['tab' => $tab, 'buscar' => $request->input('buscar')])
@@ -108,5 +112,24 @@ class MaestroController extends Controller
         return redirect()
             ->route('maestros.index', ['tab' => $tab, 'buscar' => $buscar])
             ->with('status', MaestrosCatalogo::definicion($tab)['label'].' activado.');
+    }
+
+    /**
+     * Extrae sólo los campos extra definidos en la definición de catálogo.
+     *
+     * @param  array<string, mixed>  $datos
+     * @param  list<string>  $claves
+     * @return array<string, mixed>
+     */
+    private function extrasValidados(array $datos, array $claves): array
+    {
+        $extras = [];
+        foreach ($claves as $clave) {
+            if (array_key_exists($clave, $datos)) {
+                $extras[$clave] = $datos[$clave];
+            }
+        }
+
+        return $extras;
     }
 }

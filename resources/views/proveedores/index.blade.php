@@ -17,17 +17,17 @@
 @include('partials.flash')
 
 <section class="panel panel--proveedor">
-    <div class="receta-command">
-        <div class="receta-command__shell">
+    <div class="proveedor-toolbar">
+        <div class="proveedor-toolbar__shell">
             <form
                 method="GET"
                 action="{{ route('proveedor.index') }}"
-                class="receta-command__form"
+                class="proveedor-filters"
                 data-grid-filters
                 data-clear-url="{{ route('proveedor.index') }}"
             >
-                <div class="receta-command__grid">
-                    <label class="receta-cmd-field">
+                <div class="proveedor-filters__main">
+                    <label class="receta-cmd-field proveedor-filters__field proveedor-filters__field--material">
                         <span class="receta-cmd-label">Material</span>
                         <select id="proveedor-filtro-familia" name="familia" class="receta-cmd-input">
                             <option value="">Todas</option>
@@ -37,7 +37,7 @@
                         </select>
                     </label>
 
-                    <label class="receta-cmd-field receta-cmd-field--search">
+                    <label class="receta-cmd-field proveedor-filters__field proveedor-filters__field--search">
                         <span class="receta-cmd-label">Buscar</span>
                         <input
                             type="search"
@@ -50,38 +50,34 @@
                         >
                     </label>
 
-                    <div class="receta-cmd-clear">
+                    <div class="proveedor-filters__clear">
                         <button type="button" class="btn btn--outline btn--sm" id="proveedor-limpiar" data-grid-filters-clear>Limpiar</button>
                     </div>
-
-                    <div class="receta-cmd-export">
-                        @include('partials.export-actions', [
-                            'pdfUrl' => route('proveedor.export.pdf', $exportParams),
-                            'excelUrl' => route('proveedor.export.excel', $exportParams),
-                            'class' => 'receta-cmd-export-inner',
-                        ])
-                    </div>
                 </div>
+
+                @include('partials.export-actions', [
+                    'pdfUrl' => route('proveedor.export.pdf', $exportParams),
+                    'excelUrl' => route('proveedor.export.excel', $exportParams),
+                    'class' => 'receta-cmd-export-inner proveedor-filters__export',
+                ])
             </form>
 
-            <aside class="receta-command__aside">
-                <div class="receta-command__stat" aria-live="polite">
-                    <span class="receta-command__stat-value">{{ number_format($totalFilas) }}</span>
-                    <span class="receta-command__stat-label">registros</span>
+            <div class="proveedor-toolbar__aside">
+                <div class="proveedor-toolbar__stat" aria-live="polite">
+                    <span class="proveedor-toolbar__stat-value">{{ number_format($totalFilas) }}</span>
+                    <span class="proveedor-toolbar__stat-label">registros</span>
                 </div>
-                <button type="button" class="btn btn--outline btn--sm" id="proveedor-abrir-columnas">Columnas</button>
-                @if ($puedeCrear)
-                    <button type="button" class="btn btn--purple btn--sm" id="proveedor-abrir-agregar">Agregar</button>
-                @endif
-            </aside>
+                <div class="proveedor-toolbar__actions">
+                    <button type="button" class="btn btn--outline btn--sm" id="proveedor-abrir-columnas">Columnas</button>
+                    @if ($puedeCrear)
+                        <button type="button" class="btn btn--purple btn--sm" id="proveedor-abrir-agregar">Agregar</button>
+                    @endif
+                </div>
+            </div>
         </div>
     </div>
 
     <div class="grid-table-section">
-        <div class="grid-table-head">
-            <p class="grid-table-count" id="proveedor-contador" data-total="{{ $totalFilas }}">{{ number_format($totalFilas) }} registros en proveedor</p>
-        </div>
-
         <div class="programas-grid-wrap proveedor-grid-wrap">
         <table class="programas-grid proveedor-grid" id="proveedor-grid">
             <colgroup>

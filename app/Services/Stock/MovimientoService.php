@@ -113,6 +113,9 @@ class MovimientoService
                     ->orderBy('nomTipoConsumo')
                     ->get(['idTipoConsumo', 'nomTipoConsumo']);
             }),
+            'programasGenerales' => Cache::remember('catalogo.programas_generales_consumo', 600, function () {
+                return app(ConsumoRecetaService::class)->programasGeneralesDisponibles();
+            }),
             'programas' => Cache::remember('catalogo.programas_consumo', 600, function () {
                 return app(ConsumoRecetaService::class)->programasDisponibles();
             }),
@@ -1398,6 +1401,7 @@ class MovimientoService
                 ])->values()->all(),
             ] : [
                 'id_almacen' => $movimiento->idAlmacen,
+                'id_programa_general' => $movimiento->programa?->idProgramaGeneral,
                 'id_programa' => $movimiento->idPrograma,
                 'id_presentacion' => $movimiento->idPresentacion,
                 'id_tipo_consumo' => $movimiento->idTipoConsumo,

@@ -490,16 +490,22 @@ class MovimientoController extends Controller
         ]);
     }
 
-    public function programasConsumo(): JsonResponse
+    public function programasConsumo(Request $request): JsonResponse
     {
+        $idProgramaGeneral = (int) $request->query('id_programa_general', 0);
+
         Cache::forget('catalogo.programas_consumo');
+        if ($idProgramaGeneral > 0) {
+            Cache::forget('catalogo.programas_consumo.pg.'.$idProgramaGeneral);
+        }
 
         return response()->json([
             'programas' => $this->consumoRecetaService
-                ->programasDisponibles()
+                ->programasDisponibles($idProgramaGeneral > 0 ? $idProgramaGeneral : null)
                 ->map(fn ($item) => [
                     'id_programa' => $item->idPrograma,
                     'nom_programa' => $item->nomPrograma,
+                    'id_programa_general' => $item->idProgramaGeneral,
                 ])
                 ->values()
                 ->all(),

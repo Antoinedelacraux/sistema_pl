@@ -3,6 +3,7 @@
 namespace App\Services\Programas;
 
 use App\Models\Programas\ProgramaFila;
+use App\Support\CantidadCajaSupport;
 use App\Support\ExportaGridDocumento;
 
 class ProgramaExportService
@@ -42,6 +43,8 @@ class ProgramaExportService
             '#',
             'Mercado',
             'Cliente',
+            'Prog. General',
+            'Cód. PG',
             'Programa',
             'Variedad',
             'Producto',
@@ -72,6 +75,8 @@ class ProgramaExportService
             $fila->nroFila,
             $fila->mercado?->nomMercado,
             $fila->cliente?->nomCliente,
+            $fila->programa?->programaGeneral?->nombre,
+            $fila->programa?->programaGeneral?->CodigoProGeneral,
             $fila->programa?->nomPrograma,
             $fila->variedad?->nomVariedad,
             $fila->presentacion?->nomPresentacion,
@@ -79,7 +84,10 @@ class ProgramaExportService
             $fila->material?->CodigoPL,
             $fila->material?->nomMaterial,
             $fila->uso?->nomUso,
-            number_format((float) $fila->cantidadCaja?->cantidad, 2, '.', ''),
+            CantidadCajaSupport::formatear(
+                $fila->cantidadCaja?->cantidad !== null ? (float) $fila->cantidadCaja->cantidad : null,
+                $fila->familia?->nomFamilia
+            ),
         ];
     }
 }

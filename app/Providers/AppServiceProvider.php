@@ -50,7 +50,7 @@ class AppServiceProvider extends ServiceProvider
         $forwarded = strtolower((string) $request->headers->get('X-Forwarded-Proto', ''));
         $host = strtolower($request->getHost());
 
-        if ($request->secure() || $forwarded === 'https' || str_contains($host, 'trycloudflare.com')) {
+        if ($request->secure() || $forwarded === 'https' || str_contains($host, 'trycloudflare.com') || str_contains($host, 'loca.lt')) {
             URL::forceScheme('https');
         }
     }

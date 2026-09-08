@@ -13,7 +13,6 @@
     var consumoEditLineas = {};
     var consumoOverrides = {};
     var consumoTotalOverrides = {};
-    var consumoProgramasBackup = '';
     var consumoPresentacionesCache = {};
 
     var modales = {
@@ -94,19 +93,63 @@
         }
     }
 
-    function formatearNumero(valor) {
+    function decimalesFamiliaConsumo(nomFamilia, decimalesApi) {
+        if (decimalesApi != null && decimalesApi !== '') {
+            return Number(decimalesApi);
+        }
+
+        var familia = normalizarFamiliaConsumo(nomFamilia);
+        if (
+            familia === 'carton' || familia === 'cartons' || familia === 'cartones'
+            || familia === 'pallet' || familia === 'pallets'
+            || familia === 'parihuela' || familia === 'parihuelas'
+            || familia === 'temperature recorder'
+        ) {
+            return 4;
+        }
+
+        return 2;
+    }
+
+    function redondearConsumo(valor, nomFamilia, decimalesApi) {
+        var dec = decimalesFamiliaConsumo(nomFamilia, decimalesApi);
+        var factor = Math.pow(10, dec);
+
+        return Math.round(Number(valor || 0) * factor) / factor;
+    }
+
+    function formatearNumero(valor, nomFamilia, decimalesApi) {
+        var dec = decimalesFamiliaConsumo(nomFamilia, decimalesApi);
+
         return Number(valor || 0).toLocaleString('es-PE', {
             minimumFractionDigits: 0,
-            maximumFractionDigits: 2,
+            maximumFractionDigits: dec,
         });
+    }
+
+    function stepCantidadConsumo(nomFamilia, decimalesApi) {
+        var dec = decimalesFamiliaConsumo(nomFamilia, decimalesApi);
+
+        if (dec <= 0) {
+            return '1';
+        }
+
+        return (1 / Math.pow(10, dec)).toFixed(dec);
     }
 
     function resetConsumoCascada() {
         var presentacion = document.getElementById('egreso-id-presentacion');
         var materialHidden = document.getElementById('egreso-id-material');
         var programa = document.getElementById('egreso-id-programa');
+        var programaGeneral = document.getElementById('egreso-id-programa-general');
+
+        if (programaGeneral) {
+            programaGeneral.value = '';
+        }
 
         if (programa) {
+            programa.innerHTML = '<option value="">Seleccione un programa general</option>';
+            programa.disabled = true;
             programa.value = '';
         }
 
@@ -337,6 +380,106 @@
         return baseCantidadFila(tr) * factorCaja;
     }
 
+    function almacenConsumoSeleccionado() {
+        var almacen = document.getElementById('egreso-id-almacen');
+
+        return !!(almacen && String(almacen.value || '').trim() !== '');
+    }
+
+    function pintarCeldaStockConsumo(tdStock, stock) {
+        tdStock.innerHTML = '';
+        tdStock.removeAttribute('title');
+
+        if (stock == null) {
+            tdStock.textContent = '—';
+            if (!almacenConsumoSeleccionado()) {
+                tdStock.title = 'Seleccione un almacén para ver el stock';
+            }
+            return;
+        }
+
+        var tr = tdStock.closest('tr');
+        var stockBadge = document.createElement('span');
+        stockBadge.className = 'registro-consumo-tabla__stock-valor';
+        stockBadge.textContent = formatearNumero(
+            stock,
+            tr ? tr.getAttribute('data-nom-familia') : null,
+            tr ? tr.getAttribute('data-decimales-cantidad') : null
+        );
+        if (stock <= 0) {
+            stockBadge.classList.add('is-critico');
+        }
+        tdStock.appendChild(stockBadge);
+    }
+
+    function actualizarHintStockConsumo() {
+        var hint = document.getElementById('egreso-materiales-hint');
+        var wrap = document.getElementById('egreso-materiales-tabla-wrap');
+
+        if (!hint || !wrap || wrap.hidden) {
+            return;
+        }
+
+        if (!almacenConsumoSeleccionado()) {
+            hint.hidden = false;
+            hint.textContent = 'Seleccione un almacén para ver el stock disponible.';
+            hint.classList.remove('is-error');
+            return;
+        }
+
+        hint.hidden = true;
+        hint.textContent = '';
+    }
+
+    function actualizarStockEnTablaConsumo(materiales) {
+        var body = document.getElementById('egreso-materiales-body');
+        if (!body) {
+            return;
+        }
+
+        var stockPorId = {};
+        (Array.isArray(materiales) ? materiales : []).forEach(function (item) {
+            if (!item || !item.id_material_pl) {
+                return;
+            }
+            stockPorId[String(item.id_material_pl)] = item.stock;
+        });
+
+        body.querySelectorAll('tr[data-consumo-row]').forEach(function (tr) {
+            var input = tr.querySelector('input[name*="[id_material_pl]"]');
+            var tdStock = tr.querySelector('.registro-consumo-tabla__stock');
+            if (!input || !tdStock) {
+                return;
+            }
+
+            var idMaterial = String(input.value || '');
+            var stock = Object.prototype.hasOwnProperty.call(stockPorId, idMaterial)
+                ? stockPorId[idMaterial]
+                : null;
+            pintarCeldaStockConsumo(
+                tdStock,
+                stock == null ? null : Number(stock)
+            );
+        });
+
+        actualizarHintStockConsumo();
+    }
+
+    function sincronizarStockMaterialesConsumo() {
+        var programa = document.getElementById('egreso-id-programa');
+        var presentacion = document.getElementById('egreso-id-presentacion');
+        if (!programa || !programa.value || !presentacion || !presentacion.value) {
+            return;
+        }
+
+        if (!almacenConsumoSeleccionado()) {
+            actualizarStockEnTablaConsumo([]);
+            return;
+        }
+
+        return cargarMaterialesConsumo(programa.value, presentacion.value, { soloStock: true });
+    }
+
     function recalcularTotalesConsumo() {
         var body = document.getElementById('egreso-materiales-body');
         if (!body) {
@@ -357,7 +500,11 @@
             }
 
             var total = calcularTotalMaterial(tr, factores, params);
-            totalInput.value = total > 0 ? total.toFixed(2) : '';
+            var nomFamilia = tr.getAttribute('data-nom-familia') || '';
+            var decimales = tr.getAttribute('data-decimales-cantidad');
+            totalInput.value = total > 0
+                ? redondearConsumo(total, nomFamilia, decimales).toFixed(decimalesFamiliaConsumo(nomFamilia, decimales))
+                : '';
         });
     }
 
@@ -394,6 +541,8 @@
             var tr = document.createElement('tr');
             tr.setAttribute('data-consumo-row', '1');
             tr.setAttribute('data-cantidad-caja', String(item.cantidad_por_caja || 0));
+            tr.setAttribute('data-nom-familia', item.nom_familia || '');
+            tr.setAttribute('data-decimales-cantidad', String(item.decimales_cantidad != null ? item.decimales_cantidad : ''));
             tr.setAttribute('data-usa-pallets', usaPallets ? '1' : '0');
             tr.setAttribute('data-es-caja', esFilaCaja ? '1' : '0');
             tr.setAttribute('data-uso', claveUso);
@@ -443,7 +592,7 @@
             }
 
             var qtyReceta = document.createElement('span');
-            qtyReceta.textContent = formatearNumero(item.cantidad_por_caja || 0);
+            qtyReceta.textContent = formatearNumero(item.cantidad_por_caja || 0, item.nom_familia, item.decimales_cantidad);
             tdCaja.appendChild(qtyReceta);
 
             var tdPersonalizado = document.createElement('td');
@@ -453,7 +602,7 @@
                 inputCaja.type = 'number';
                 inputCaja.className = 'field__input';
                 inputCaja.min = '0';
-                inputCaja.step = '0.01';
+                inputCaja.step = stepCantidadConsumo(item.nom_familia, item.decimales_cantidad);
                 inputCaja.placeholder = '';
                 inputCaja.value = override;
                 inputCaja.name = 'lineas[' + index + '][cantidad]';
@@ -479,12 +628,13 @@
             totalInput.type = 'number';
             totalInput.className = 'field__input';
             totalInput.min = '0';
-            totalInput.step = '0.01';
+            totalInput.step = stepCantidadConsumo(item.nom_familia, item.decimales_cantidad);
             totalInput.name = 'lineas[' + index + '][total]';
             totalInput.setAttribute('data-consumo-total', '1');
             totalInput.setAttribute('data-material-id', idMaterial);
             if (totalOverride != null && String(totalOverride).trim() !== '') {
-                totalInput.value = Number(totalOverride).toFixed(2);
+                totalInput.value = redondearConsumo(totalOverride, item.nom_familia, item.decimales_cantidad)
+                    .toFixed(decimalesFamiliaConsumo(item.nom_familia, item.decimales_cantidad));
                 totalInput.setAttribute('data-total-manual', '1');
                 tr.setAttribute('data-total-manual', '1');
             }
@@ -505,17 +655,7 @@
 
             var tdStock = document.createElement('td');
             tdStock.className = 'registro-consumo-tabla__qty registro-consumo-tabla__stock';
-            if (stock == null) {
-                tdStock.textContent = '—';
-            } else {
-                var stockBadge = document.createElement('span');
-                stockBadge.className = 'registro-consumo-tabla__stock-valor';
-                stockBadge.textContent = formatearNumero(stock);
-                if (stock <= 0) {
-                    stockBadge.classList.add('is-critico');
-                }
-                tdStock.appendChild(stockBadge);
-            }
+            pintarCeldaStockConsumo(tdStock, stock);
 
             tr.appendChild(tdMaterial);
             tr.appendChild(tdCodigo);
@@ -528,32 +668,29 @@
         });
 
         wrap.hidden = false;
-        if (hint) {
-            hint.hidden = true;
-            hint.textContent = '';
-        }
+        actualizarHintStockConsumo();
 
         recalcularTotalesConsumo();
     }
 
-    function respaldarProgramasConsumo() {
-        var programa = document.getElementById('egreso-id-programa');
-        if (programa && !consumoProgramasBackup) {
-            consumoProgramasBackup = programa.innerHTML;
-        }
-    }
-
-    function restaurarProgramasConsumo(idProgramaSeleccionado) {
-        var programa = document.getElementById('egreso-id-programa');
-        if (!programa || !consumoProgramasBackup) {
-            return;
-        }
-
-        programa.innerHTML = consumoProgramasBackup;
-        programa.disabled = programa.options.length <= 1;
+    function pintarProgramasConsumo(programa, items, idProgramaSeleccionado) {
+        programa.innerHTML = '<option value="">Seleccionar programa</option>';
+        items.forEach(function (item) {
+            var opt = document.createElement('option');
+            opt.value = String(item.id_programa);
+            opt.textContent = item.nom_programa || ('#' + item.id_programa);
+            programa.appendChild(opt);
+        });
+        programa.disabled = items.length === 0;
         if (idProgramaSeleccionado) {
             programa.value = String(idProgramaSeleccionado);
         }
+    }
+
+    function programasOfflinePorGeneral(idProgramaGeneral) {
+        var mapa = window.registroConsumoProgramasPorGeneral || {};
+
+        return mapa[String(idProgramaGeneral || '')] || [];
     }
 
     function pintarPresentacionesConsumo(presentacion, items, idPresentacionSeleccionada) {
@@ -582,41 +719,39 @@
 
     window.registroPrepararEgresoSubmit = prepararEnvioConsumo;
 
-    function cargarProgramasConsumo(idProgramaSeleccionado) {
+    function cargarProgramasConsumo(idProgramaGeneral, idProgramaSeleccionado) {
         var programa = document.getElementById('egreso-id-programa');
 
         if (!programa) {
             return Promise.resolve();
         }
 
-        respaldarProgramasConsumo();
+        if (!idProgramaGeneral) {
+            programa.innerHTML = '<option value="">Seleccione un programa general</option>';
+            programa.disabled = true;
+            return Promise.resolve();
+        }
+
+        var offlineItems = programasOfflinePorGeneral(idProgramaGeneral);
 
         if (!consumoProgramasUrl || !navigator.onLine) {
-            restaurarProgramasConsumo(idProgramaSeleccionado);
+            pintarProgramasConsumo(programa, offlineItems, idProgramaSeleccionado);
             return Promise.resolve();
         }
 
         programa.disabled = true;
         programa.innerHTML = '<option value="">Cargando programas...</option>';
 
-        return fetch(consumoProgramasUrl, { headers: { Accept: 'application/json' } })
+        return fetch(consumoProgramasUrl + '?id_programa_general=' + encodeURIComponent(idProgramaGeneral), {
+            headers: { Accept: 'application/json' },
+        })
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 var items = Array.isArray(data.programas) ? data.programas : [];
-                programa.innerHTML = '<option value="">Seleccionar programa</option>';
-                items.forEach(function (item) {
-                    var opt = document.createElement('option');
-                    opt.value = String(item.id_programa);
-                    opt.textContent = item.nom_programa || ('#' + item.id_programa);
-                    programa.appendChild(opt);
-                });
-                programa.disabled = items.length === 0;
-                if (idProgramaSeleccionado) {
-                    programa.value = String(idProgramaSeleccionado);
-                }
+                pintarProgramasConsumo(programa, items, idProgramaSeleccionado);
             })
             .catch(function () {
-                restaurarProgramasConsumo(idProgramaSeleccionado);
+                pintarProgramasConsumo(programa, offlineItems, idProgramaSeleccionado);
             });
     }
 
@@ -662,7 +797,9 @@
             });
     }
 
-    function cargarMaterialesConsumo(idPrograma, idPresentacion) {
+    function cargarMaterialesConsumo(idPrograma, idPresentacion, opciones) {
+        opciones = opciones || {};
+
         if (!idPrograma || !idPresentacion || !consumoMaterialesUrl) {
             vaciarTablaMaterialesConsumo('Seleccione un producto para cargar los materiales desde Receta.');
             return Promise.resolve();
@@ -670,12 +807,14 @@
 
         var wrap = document.getElementById('egreso-materiales-tabla-wrap');
         var hint = document.getElementById('egreso-materiales-hint');
-        if (hint) {
-            hint.hidden = false;
-            hint.textContent = 'Cargando materiales...';
-        }
-        if (wrap) {
-            wrap.hidden = true;
+        if (!opciones.soloStock) {
+            if (hint) {
+                hint.hidden = false;
+                hint.textContent = 'Cargando materiales...';
+            }
+            if (wrap) {
+                wrap.hidden = true;
+            }
         }
 
         var almacen = document.getElementById('egreso-id-almacen');
@@ -694,6 +833,13 @@
         return fetch(url, { headers: { Accept: 'application/json' } })
             .then(function (response) { return response.json(); })
             .then(function (data) {
+                var materiales = Array.isArray(data.materiales) ? data.materiales : [];
+
+                if (opciones.soloStock) {
+                    actualizarStockEnTablaConsumo(materiales);
+                    return;
+                }
+
                 var params = data.presentacion || null;
                 if (consumoOld && (consumoOld.conformacion_dentro != null || consumoOld.pallets_fuera != null)) {
                     params = {
@@ -702,7 +848,7 @@
                     };
                 }
                 actualizarParametrosPresentacionConsumo(params);
-                renderTablaMaterialesConsumo(Array.isArray(data.materiales) ? data.materiales : []);
+                renderTablaMaterialesConsumo(materiales);
             })
             .catch(function () {
                 vaciarTablaMaterialesConsumo('No se pudieron cargar los materiales.');
@@ -946,9 +1092,17 @@
         });
     });
 
+    var egresoProgramaGeneral = document.getElementById('egreso-id-programa-general');
     var egresoPrograma = document.getElementById('egreso-id-programa');
     var egresoPresentacion = document.getElementById('egreso-id-presentacion');
     var egresoAlmacen = document.getElementById('egreso-id-almacen');
+
+    if (egresoProgramaGeneral) {
+        egresoProgramaGeneral.addEventListener('change', function () {
+            cargarPresentacionesConsumo('');
+            cargarProgramasConsumo(egresoProgramaGeneral.value);
+        });
+    }
 
     if (egresoPrograma) {
         egresoPrograma.addEventListener('change', function () {
@@ -968,6 +1122,11 @@
 
     if (egresoAlmacen) {
         egresoAlmacen.addEventListener('change', function () {
+            var body = document.getElementById('egreso-materiales-body');
+            if (body && body.querySelector('tr[data-consumo-row]')) {
+                sincronizarStockMaterialesConsumo();
+                return;
+            }
             recargarMaterialesConsumoActuales();
         });
     }
@@ -993,10 +1152,7 @@
 
     if (abrirEgreso) abrirEgreso.addEventListener('click', function () {
         resetModalCreacion('egreso');
-        respaldarProgramasConsumo();
-        cargarProgramasConsumo().then(function () {
-            abrirModal('egreso');
-        });
+        abrirModal('egreso');
     });
     if (abrirTraslado) abrirTraslado.addEventListener('click', function () {
         resetModalCreacion('traslado');
@@ -1030,9 +1186,9 @@
     }
 
     var consumoOld = window.registroConsumoOld || null;
-    respaldarProgramasConsumo();
-    if (consumoOld && consumoOld.id_programa) {
+    if (consumoOld && (consumoOld.id_programa || consumoOld.id_programa_general)) {
         var programaSelectOld = document.getElementById('egreso-id-programa');
+        var programaGeneralSelectOld = document.getElementById('egreso-id-programa-general');
         consumoOverrides = {};
         consumoTotalOverrides = {};
         (Array.isArray(consumoOld.lineas) ? consumoOld.lineas : []).forEach(function (linea) {
@@ -1046,10 +1202,13 @@
                 }
             }
         });
+        if (programaGeneralSelectOld && consumoOld.id_programa_general) {
+            programaGeneralSelectOld.value = String(consumoOld.id_programa_general);
+        }
         if (programaSelectOld) {
-            cargarProgramasConsumo(consumoOld.id_programa)
+            cargarProgramasConsumo(consumoOld.id_programa_general || '', consumoOld.id_programa || '')
                 .then(function () {
-                    return cargarPresentacionesConsumo(consumoOld.id_programa, consumoOld.id_presentacion || '');
+                    return cargarPresentacionesConsumo(consumoOld.id_programa || '', consumoOld.id_presentacion || '');
                 })
                 .then(function () {
                     return cargarMaterialesConsumo(
@@ -1897,9 +2056,14 @@
                         selectMotivo.value = motivoValue;
                     }
 
+                    var programaGeneralSelect = document.getElementById('egreso-id-programa-general');
                     var programaSelect = document.getElementById('egreso-id-programa');
 
-                    cargarProgramasConsumo(edit.id_programa || '')
+                    if (programaGeneralSelect && edit.id_programa_general) {
+                        programaGeneralSelect.value = String(edit.id_programa_general);
+                    }
+
+                    cargarProgramasConsumo(edit.id_programa_general || '', edit.id_programa || '')
                         .then(function () {
                             return cargarPresentacionesConsumo(edit.id_programa || '', edit.id_presentacion || '');
                         })

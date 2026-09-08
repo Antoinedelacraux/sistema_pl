@@ -16,6 +16,7 @@ class ProgramaPresentacionParamService
         $query = DB::table('ProgramaFila as pf')
             ->join('Programa as prog', 'prog.idPrograma', '=', 'pf.idPrograma')
             ->join('Presentacion as pres', 'pres.idPresentacion', '=', 'pf.idPresentacion')
+            ->leftJoin('ProgramaGeneral as pg', 'pg.idProgramaGeneral', '=', 'prog.idProgramaGeneral')
             ->leftJoin('ProgramaPresentacionParam as param', function ($join) {
                 $join->on('param.idPrograma', '=', 'pf.idPrograma')
                     ->on('param.idPresentacion', '=', 'pf.idPresentacion')
@@ -25,6 +26,8 @@ class ProgramaPresentacionParamService
             ->selectRaw('
                 pf.idPrograma as id_programa,
                 pf.idPresentacion as id_presentacion,
+                MAX(pg.nombre) as nom_programa_general,
+                MAX(pg.CodigoProGeneral) as codigo_programa_general,
                 prog.nomPrograma as nom_programa,
                 pres.nomPresentacion as nom_presentacion,
                 MAX(param.idProgramaPresentacionParam) as id_param,
@@ -32,8 +35,13 @@ class ProgramaPresentacionParamService
                 MAX(param.conformacion) as conformacion
             ')
             ->groupBy('pf.idPrograma', 'pf.idPresentacion', 'prog.nomPrograma', 'pres.nomPresentacion')
+            ->orderBy('nom_programa_general')
             ->orderBy('prog.nomPrograma')
             ->orderBy('pres.nomPresentacion');
+
+        if (! empty($filtros['programa_general'])) {
+            $query->where('prog.idProgramaGeneral', (int) $filtros['programa_general']);
+        }
 
         if (! empty($filtros['programa'])) {
             $query->where('pf.idPrograma', (int) $filtros['programa']);
@@ -47,7 +55,9 @@ class ProgramaPresentacionParamService
             $buscar = '%'.addcslashes((string) $filtros['buscar'], '%_\\').'%';
             $query->where(function ($q) use ($buscar) {
                 $q->where('prog.nomPrograma', 'like', $buscar)
-                    ->orWhere('pres.nomPresentacion', 'like', $buscar);
+                    ->orWhere('pres.nomPresentacion', 'like', $buscar)
+                    ->orWhere('pg.nombre', 'like', $buscar)
+                    ->orWhere('pg.CodigoProGeneral', 'like', $buscar);
             });
         }
 

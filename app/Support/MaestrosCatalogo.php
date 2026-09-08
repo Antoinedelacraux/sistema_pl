@@ -9,6 +9,7 @@ use App\Models\Programas\Familia;
 use App\Models\Programas\Mercado;
 use App\Models\Programas\Presentacion;
 use App\Models\Programas\ProgramaCatalogo;
+use App\Models\Programas\ProgramaGeneral;
 use App\Models\Programas\ProveedorCatalogo;
 use App\Models\Programas\Situado;
 use App\Models\Programas\TipoConsumo;
@@ -22,6 +23,7 @@ class MaestrosCatalogo
 {
     /** @var list<string> */
     public const TABS = [
+        'programa_general',
         'mercado',
         'cliente',
         'programa',
@@ -52,11 +54,22 @@ class MaestrosCatalogo
      *   label: string,
      *   labelPlural: string,
      *   maxLength: int,
+     *   extraFields?: list<string>,
      * }>
      */
     public static function definiciones(): array
     {
         return [
+            'programa_general' => [
+                'model' => ProgramaGeneral::class,
+                'pk' => 'idProgramaGeneral',
+                'nombre' => 'nombre',
+                'tabla' => 'ProgramaGeneral',
+                'label' => 'Prog. General',
+                'labelPlural' => 'Programas Generales',
+                'maxLength' => 150,
+                'extraFields' => ['CodigoProGeneral', 'fecha'],
+            ],
             'mercado' => [
                 'model' => Mercado::class,
                 'pk' => 'idMercado',

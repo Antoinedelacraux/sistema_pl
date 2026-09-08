@@ -6,6 +6,7 @@
 
     var mercado = document.getElementById('receta-filtro-mercado');
     var cliente = document.getElementById('receta-filtro-cliente');
+    var programaGeneral = document.getElementById('receta-filtro-programa-general');
     var programa = document.getElementById('receta-filtro-programa');
     var presentacion = document.getElementById('receta-filtro-presentacion');
     var familia = document.getElementById('receta-filtro-familia');
@@ -13,11 +14,15 @@
     var cascada = [];
 
     if (mercado) {
-        cascada.push({ el: mercado, reset: [cliente, programa, presentacion, familia] });
+        cascada.push({ el: mercado, reset: [cliente, programaGeneral, programa, presentacion, familia] });
     }
 
     if (cliente) {
-        cascada.push({ el: cliente, reset: [programa, presentacion, familia] });
+        cascada.push({ el: cliente, reset: [programaGeneral, programa, presentacion, familia] });
+    }
+
+    if (programaGeneral) {
+        cascada.push({ el: programaGeneral, reset: [programa, presentacion, familia] });
     }
 
     if (programa) {

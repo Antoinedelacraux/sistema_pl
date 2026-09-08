@@ -2,7 +2,6 @@
 
 namespace App\Services\Stock;
 
-use App\Models\Programas\MaterialProgramaPL;
 use App\Models\Proveedores\Proveedor;
 use DOMDocument;
 use DOMXPath;
@@ -282,23 +281,11 @@ class GuiaXmlParserService
             ];
         }
 
-        $material = MaterialProgramaPL::query()
-            ->activo()
-            ->where('CodigoPL', $codigoProveedor)
-            ->first();
-
-        if ($material) {
-            return [
-                'id_material_pl' => (int) $material->idMaterialPL,
-                'codigo_pl' => (string) $material->CodigoPL,
-                'nom_material' => (string) $material->nomMaterial,
-                'nom_proveedor' => null,
-                'match_tipo' => 'codigo',
-            ];
-        }
-
         if ($descripcion !== null && trim($descripcion) !== '') {
-            return $this->resolverPorDescripcion($descripcion, $nomProveedorXml);
+            $porDescripcion = $this->resolverPorDescripcion($descripcion, $nomProveedorXml);
+            if ($porDescripcion !== null) {
+                return $porDescripcion;
+            }
         }
 
         return null;

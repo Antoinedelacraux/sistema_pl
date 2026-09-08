@@ -36,7 +36,10 @@ class MaestroCatalogoService
         return $query->paginate(GridPagination::PER_PAGE)->withQueryString();
     }
 
-    public function crear(string $tab, string $nombre): Model
+    /**
+     * @param  array<string, mixed>  $extras  campos adicionales (CodigoProGeneral, fecha, etc.)
+     */
+    public function crear(string $tab, string $nombre, array $extras = []): Model
     {
         $definicion = MaestrosCatalogo::definicion($tab);
         $modelClass = $definicion['model'];
@@ -49,10 +52,10 @@ class MaestroCatalogoService
 
         if ($existente) {
             if ((int) $existente->getAttribute('Estado') === Estado::INACTIVO) {
-                $existente->update([
-                    $columnaNombre => $nombre,
-                    'Estado' => Estado::ACTIVO,
-                ]);
+                $existente->update(array_merge(
+                    [$columnaNombre => $nombre, 'Estado' => Estado::ACTIVO],
+                    $extras
+                ));
 
                 return $existente->fresh();
             }
@@ -62,24 +65,26 @@ class MaestroCatalogoService
             );
         }
 
-        return $modelClass::query()->create([
-            $columnaNombre => $nombre,
-            'Estado' => Estado::ACTIVO,
-        ]);
+        return $modelClass::query()->create(array_merge(
+            [$columnaNombre => $nombre, 'Estado' => Estado::ACTIVO],
+            $extras
+        ));
     }
 
-    public function actualizar(string $tab, int $id, string $nombre, int $estado): Model
+    /**
+     * @param  array<string, mixed>  $extras  campos adicionales (CodigoProGeneral, fecha, etc.)
+     */
+    public function actualizar(string $tab, int $id, string $nombre, int $estado, array $extras = []): Model
     {
         $definicion = MaestrosCatalogo::definicion($tab);
         $modelClass = $definicion['model'];
         $columnaNombre = $definicion['nombre'];
-        $pk = $definicion['pk'];
 
         $registro = $modelClass::query()->findOrFail($id);
-        $registro->update([
-            $columnaNombre => trim($nombre),
-            'Estado' => $estado,
-        ]);
+        $registro->update(array_merge(
+            [$columnaNombre => trim($nombre), 'Estado' => $estado],
+            $extras
+        ));
 
         return $registro->fresh();
     }
@@ -120,6 +125,7 @@ class MaestroCatalogoService
         }
 
         $enUso = match ($tab) {
+            'programa_general' => \App\Models\Programas\ProgramaCatalogo::query()->where('idProgramaGeneral', $id)->exists(),
             'mercado' => ProgramaFila::query()->where('idMercado', $id)->exists(),
             'cliente' => ProgramaFila::query()->where('idCliente', $id)->exists(),
             'programa' => ProgramaFila::query()->where('idPrograma', $id)->exists()
@@ -149,6 +155,7 @@ class MaestroCatalogoService
         }
 
         return match ($tab) {
+            'programa_general' => 'No se puede desactivar: tiene programas asignados.',
             'mercado', 'cliente', 'programa', 'presentacion', 'familia', 'uso', 'situado' => 'No se puede desactivar: está en uso en Receta u otro módulo.',
             'proveedor' => 'No se puede desactivar: el proveedor está referenciado en el módulo Proveedor.',
             'tipo_consumo' => 'No se puede desactivar: el tipo de consumo está usado en registros de Consumo.',

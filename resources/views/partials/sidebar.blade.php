@@ -23,6 +23,8 @@
 
         ['key' => 'programas', 'label' => 'Receta', 'route' => 'programas.index', 'modulo' => 'programas'],
 
+        ['key' => 'mrp', 'label' => 'Plan MRP', 'route' => 'mrp.index', 'modulo' => 'mrp'],
+
         ['key' => 'maestros', 'label' => 'Crud', 'route' => 'maestros.index', 'modulo' => 'maestros'],
 
         ['key' => 'proveedor', 'label' => 'Proveedor', 'route' => 'proveedor.index', 'modulo' => 'proveedor'],

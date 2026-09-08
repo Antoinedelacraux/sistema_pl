@@ -87,16 +87,40 @@ class ProgramaController extends Controller
             );
     }
 
+    public function vaciarReceta(Request $request): RedirectResponse
+    {
+        $resultado = $this->gridService->vaciarReceta();
+
+        $this->auditoria->registrar(
+            accion: AuditoriaAccion::PROGRAMA_VACIAR,
+            entidad: 'ProgramaFila',
+            idEntidad: null,
+            descripcion: 'Receta vaciada desde la interfaz',
+            datosAnteriores: $resultado,
+            request: $request,
+        );
+
+        return redirect()
+            ->route('programas.index')
+            ->with(
+                'status',
+                sprintf(
+                    'Receta vaciada: %d fila(s) y %d parámetro(s) de pallets/conformación eliminados. Importe el Excel para cargar la receta nuevamente.',
+                    $resultado['filas'],
+                    $resultado['params']
+                )
+            );
+    }
+
     /**
-     * @param  array{insertadas: int, actualizadas: int, sin_cambios: int, omitidas: int, total: int}  $resultado
+     * @param  array{insertadas: int, duplicadas: int, omitidas: int, total: int}  $resultado
      */
     private function mensajeImportacion(array $resultado): string
     {
         return sprintf(
-            'Importación: %d nueva(s), %d actualizada(s), %d sin cambios, %d omitida(s). Total: %d.',
+            'Importación: %d nueva(s), %d duplicada(s) en Excel, %d omitida(s). Total: %d.',
             $resultado['insertadas'],
-            $resultado['actualizadas'],
-            $resultado['sin_cambios'],
+            $resultado['duplicadas'],
             $resultado['omitidas'],
             $resultado['total']
         );
@@ -180,13 +204,14 @@ class ProgramaController extends Controller
     }
 
     /**
-     * @return array{mercado: mixed, cliente: mixed, familia: mixed, programa: mixed, presentacion: mixed, q: string}
+     * @return array{mercado: mixed, cliente: mixed, programa_general: mixed, familia: mixed, programa: mixed, presentacion: mixed, q: string}
      */
     private function filtrosDesdeRequest(Request $request): array
     {
         return [
             'mercado' => $request->query('mercado'),
             'cliente' => $request->query('cliente'),
+            'programa_general' => $request->query('programa_general'),
             'familia' => $request->query('familia'),
             'programa' => $request->query('programa'),
             'presentacion' => $request->query('presentacion'),

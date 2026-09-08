@@ -162,7 +162,7 @@ class ProveedorGridService
 
     public function materialPorCodigo(string $codigo): ?MaterialProgramaPL
     {
-        return MaterialProgramaLookup::porCodigo($codigo);
+        return MaterialProgramaLookup::porCodigo($codigo, soloActivos: false);
     }
 
     public function materialPorNombre(string $nombre): ?MaterialProgramaPL
@@ -181,7 +181,7 @@ class ProveedorGridService
 
     public function crear(array $datos): Proveedor
     {
-        $idMaterialPL = (int) $datos['id_material_pl'];
+        $idMaterialPL = (int) ($datos['id_material_pl'] ?? 0);
         $nomProveedor = trim($datos['nom_proveedor']);
         $idFamilia = $this->familiaDesdeMaterial($idMaterialPL);
 

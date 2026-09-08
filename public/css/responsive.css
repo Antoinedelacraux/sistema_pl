@@ -22,7 +22,7 @@
     }
 
     .panel--programas .receta-command__grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr)) auto auto;
     }
 
     .panel--proveedor .receta-command__grid {
@@ -32,6 +32,7 @@
 
     .panel--programas .receta-cmd-field--search {
         grid-column: 1 / -1;
+        grid-row: auto;
     }
 
     .panel--proveedor .receta-cmd-field--search {
@@ -40,7 +41,8 @@
     }
 
     .panel--programas .receta-cmd-clear {
-        grid-column: 1;
+        grid-column: auto;
+        grid-row: auto;
     }
 
     .panel--proveedor .receta-cmd-clear {
@@ -59,7 +61,9 @@
     }
 
     .panel--programas .receta-cmd-export {
-        grid-column: 2 / -1;
+        grid-column: auto;
+        grid-row: auto;
+        justify-content: flex-start;
     }
 
     .panel--proveedor .receta-cmd-export {

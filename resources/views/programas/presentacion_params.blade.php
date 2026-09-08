@@ -25,6 +25,16 @@
             >
                 <div class="receta-command__grid receta-command__grid--params">
                     <label class="receta-cmd-field">
+                        <span class="receta-cmd-label">Prog. General</span>
+                        <select id="receta-filtro-programa-general" name="programa_general" class="receta-cmd-input">
+                            <option value="">Todos</option>
+                            @foreach ($catalogosFiltro['programasGenerales'] as $item)
+                                <option value="{{ $item->idProgramaGeneral }}" @selected((string) ($filtros['programa_general'] ?? '') === (string) $item->idProgramaGeneral)>{{ $item->nombre }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+
+                    <label class="receta-cmd-field">
                         <span class="receta-cmd-label">Programa</span>
                         <select id="receta-filtro-programa" name="programa" class="receta-cmd-input">
                             <option value="">Todos</option>
@@ -54,7 +64,7 @@
                             type="search"
                             name="buscar"
                             class="receta-cmd-input receta-cmd-input--search"
-                            placeholder="Programa o producto"
+                            placeholder="Prog. general, programa o producto"
                             value="{{ $filtros['buscar'] ?? '' }}"
                         >
                     </label>
@@ -72,6 +82,7 @@
             <table class="programas-grid receta-params-grid">
                 <thead>
                     <tr>
+                        <th class="programas-grid__th programas-grid__th--stack">Prog.<br>General</th>
                         <th class="programas-grid__th">Programa</th>
                         <th class="programas-grid__th">Producto</th>
                         <th class="programas-grid__th programas-grid__th--qty">Conformación<br>(Dentro)</th>
@@ -84,6 +95,7 @@
                 <tbody>
                     @forelse ($combinaciones as $fila)
                         <tr>
+                            <td class="programas-grid__cell">{{ $fila->nom_programa_general ?? '—' }}</td>
                             <td class="programas-grid__cell">{{ $fila->nom_programa }}</td>
                             <td class="programas-grid__cell">{{ $fila->nom_presentacion }}</td>
                             <td class="programas-grid__qty">{{ $fila->conformacion !== null ? number_format((float) $fila->conformacion, 2, '.', '') : '—' }}</td>
@@ -107,7 +119,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $puedeEditar ? 5 : 4 }}" class="data-table__empty">No hay combinaciones programa/producto en receta.</td>
+                            <td colspan="{{ $puedeEditar ? 6 : 5 }}" class="data-table__empty">No hay combinaciones programa/producto en receta.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -127,7 +139,7 @@
 @if ($errors->any())
 <script>window.recetaParamOld = @json(old());</script>
 @endif
-<script src="{{ asset('js/receta-filters.js') }}?v=1" defer></script>
+<script src="{{ asset('js/receta-filters.js') }}?v=2" defer></script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
 <script src="{{ asset('js/receta-params.js') }}" defer></script>
 @endpush

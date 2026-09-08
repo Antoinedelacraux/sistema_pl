@@ -11,9 +11,12 @@ use App\Models\Programas\Mercado;
 use App\Models\Programas\Presentacion;
 use App\Models\Programas\ProgramaCatalogo;
 use App\Models\Programas\ProgramaFila;
+use App\Models\Programas\ProgramaGeneral;
+use App\Models\Programas\ProgramaPresentacionParam;
 use App\Models\Programas\Situado;
 use App\Models\Programas\Uso;
 use App\Models\Programas\Variedad;
+use App\Support\CantidadCajaSupport;
 use App\Support\FamiliaMaterialSupport;
 use App\Support\MaterialProgramaLookup;
 use Illuminate\Http\UploadedFile;
@@ -26,7 +29,24 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class ProgramaImportService
 {
-    /** @var list<string> */
+    /** @var array<string, int> */
+    private array $cacheCatalogo = [];
+
+    /** @var array<string, int> */
+    private array $cacheCantidadCaja = [];
+
+    /** @var array<string, true> */
+    private array $cacheConformacionUpsert = [];
+
+    /** @var array<int, string> */
+    private array $cacheVinculoProgramaGeneral = [];
+
+    /** @var array<string, MaterialProgramaPL> */
+    private array $cacheMaterialPl = [];
+
+    private ?int $idSituadoImport = null;
+
+    /** @var list<string> Columnas requeridas */
     public const COLUMNAS = [
         'Mercado',
         'Cliente',
@@ -40,10 +60,22 @@ class ProgramaImportService
         'Cantidad x Caja',
     ];
 
+    /** @var list<string> Columnas opcionales (no impiden la importación si faltan) */
+    public const COLUMNAS_OPCIONALES = [
+        'Programa General',
+        'Codigo Programa General',
+        'Conformación Estándar',
+    ];
+
     /** @var array<string, list<string>> nombres exactos del Excel + alias */
     private const ALIAS_EXCEL = [
         'Mercado' => ['MERCADO', 'Mercado', 'Market'],
         'Cliente' => ['Client', 'Cliente', 'client'],
+        'Programa General' => ['Programa General', 'ProgramaGeneral', 'General', 'Grupo Programa', 'Prog General'],
+        'Codigo Programa General' => [
+            'Codigo Programa General', 'Código Programa General', 'CodigoProgramaGeneral',
+            'Codigo Pro General', 'Código Pro General', 'CodigoProGeneral',
+        ],
         'Programa' => ['Program', 'Programa', 'program', 'Producto', 'producto'],
         'Presentación' => ['Product', 'Presentación', 'Presentacion', 'presentacion', 'Producto', 'producto'],
         'Variedad' => ['Variety', 'Variedad', 'variety'],
@@ -58,6 +90,10 @@ class ProgramaImportService
         ],
         'Observacion' => ['Observations', 'Observacion', 'Observación', 'Uso'],
         'Cantidad x Caja' => ['Cantidad x caja', 'Cantidad x Caja', 'CANTIDAD X CAJA', 'Cantidad X Caja'],
+        'Conformación Estándar' => [
+            'Conformacion Estándar', 'Conformacion Estandar', 'Conformación Estándar', 'Conformación Estandar',
+            'Conformacion Estándar', 'Conformacion Standard',
+        ],
     ];
 
     private const SITUADO_IMPORT_DEFAULT = 'Dentro';
@@ -65,30 +101,39 @@ class ProgramaImportService
     private const OBSERVACION_VACIA = 'Oficial';
 
     /**
-     * Importa Receta desde Excel: inserta filas nuevas y actualiza existentes si cambió cantidad,
-     * descripción u otros datos. La clave de coincidencia es programa + producto + código PL + uso + familia.
+     * Importa Receta desde Excel (solo inserción). La receta debe estar vacía; use «Vaciar» antes.
      *
-     * @return array{leidas: int, insertadas: int, actualizadas: int, sin_cambios: int, omitidas: int, total: int}
+     * @return array{leidas: int, insertadas: int, duplicadas: int, omitidas: int, total: int}
      */
     public function importar(UploadedFile $archivo): array
     {
+        @ini_set('max_execution_time', '300');
+        set_time_limit(300);
+
+        if (ProgramaFila::query()->exists()) {
+            throw new InvalidArgumentException(
+                'La receta ya tiene datos. Use «Vaciar» antes de importar el Excel.'
+            );
+        }
+
+        $this->resetCachesImport();
         $filasExcel = $this->leerExcel($archivo);
-        $indiceExistentes = $this->indiceFilasExistentes();
+        $this->precargarCatalogos();
+        $this->precargarMateriales($filasExcel);
 
         $insertadas = 0;
-        $actualizadas = 0;
-        $sinCambios = 0;
+        $duplicadas = 0;
         $omitidas = 0;
+        $vistasEnExcel = [];
 
         DB::transaction(function () use (
             $filasExcel,
-            $indiceExistentes,
             &$insertadas,
-            &$actualizadas,
-            &$sinCambios,
-            &$omitidas
+            &$duplicadas,
+            &$omitidas,
+            &$vistasEnExcel
         ) {
-            $nroFila = (int) ProgramaFila::query()->max('nroFila');
+            $nroFila = 0;
 
             foreach ($filasExcel as $filaExcel) {
                 if (! $this->codigoPlanificacionValido($filaExcel['Codigo Planificación'])) {
@@ -98,21 +143,15 @@ class ProgramaImportService
                 }
 
                 $matchKey = $this->matchKeyDesdeExcel($filaExcel);
-                $existente = $indiceExistentes[$matchKey] ?? null;
-
-                if ($existente instanceof ProgramaFila) {
-                    if ($this->actualizarFila($existente, $filaExcel)) {
-                        $actualizadas++;
-                    } else {
-                        $sinCambios++;
-                    }
+                if (isset($vistasEnExcel[$matchKey])) {
+                    $duplicadas++;
 
                     continue;
                 }
 
                 $nroFila++;
-                $nueva = $this->insertarFila($filaExcel, $nroFila);
-                $indiceExistentes[$matchKey] = $nueva;
+                $this->insertarFila($filaExcel, $nroFila);
+                $vistasEnExcel[$matchKey] = true;
                 $insertadas++;
             }
         });
@@ -122,8 +161,7 @@ class ProgramaImportService
         return [
             'leidas' => count($filasExcel),
             'insertadas' => $insertadas,
-            'actualizadas' => $actualizadas,
-            'sin_cambios' => $sinCambios,
+            'duplicadas' => $duplicadas,
             'omitidas' => $omitidas,
             'total' => ProgramaFila::query()->count(),
         ];
@@ -141,7 +179,12 @@ class ProgramaImportService
 
         $reader = IOFactory::createReaderForFile($ruta);
         if (method_exists($reader, 'setReadDataOnly')) {
-            $reader->setReadDataOnly(false);
+            $reader->setReadDataOnly(true);
+        }
+        $nombresHojas = $reader->listWorksheetNames($ruta);
+        $hojaObjetivo = $this->elegirHojaExcel($nombresHojas);
+        if (method_exists($reader, 'setLoadSheetsOnly')) {
+            $reader->setLoadSheetsOnly([$hojaObjetivo]);
         }
         $spreadsheet = $reader->load($ruta);
         $layout = $this->resolverLayout($spreadsheet);
@@ -164,6 +207,15 @@ class ProgramaImportService
                     $vacia = false;
                 }
                 $linea[$columna] = $valor;
+            }
+
+            // Columnas opcionales
+            foreach (self::COLUMNAS_OPCIONALES as $columna) {
+                if (isset($mapaColumnas[$columna])) {
+                    $linea[$columna] = $this->valorCeldaTexto($hoja, $mapaColumnas[$columna].$numeroFila);
+                } else {
+                    $linea[$columna] = '';
+                }
             }
 
             if (! $vacia) {
@@ -209,8 +261,17 @@ class ProgramaImportService
             }
         }
 
-        if ($mejor === null || $mejor['coincidencias'] < count(self::COLUMNAS)) {
-            $faltantes = array_keys(array_diff_key(self::ALIAS_EXCEL, $mejor['mapa'] ?? []));
+        // Validar solo columnas requeridas
+        $requeridas = count(self::COLUMNAS);
+        $encontradas = count(array_intersect_key($mejor['mapa'] ?? [], array_flip(self::COLUMNAS)));
+
+        if ($mejor === null || $encontradas < $requeridas) {
+            $requeridosAlias = array_filter(
+                self::ALIAS_EXCEL,
+                fn ($k) => in_array($k, self::COLUMNAS, true),
+                ARRAY_FILTER_USE_KEY
+            );
+            $faltantes = array_keys(array_diff_key($requeridosAlias, $mejor['mapa'] ?? []));
             $vistos = isset($mejor['encabezados']) ? implode(', ', $mejor['encabezados']) : '(ninguno)';
             throw new InvalidArgumentException(
                 'Columnas no encontradas: '.implode(', ', $faltantes)
@@ -379,36 +440,13 @@ class ProgramaImportService
     }
 
     /**
-     * @return array<string, ProgramaFila>
-     */
-    private function indiceFilasExistentes(): array
-    {
-        $mapa = [];
-
-        ProgramaFila::query()
-            ->with([
-                'mercado', 'cliente', 'variedad', 'programa', 'presentacion',
-                'material', 'cantidadCaja', 'uso', 'familia',
-            ])
-            ->orderBy('idProgramaFila')
-            ->chunk(300, function ($filas) use (&$mapa) {
-                foreach ($filas as $fila) {
-                    $clave = $this->matchKeyDesdeFila($fila);
-                    if (! isset($mapa[$clave])) {
-                        $mapa[$clave] = $fila;
-                    }
-                }
-            });
-
-        return $mapa;
-    }
-
-    /**
      * @param  array<string, string>  $filaExcel
      */
     private function matchKeyDesdeExcel(array $filaExcel): string
     {
         return $this->armarFingerprint([
+            trim($filaExcel['Programa General'] ?? ''),
+            trim($filaExcel['Codigo Programa General'] ?? ''),
             $filaExcel['Mercado'],
             $filaExcel['Cliente'],
             $filaExcel['Programa'],
@@ -417,20 +455,6 @@ class ProgramaImportService
             MaterialProgramaLookup::normalizarCodigo($filaExcel['Codigo Planificación']),
             $this->valorObservacion($filaExcel['Observacion']),
             $this->normalizarFamiliaImport($filaExcel['Material']),
-        ]);
-    }
-
-    private function matchKeyDesdeFila(ProgramaFila $fila): string
-    {
-        return $this->armarFingerprint([
-            $fila->mercado?->nomMercado,
-            $fila->cliente?->nomCliente,
-            $fila->programa?->nomPrograma,
-            $fila->variedad?->nomVariedad,
-            $fila->presentacion?->nomPresentacion,
-            MaterialProgramaLookup::normalizarCodigo((string) ($fila->material?->CodigoPL ?? '')),
-            $fila->uso?->nomUso,
-            $this->normalizarFamiliaImport((string) ($fila->familia?->nomFamilia ?? '')),
         ]);
     }
 
@@ -454,50 +478,17 @@ class ProgramaImportService
         return mb_strtolower(trim((string) $valor));
     }
 
-    private function normalizarCantidad(string $valor): string
+    private function normalizarCantidad(string $valor, string $nomFamilia): float
     {
-        $valor = str_replace(',', '.', trim($valor));
-        if ($valor === '' || ! is_numeric($valor)) {
-            return '0.00';
-        }
-
-        return number_format((float) $valor, 2, '.', '');
+        return CantidadCajaSupport::normalizarValor($valor, $nomFamilia);
     }
 
     /**
      * @param  array<string, string>  $filaExcel
      */
-    private function insertarFila(array $filaExcel, int $nroFila): ProgramaFila
+    private function insertarFila(array $filaExcel, int $nroFila): void
     {
-        return ProgramaFila::query()->create($this->datosFilaDesdeExcel($filaExcel, $nroFila));
-    }
-
-    /**
-     * @param  array<string, string>  $filaExcel
-     */
-    private function actualizarFila(ProgramaFila $fila, array $filaExcel): bool
-    {
-        $nomMaterialAntes = $fila->material?->nomMaterial;
-        $datos = $this->datosFilaDesdeExcel($filaExcel, (int) $fila->nroFila);
-        unset($datos['nroFila']);
-
-        $material = MaterialProgramaPL::query()->find($datos['idMaterialPL']);
-        $materialCambio = $material && $nomMaterialAntes !== $material->nomMaterial;
-
-        $cambioFila = false;
-        foreach ($datos as $campo => $valor) {
-            if ((string) $fila->getAttribute($campo) !== (string) $valor) {
-                $cambioFila = true;
-                break;
-            }
-        }
-
-        if ($cambioFila) {
-            $fila->update($datos);
-            $fila->refresh();
-        }
-
-        return $cambioFila || $materialCambio;
+        ProgramaFila::query()->create($this->datosFilaDesdeExcel($filaExcel, $nroFila));
     }
 
     /**
@@ -511,10 +502,24 @@ class ProgramaImportService
             trim($filaExcel['Material Descripcion'])
         );
 
-        $cantidadValor = (float) $this->normalizarCantidad($filaExcel['Cantidad x Caja']);
-        $cantidad = CantidadCaja::query()->firstOrCreate(
-            ['cantidad' => $cantidadValor],
-            ['Estado' => Estado::ACTIVO]
+        $nomFamilia = $this->normalizarFamiliaImport($filaExcel['Material']);
+        $cantidadValor = $this->normalizarCantidad($filaExcel['Cantidad x Caja'], $nomFamilia);
+        $cantidad = $this->resolverCantidadCaja($cantidadValor, $nomFamilia);
+
+        $idPrograma = $this->catalogoId(ProgramaCatalogo::class, 'nomPrograma', $filaExcel['Programa']);
+        $idPresentacion = $this->catalogoId(Presentacion::class, 'nomPresentacion', trim($filaExcel['Presentación']));
+
+        // Si el Excel trae Programa General / código, vincular al Programa
+        $nombreGeneral = trim($filaExcel['Programa General'] ?? '');
+        $codigoGeneral = trim($filaExcel['Codigo Programa General'] ?? '');
+        if ($nombreGeneral !== '' || $codigoGeneral !== '') {
+            $this->vincularProgramaGeneral($idPrograma, $nombreGeneral, $codigoGeneral);
+        }
+
+        $this->upsertConformacionDesdeExcel(
+            $idPrograma,
+            $idPresentacion,
+            $filaExcel['Conformación Estándar'] ?? ''
         );
 
         return [
@@ -522,13 +527,13 @@ class ProgramaImportService
             'idMercado' => $this->catalogoId(Mercado::class, 'nomMercado', $filaExcel['Mercado']),
             'idCliente' => $this->catalogoId(Cliente::class, 'nomCliente', $filaExcel['Cliente']),
             'idVariedad' => $this->catalogoId(Variedad::class, 'nomVariedad', $filaExcel['Variedad']),
-            'idPrograma' => $this->catalogoId(ProgramaCatalogo::class, 'nomPrograma', $filaExcel['Programa']),
-            'idPresentacion' => $this->catalogoId(Presentacion::class, 'nomPresentacion', trim($filaExcel['Presentación'])),
+            'idPrograma' => $idPrograma,
+            'idPresentacion' => $idPresentacion,
             'idMaterialPL' => $material->idMaterialPL,
             'idCantidadCaja' => $cantidad->idCantidadCaja,
             'idUso' => $this->catalogoId(Uso::class, 'nomUso', $this->valorObservacion($filaExcel['Observacion'])),
-            'idSituado' => $this->catalogoId(Situado::class, 'nomSituado', self::SITUADO_IMPORT_DEFAULT),
-            'idFamilia' => $this->catalogoId(Familia::class, 'nomFamilia', $this->normalizarFamiliaImport($filaExcel['Material'])),
+            'idSituado' => $this->idSituadoImport(),
+            'idFamilia' => $this->catalogoId(Familia::class, 'nomFamilia', $nomFamilia),
             'Estado' => Estado::ACTIVO,
         ];
     }
@@ -560,7 +565,138 @@ class ProgramaImportService
             throw new InvalidArgumentException('Código de planificación vacío.');
         }
 
-        return MaterialProgramaLookup::resolverPorCodigo($codigo, $descripcion, reactivar: true, actualizarNombre: true);
+        if (isset($this->cacheMaterialPl[$codigo])) {
+            $material = $this->cacheMaterialPl[$codigo];
+            $nomMaterial = trim($descripcion) !== '' ? trim($descripcion) : $codigo;
+            if ($nomMaterial !== $codigo && $nomMaterial !== $material->nomMaterial) {
+                $material->nomMaterial = $nomMaterial;
+                $material->save();
+            }
+
+            return $material;
+        }
+
+        $material = MaterialProgramaLookup::resolverPorCodigo($codigo, $descripcion, reactivar: true, actualizarNombre: true);
+        $this->cacheMaterialPl[$codigo] = $material;
+
+        return $material;
+    }
+
+    private function upsertConformacionDesdeExcel(int $idPrograma, int $idPresentacion, string $valor): void
+    {
+        $valor = trim($valor);
+        if ($valor === '') {
+            return;
+        }
+
+        $normalizado = str_replace(',', '.', $valor);
+        if (! is_numeric($normalizado)) {
+            return;
+        }
+
+        $clave = $idPrograma.'|'.$idPresentacion;
+        if (isset($this->cacheConformacionUpsert[$clave])) {
+            return;
+        }
+
+        $conformacion = (float) $normalizado;
+        $param = ProgramaPresentacionParam::query()->firstOrNew([
+            'idPrograma' => $idPrograma,
+            'idPresentacion' => $idPresentacion,
+        ]);
+
+        $param->conformacion = $conformacion;
+        if (! $param->exists) {
+            $param->pallets = 0;
+        }
+        $param->Estado = Estado::ACTIVO;
+        $param->save();
+
+        $this->cacheConformacionUpsert[$clave] = true;
+    }
+
+    /**
+     * Crea o reutiliza ProgramaGeneral y lo vincula al Programa dado.
+     * Usa el código exacto del Excel cuando viene informado.
+     */
+    private function vincularProgramaGeneral(int $idPrograma, string $nombre, string $codigo = ''): void
+    {
+        $nombre = trim($nombre);
+        $codigo = trim($codigo);
+
+        if ($nombre === '' && $codigo === '') {
+            return;
+        }
+
+        $firma = mb_strtolower($nombre).'|'.mb_strtolower($codigo);
+        if (($this->cacheVinculoProgramaGeneral[$idPrograma] ?? null) === $firma) {
+            return;
+        }
+
+        $programaGeneral = null;
+
+        if ($codigo !== '') {
+            $programaGeneral = ProgramaGeneral::query()
+                ->where('CodigoProGeneral', $codigo)
+                ->first();
+        }
+
+        if (! $programaGeneral && $nombre !== '') {
+            $programaGeneral = ProgramaGeneral::query()
+                ->whereRaw('LOWER(nombre) = ?', [mb_strtolower($nombre)])
+                ->first();
+        }
+
+        if ($programaGeneral) {
+            $updates = [];
+
+            if ($codigo !== '' && $programaGeneral->CodigoProGeneral !== $codigo) {
+                $codigoOcupado = ProgramaGeneral::query()
+                    ->where('CodigoProGeneral', $codigo)
+                    ->where('idProgramaGeneral', '!=', $programaGeneral->idProgramaGeneral)
+                    ->exists();
+
+                if (! $codigoOcupado) {
+                    $updates['CodigoProGeneral'] = $codigo;
+                }
+            }
+
+            if ($nombre !== '' && $programaGeneral->nombre !== $nombre) {
+                $updates['nombre'] = $nombre;
+            }
+
+            if ($updates !== []) {
+                $programaGeneral->update($updates);
+            }
+        } else {
+            $codigoFinal = $codigo !== '' ? $codigo : $this->generarCodigoProgramaGeneral($nombre);
+            $programaGeneral = ProgramaGeneral::query()->create([
+                'CodigoProGeneral' => $codigoFinal,
+                'nombre' => $nombre !== '' ? $nombre : $codigoFinal,
+                'Estado' => Estado::ACTIVO,
+            ]);
+        }
+
+        $programa = ProgramaCatalogo::query()->find($idPrograma);
+        if ($programa && (int) $programa->idProgramaGeneral !== (int) $programaGeneral->idProgramaGeneral) {
+            $programa->update(['idProgramaGeneral' => $programaGeneral->idProgramaGeneral]);
+        }
+
+        $this->cacheVinculoProgramaGeneral[$idPrograma] = $firma;
+    }
+
+    private function generarCodigoProgramaGeneral(string $nombre): string
+    {
+        $codigo = mb_strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', $nombre) ?? '');
+        $codigo = mb_substr($codigo, 0, 40);
+        $base = $codigo !== '' ? $codigo : 'PG';
+        $n = 1;
+
+        while (ProgramaGeneral::query()->where('CodigoProGeneral', $codigo)->exists()) {
+            $codigo = $base.'-'.$n++;
+        }
+
+        return $codigo;
     }
 
     /**
@@ -573,11 +709,144 @@ class ProgramaImportService
             throw new InvalidArgumentException("Valor vacío para {$campo}.");
         }
 
+        $clave = $modelo.'|'.$campo.'|'.mb_strtolower($valor);
+        if (isset($this->cacheCatalogo[$clave])) {
+            return $this->cacheCatalogo[$clave];
+        }
+
         $registro = $modelo::query()->firstOrCreate(
             [$campo => $valor],
             ['Estado' => Estado::ACTIVO]
         );
 
-        return (int) $registro->getKey();
+        $this->cacheCatalogo[$clave] = (int) $registro->getKey();
+
+        return $this->cacheCatalogo[$clave];
+    }
+
+    private function idSituadoImport(): int
+    {
+        if ($this->idSituadoImport !== null) {
+            return $this->idSituadoImport;
+        }
+
+        $this->idSituadoImport = $this->catalogoId(Situado::class, 'nomSituado', self::SITUADO_IMPORT_DEFAULT);
+
+        return $this->idSituadoImport;
+    }
+
+    private function resolverCantidadCaja(float $cantidadValor, string $nomFamilia): CantidadCaja
+    {
+        $clave = CantidadCajaSupport::clave($cantidadValor, $nomFamilia);
+        if (isset($this->cacheCantidadCaja[$clave])) {
+            return CantidadCaja::query()->findOrFail($this->cacheCantidadCaja[$clave]);
+        }
+
+        $cantidad = CantidadCaja::query()->firstOrCreate(
+            ['cantidad' => $clave],
+            ['Estado' => Estado::ACTIVO]
+        );
+
+        $this->cacheCantidadCaja[$clave] = (int) $cantidad->idCantidadCaja;
+
+        return $cantidad;
+    }
+
+    private function resetCachesImport(): void
+    {
+        $this->cacheCatalogo = [];
+        $this->cacheCantidadCaja = [];
+        $this->cacheConformacionUpsert = [];
+        $this->cacheVinculoProgramaGeneral = [];
+        $this->cacheMaterialPl = [];
+        $this->idSituadoImport = null;
+    }
+
+    /**
+     * @param  list<string>  $nombresHojas
+     */
+    private function elegirHojaExcel(array $nombresHojas): string
+    {
+        $preferidas = ['Materiales V2', 'Programas', 'Receta', 'Materiales'];
+        foreach ($preferidas as $preferida) {
+            foreach ($nombresHojas as $nombre) {
+                if (mb_strtolower(trim($nombre)) === mb_strtolower(trim($preferida))) {
+                    return $nombre;
+                }
+            }
+        }
+
+        return $nombresHojas[0] ?? 'Sheet1';
+    }
+
+    private function precargarCatalogos(): void
+    {
+        $catalogos = [
+            Mercado::class => 'nomMercado',
+            Cliente::class => 'nomCliente',
+            Variedad::class => 'nomVariedad',
+            ProgramaCatalogo::class => 'nomPrograma',
+            Presentacion::class => 'nomPresentacion',
+            Uso::class => 'nomUso',
+            Familia::class => 'nomFamilia',
+            Situado::class => 'nomSituado',
+        ];
+
+        foreach ($catalogos as $modelo => $campo) {
+            $pk = (new $modelo)->getKeyName();
+            $modelo::query()
+                ->select([$pk, $campo])
+                ->orderBy($pk)
+                ->lazy(500)
+                ->each(function ($registro) use ($modelo, $campo) {
+                    $valor = trim((string) $registro->getAttribute($campo));
+                    if ($valor === '') {
+                        return;
+                    }
+
+                    $clave = $modelo.'|'.$campo.'|'.mb_strtolower($valor);
+                    $this->cacheCatalogo[$clave] = (int) $registro->getKey();
+                });
+        }
+
+        CantidadCaja::query()
+            ->select(['idCantidadCaja', 'cantidad'])
+            ->orderBy('idCantidadCaja')
+            ->lazy(500)
+            ->each(function (CantidadCaja $cantidad) {
+                $valor = (float) $cantidad->cantidad;
+                foreach ([CantidadCajaSupport::DECIMALES_NORMAL, CantidadCajaSupport::DECIMALES_ALTA] as $decimales) {
+                    $clave = number_format($valor, $decimales, '.', '');
+                    $this->cacheCantidadCaja[$clave] = (int) $cantidad->idCantidadCaja;
+                }
+            });
+    }
+
+    /**
+     * @param  list<array<string, string>>  $filasExcel
+     */
+    private function precargarMateriales(array $filasExcel): void
+    {
+        $codigos = [];
+        foreach ($filasExcel as $fila) {
+            $codigo = MaterialProgramaLookup::normalizarCodigo($fila['Codigo Planificación'] ?? '');
+            if ($codigo !== '' && $codigo !== '-') {
+                $codigos[$codigo] = true;
+            }
+        }
+
+        if ($codigos === []) {
+            return;
+        }
+
+        foreach (array_chunk(array_keys($codigos), 200) as $lote) {
+            MaterialProgramaPL::query()
+                ->whereIn('CodigoPL', $lote)
+                ->orderBy('idMaterialPL')
+                ->get()
+                ->each(function (MaterialProgramaPL $material) {
+                    $this->cacheMaterialPl[$material->CodigoPL] = $material;
+                });
+        }
     }
 }

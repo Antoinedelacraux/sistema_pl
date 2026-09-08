@@ -4,6 +4,8 @@
     var methodInput = document.getElementById('maestros-form-method');
     var title = document.getElementById('maestros-modal-title');
     var nombreInput = document.getElementById('maestros-nombre');
+    var codigoInput = document.getElementById('maestros-codigo');
+    var fechaInput = document.getElementById('maestros-fecha');
     var estadoWrap = document.getElementById('maestros-estado-wrap');
     var estadoSelect = document.getElementById('maestros-estado');
     var submitBtn = document.getElementById('maestros-submit');
@@ -26,7 +28,9 @@
 
         modal.setAttribute('aria-hidden', 'false');
         modal.classList.add('is-open');
-        if (nombreInput) {
+        if (codigoInput) {
+            codigoInput.focus();
+        } else if (nombreInput) {
             nombreInput.focus();
         }
     }
@@ -45,8 +49,14 @@
         if (title) {
             title.textContent = 'Agregar ' + (config.label || 'registro');
         }
+        if (codigoInput) {
+            codigoInput.value = '';
+        }
         if (nombreInput) {
             nombreInput.value = '';
+        }
+        if (fechaInput) {
+            fechaInput.value = '';
         }
         if (estadoWrap) {
             estadoWrap.hidden = true;
@@ -60,7 +70,7 @@
         abrirModal();
     }
 
-    function prepararEditar(id, nombre, estado) {
+    function prepararEditar(id, nombre, estado, codigo, fecha) {
         if (!form || !config.updateUrlTemplate) {
             return;
         }
@@ -74,8 +84,14 @@
         if (title) {
             title.textContent = 'Editar ' + (config.label || 'registro');
         }
+        if (codigoInput) {
+            codigoInput.value = codigo || '';
+        }
         if (nombreInput) {
             nombreInput.value = nombre || '';
+        }
+        if (fechaInput) {
+            fechaInput.value = fecha || '';
         }
         if (estadoWrap) {
             estadoWrap.hidden = false;
@@ -98,7 +114,9 @@
             prepararEditar(
                 btn.getAttribute('data-id'),
                 btn.getAttribute('data-nombre'),
-                parseInt(btn.getAttribute('data-estado') || '1', 10)
+                parseInt(btn.getAttribute('data-estado') || '1', 10),
+                btn.getAttribute('data-codigo') || '',
+                btn.getAttribute('data-fecha') || ''
             );
         });
     });

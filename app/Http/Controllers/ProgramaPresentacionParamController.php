@@ -22,12 +22,14 @@ class ProgramaPresentacionParamController extends Controller
     public function index(Request $request): View
     {
         $filtros = $this->gridService->normalizarFiltros([
+            'programa_general' => $request->query('programa_general'),
             'programa' => $request->query('programa'),
             'presentacion' => $request->query('presentacion'),
             'q' => trim((string) $request->query('buscar', '')),
         ]);
 
         $combinaciones = $this->paramService->listarPaginado([
+            'programa_general' => $filtros['programa_general'],
             'programa' => $filtros['programa'],
             'presentacion' => $filtros['presentacion'],
             'buscar' => $filtros['q'],
@@ -37,6 +39,7 @@ class ProgramaPresentacionParamController extends Controller
             'catalogosFiltro' => $this->gridService->catalogosFiltro($filtros),
             'combinaciones' => $combinaciones,
             'filtros' => [
+                'programa_general' => $filtros['programa_general'],
                 'programa' => $filtros['programa'],
                 'presentacion' => $filtros['presentacion'],
                 'buscar' => $filtros['q'],

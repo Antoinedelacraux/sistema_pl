@@ -32,12 +32,18 @@
                     </select>
                 </label>
                 <label class="field">
-                    <span class="field__label">Programa</span>
-                    <select class="field__input @error('id_programa') is-invalid @enderror" name="id_programa" id="egreso-id-programa" required>
-                        <option value="">Seleccionar programa</option>
-                        @foreach ($programas as $programa)
-                            <option value="{{ $programa->idPrograma }}" @selected((int) old('id_programa') === (int) $programa->idPrograma)>{{ $programa->nomPrograma }}</option>
+                    <span class="field__label">Programa General</span>
+                    <select class="field__input" id="egreso-id-programa-general" required>
+                        <option value="">Seleccionar programa general</option>
+                        @foreach ($programasGenerales as $programaGeneral)
+                            <option value="{{ $programaGeneral->idProgramaGeneral }}">{{ $programaGeneral->nombre }}</option>
                         @endforeach
+                    </select>
+                </label>
+                <label class="field field--full">
+                    <span class="field__label">Programa</span>
+                    <select class="field__input @error('id_programa') is-invalid @enderror" name="id_programa" id="egreso-id-programa" required disabled>
+                        <option value="">Seleccione un programa general</option>
                     </select>
                 </label>
                 <label class="field field--full">

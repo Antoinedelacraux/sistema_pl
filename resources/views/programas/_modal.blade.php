@@ -109,7 +109,7 @@
                     <span class="field__label">Cantidad x caja</span>
                     <input
                         type="number"
-                        step="0.01"
+                        step="0.0001"
                         min="0"
                         class="field__input @error('cantidad') is-invalid @enderror"
                         name="cantidad"

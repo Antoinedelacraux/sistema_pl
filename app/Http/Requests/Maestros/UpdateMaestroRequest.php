@@ -32,7 +32,7 @@ class UpdateMaestroRequest extends FormRequest
         $definicion = MaestrosCatalogo::definicion($tab);
         $id = (int) $this->route('id');
 
-        return [
+        $rules = [
             'nombre' => [
                 'required',
                 'string',
@@ -42,6 +42,19 @@ class UpdateMaestroRequest extends FormRequest
             ],
             'estado' => ['required', 'integer', Rule::in([Estado::ACTIVO, Estado::INACTIVO])],
         ];
+
+        if (in_array('CodigoProGeneral', $definicion['extraFields'] ?? [], true)) {
+            $rules['CodigoProGeneral'] = [
+                'required', 'string', 'max:50',
+                Rule::unique('ProgramaGeneral', 'CodigoProGeneral')->ignore($id, 'idProgramaGeneral'),
+            ];
+        }
+
+        if (in_array('fecha', $definicion['extraFields'] ?? [], true)) {
+            $rules['fecha'] = ['nullable', 'date'];
+        }
+
+        return $rules;
     }
 
     /**
@@ -55,6 +68,8 @@ class UpdateMaestroRequest extends FormRequest
         return [
             'nombre' => 'nombre de '.$label,
             'estado' => 'estado',
+            'CodigoProGeneral' => 'código',
+            'fecha' => 'fecha',
         ];
     }
 

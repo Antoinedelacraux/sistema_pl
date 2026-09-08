@@ -1872,17 +1872,19 @@ body.page-app[data-theme="dark"] select.field__input {
 }
 
 /* RECETA — barra de filtros */
-.panel--programas .receta-command,
-.panel--proveedor .receta-command {
+.receta-toolbar {
     padding: 12px 14px 0;
+    width: 100%;
 }
 
-.panel--programas .receta-command__shell,
-.panel--proveedor .receta-command__shell {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 132px;
-    gap: 10px;
-    align-items: stretch;
+.receta-toolbar__shell {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
     padding: 12px 14px;
     background: var(--app-surface);
     border: 1px solid var(--app-line);
@@ -1890,88 +1892,411 @@ body.page-app[data-theme="dark"] select.field__input {
     box-shadow: 0 1px 3px rgba(50, 42, 68, 0.06);
 }
 
-.panel--programas .receta-command__form,
-.panel--proveedor .receta-command__form {
+.receta-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+    flex: 1 1 480px;
     min-width: 0;
     margin: 0;
-    padding: 0;
-    border: none;
-    background: transparent;
 }
 
-.panel--programas .receta-command__grid {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    grid-template-rows: auto auto;
+.receta-filters__main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
     gap: 10px;
-    align-items: end;
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
-.panel--proveedor .receta-command__grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto auto;
+.receta-filters__field {
+    width: 140px;
+    flex: 0 1 140px;
+    min-width: 110px;
+}
+
+.receta-filters__field--search {
+    flex: 1 1 180px;
+    min-width: 140px;
+    max-width: none;
+    width: auto;
+}
+
+.receta-filters__clear {
+    display: flex;
+    align-items: flex-end;
+    padding-bottom: 1px;
+    flex-shrink: 0;
+}
+
+.receta-filters__export.inventario-export {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    padding-bottom: 1px;
+}
+
+.receta-toolbar__aside {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
     gap: 10px;
-    align-items: end;
+    flex: 1 1 280px;
+    min-width: 0;
+    margin-left: auto;
+    padding-bottom: 1px;
 }
 
-.panel--programas .receta-cmd-field,
-.panel--proveedor .receta-cmd-field {
+.receta-toolbar__stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    min-height: 36px;
+    padding: 4px 10px;
+    border-radius: var(--radius-md);
+    background: var(--input-bg);
+    border: 1px solid var(--app-line);
+    text-align: center;
+}
+
+.receta-toolbar__stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--purple-600);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.receta-toolbar__stat-label {
+    margin-top: 1px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--purple-700);
+}
+
+.receta-toolbar__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.receta-toolbar__actions .receta-vaciar-form,
+.receta-toolbar__actions .receta-import-form {
+    margin: 0;
+}
+
+@media (max-width: 1100px) {
+    .receta-toolbar__shell,
+    .proveedor-toolbar__shell {
+        align-items: stretch;
+    }
+
+    .receta-toolbar__aside,
+    .proveedor-toolbar__aside {
+        flex: 1 1 100%;
+        margin-left: 0;
+        justify-content: space-between;
+    }
+
+    .receta-filters__field--search,
+    .proveedor-filters__field--search {
+        flex: 1 1 200px;
+        max-width: none;
+    }
+}
+
+@media (max-width: 720px) {
+    .receta-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .receta-tabs__link {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .receta-toolbar {
+        padding: 10px 10px 0;
+    }
+
+    .receta-toolbar__shell {
+        padding: 10px;
+        gap: 10px;
+    }
+
+    .receta-filters,
+    .receta-filters__main {
+        flex: 1 1 100%;
+        gap: 8px;
+    }
+
+    .receta-filters__field {
+        flex: 1 1 calc(50% - 8px);
+        width: auto;
+        min-width: 0;
+    }
+
+    .receta-filters__field--search {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+
+    .receta-filters__clear,
+    .receta-filters__export.inventario-export {
+        flex: 0 0 auto;
+    }
+
+    .receta-toolbar__aside {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .receta-toolbar__stat {
+        width: 100%;
+        flex-direction: row;
+        justify-content: center;
+        gap: 8px;
+        min-height: 0;
+        padding: 8px 10px;
+    }
+
+    .receta-toolbar__stat-label {
+        margin-top: 0;
+        font-size: 11px;
+    }
+
+    .receta-toolbar__actions {
+        width: 100%;
+        justify-content: stretch;
+        flex-wrap: wrap;
+    }
+
+    .receta-toolbar__actions .btn {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .proveedor-toolbar {
+        padding: 10px 10px 0;
+    }
+
+    .proveedor-toolbar__shell {
+        padding: 10px;
+        gap: 10px;
+    }
+
+    .proveedor-filters,
+    .proveedor-filters__main {
+        flex: 1 1 100%;
+        gap: 8px;
+    }
+
+    .proveedor-filters__field--material {
+        flex: 1 1 calc(50% - 8px);
+        width: auto;
+        min-width: 0;
+    }
+
+    .proveedor-filters__field--search {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+
+    .proveedor-filters__clear,
+    .proveedor-filters__export.inventario-export {
+        flex: 0 0 auto;
+    }
+
+    .proveedor-toolbar__aside {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .proveedor-toolbar__stat {
+        width: 100%;
+        flex-direction: row;
+        justify-content: center;
+        gap: 8px;
+        min-height: 0;
+        padding: 8px 10px;
+    }
+
+    .proveedor-toolbar__stat-label {
+        margin-top: 0;
+        font-size: 11px;
+    }
+
+    .proveedor-toolbar__actions {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .proveedor-toolbar__actions .btn {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+}
+
+.panel--programas .grid-table-section {
+    margin-top: 10px;
+}
+
+/* PROVEEDOR — barra de filtros */
+.proveedor-toolbar {
+    padding: 12px 14px 0;
+}
+
+.proveedor-toolbar__shell {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--app-surface);
+    border: 1px solid var(--app-line);
+    border-radius: var(--radius-md);
+    box-shadow: 0 1px 3px rgba(50, 42, 68, 0.06);
+}
+
+.proveedor-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+    flex: 1 1 420px;
+    min-width: 0;
+    margin: 0;
+}
+
+.proveedor-filters__main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.proveedor-filters__field--material {
+    width: 160px;
+    flex: 0 1 160px;
+    min-width: 120px;
+}
+
+.proveedor-filters__field--search {
+    flex: 1 1 180px;
+    min-width: 140px;
+    max-width: none;
+}
+
+.proveedor-filters__clear {
+    display: flex;
+    align-items: flex-end;
+    padding-bottom: 1px;
+    flex-shrink: 0;
+}
+
+.proveedor-filters__export.inventario-export {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    padding-bottom: 1px;
+}
+
+.proveedor-toolbar__aside {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex: 1 1 240px;
+    min-width: 0;
+    padding-bottom: 1px;
+}
+
+.proveedor-toolbar__stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    min-height: 36px;
+    padding: 4px 10px;
+    border-radius: var(--radius-md);
+    background: var(--input-bg);
+    border: 1px solid var(--app-line);
+    text-align: center;
+}
+
+.proveedor-toolbar__stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--purple-600);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.proveedor-toolbar__stat-label {
+    margin-top: 1px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--purple-700);
+}
+
+.proveedor-toolbar__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.panel--proveedor .grid-table-section {
+    margin-top: 10px;
+}
+
+.panel--programas .receta-cmd-field {
     display: flex;
     flex-direction: column;
     gap: 4px;
     min-width: 0;
 }
 
-.panel--programas .receta-cmd-field--search {
-    grid-column: 1 / span 3;
-    grid-row: 2;
-}
-
-.panel--programas .receta-cmd-clear {
-    grid-column: 4;
-    grid-row: 2;
-    display: flex;
-    align-items: flex-end;
-    padding-bottom: 1px;
-}
-
-.panel--proveedor .receta-cmd-clear {
-    grid-column: 3;
-    grid-row: 1;
-    display: flex;
-    align-items: flex-end;
-    padding-bottom: 1px;
-}
-
-.panel--programas .receta-cmd-export {
-    grid-column: 5;
-    grid-row: 2;
-    display: flex;
-    align-items: flex-end;
-    justify-content: flex-end;
-    padding-bottom: 1px;
-}
-
-.panel--proveedor .receta-cmd-export {
-    grid-column: 4;
-    grid-row: 1;
-    display: flex;
-    align-items: flex-end;
-    justify-content: flex-end;
-    padding-bottom: 1px;
-}
-
 .panel--programas .receta-cmd-label,
-.panel--proveedor .receta-cmd-label {
+.panel--proveedor .receta-cmd-label,
+.proveedor-toolbar .receta-cmd-label,
+.receta-toolbar .receta-cmd-label {
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: var(--purple-700);
+    white-space: nowrap;
 }
 
 .panel--programas .receta-cmd-input,
-.panel--proveedor .receta-cmd-input {
+.panel--proveedor .receta-cmd-input,
+.proveedor-toolbar .receta-cmd-input,
+.receta-toolbar .receta-cmd-input {
     width: 100%;
     height: 36px;
     padding: 0 10px;
@@ -1985,14 +2310,18 @@ body.page-app[data-theme="dark"] select.field__input {
 }
 
 .panel--programas .receta-cmd-input:focus,
-.panel--proveedor .receta-cmd-input:focus {
+.panel--proveedor .receta-cmd-input:focus,
+.proveedor-toolbar .receta-cmd-input:focus,
+.receta-toolbar .receta-cmd-input:focus {
     outline: none;
     background: var(--input-bg-focus);
     box-shadow: inset 0 0 0 1px var(--purple-500), 0 0 0 3px var(--purple-soft);
 }
 
 .panel--programas .receta-cmd-input--search,
-.panel--proveedor .receta-cmd-input--search {
+.panel--proveedor .receta-cmd-input--search,
+.proveedor-toolbar .receta-cmd-input--search,
+.receta-toolbar .receta-cmd-input--search {
     padding-left: 34px;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b8b93' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
@@ -2025,53 +2354,16 @@ body.page-app[data-theme="dark"] select.field__input {
     gap: 6px;
 }
 
-.panel--programas .receta-command__aside,
-.panel--proveedor .receta-command__aside {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.panel--programas .receta-command__stat,
-.panel--proveedor .receta-command__stat {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    flex: 1;
-    min-height: 52px;
-    padding: 8px 10px;
-    border-radius: var(--radius-md);
-    background: var(--input-bg);
-    border: 1px solid var(--app-line);
-    text-align: center;
-}
-
-.panel--programas .receta-command__stat-value,
-.panel--proveedor .receta-command__stat-value {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--purple-600);
-    line-height: 1.1;
-    font-variant-numeric: tabular-nums;
-}
-
-.panel--programas .receta-command__stat-label,
-.panel--proveedor .receta-command__stat-label {
-    margin-top: 2px;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--purple-700);
-}
-
-.panel--programas .receta-import-form {
+.panel--programas .receta-import-form,
+.panel--programas .receta-vaciar-form,
+.receta-toolbar .receta-import-form,
+.receta-toolbar .receta-vaciar-form {
     margin: 0;
     position: relative;
 }
 
-.panel--programas .receta-import-form__file {
+.panel--programas .receta-import-form__file,
+.receta-toolbar .receta-import-form__file {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -2084,9 +2376,7 @@ body.page-app[data-theme="dark"] select.field__input {
 }
 
 .panel--programas .receta-import-form .btn,
-.panel--programas .receta-command__aside > .btn,
-.panel--proveedor .receta-command__aside > .btn {
-    width: 100%;
+.panel--programas .receta-vaciar-form .btn {
     white-space: nowrap;
 }
 
@@ -2131,68 +2421,9 @@ body.page-app[data-theme="dark"] select.field__input {
     transform: scale(0.96);
 }
 
-.panel--programas .grid-table-section {
-    margin-top: 10px;
-}
-
 .panel--programas .grid-table-section .programas-grid-wrap {
     border-top: none;
     margin-top: 0;
-}
-
-.receta-toolbar {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--app-line);
-    background: var(--app-surface);
-}
-
-.receta-filters {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 10px;
-    flex: 1;
-    min-width: 0;
-}
-
-.receta-filters__field {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 120px;
-}
-
-.receta-filters__field--search {
-    flex: 1;
-    min-width: 180px;
-    max-width: 280px;
-}
-
-.receta-filters__label {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--ink-muted);
-}
-
-.receta-filters__input {
-    height: 36px;
-    padding: 0 10px;
-    border: 1px solid var(--app-line);
-    border-radius: var(--radius-sm);
-    background: var(--input-bg);
-    color: var(--ink);
-    font: inherit;
-    font-size: 12px;
-}
-
-.receta-filters__input:focus {
-    outline: none;
-    border-color: var(--purple-500);
-    box-shadow: 0 0 0 3px var(--purple-soft);
 }
 
 .receta-meta {
@@ -2222,7 +2453,7 @@ body.page-app[data-theme="dark"] select.field__input {
 
 .panel--receta-params .receta-command__grid--params {
     display: grid;
-    grid-template-columns: minmax(140px, 1fr) minmax(160px, 1.3fr) minmax(180px, 1.6fr) auto;
+    grid-template-columns: minmax(130px, 1fr) minmax(120px, 1fr) minmax(140px, 1.2fr) minmax(160px, 1.4fr) auto;
     grid-template-rows: auto;
     gap: 10px;
     align-items: end;
@@ -2261,19 +2492,22 @@ body.page-app[data-theme="dark"] select.field__input {
 }
 
 .receta-params-grid.programas-grid .programas-grid__th:nth-child(1),
-.receta-params-grid.programas-grid td:nth-child(1) { width: 20%; }
+.receta-params-grid.programas-grid td:nth-child(1) { width: 18%; }
 
 .receta-params-grid.programas-grid .programas-grid__th:nth-child(2),
-.receta-params-grid.programas-grid td:nth-child(2) { width: 36%; }
+.receta-params-grid.programas-grid td:nth-child(2) { width: 14%; }
 
 .receta-params-grid.programas-grid .programas-grid__th:nth-child(3),
-.receta-params-grid.programas-grid td:nth-child(3) { width: 18%; }
+.receta-params-grid.programas-grid td:nth-child(3) { width: 28%; }
 
 .receta-params-grid.programas-grid .programas-grid__th:nth-child(4),
-.receta-params-grid.programas-grid td:nth-child(4) { width: 18%; }
+.receta-params-grid.programas-grid td:nth-child(4) { width: 14%; }
 
 .receta-params-grid.programas-grid .programas-grid__th:nth-child(5),
-.receta-params-grid.programas-grid td:nth-child(5) { width: 8%; }
+.receta-params-grid.programas-grid td:nth-child(5) { width: 14%; }
+
+.receta-params-grid.programas-grid .programas-grid__th:nth-child(6),
+.receta-params-grid.programas-grid td:nth-child(6) { width: 8%; }
 
 .receta-params-grid .programas-grid__qty {
     text-align: right;
@@ -2553,17 +2787,19 @@ body.receta-lightbox-open {
     padding-right: 4px;
 }
 
-.panel--programas .programas-grid__th:nth-child(2)  { width: 5.5%; }
-.panel--programas .programas-grid__th:nth-child(3)  { width: 7.5%; }
-.panel--programas .programas-grid__th:nth-child(4)  { width: 7%; }
-.panel--programas .programas-grid__th:nth-child(5)  { width: 8%; }
-.panel--programas .programas-grid__th:nth-child(6)  { width: 9%; }
-.panel--programas .programas-grid__th:nth-child(7)  { width: 10%; }
-.panel--programas .programas-grid__th:nth-child(8)  { width: 9%; }
-.panel--programas .programas-grid__th:nth-child(9)  { width: 17%; }
+.panel--programas .programas-grid__th:nth-child(2)  { width: 5%; }
+.panel--programas .programas-grid__th:nth-child(3)  { width: 7%; }
+.panel--programas .programas-grid__th:nth-child(4)  { width: 9%; }
+.panel--programas .programas-grid__th:nth-child(5)  { width: 7%; }
+.panel--programas .programas-grid__th:nth-child(6)  { width: 6.5%; }
+.panel--programas .programas-grid__th:nth-child(7)  { width: 7%; }
+.panel--programas .programas-grid__th:nth-child(8)  { width: 8%; }
+.panel--programas .programas-grid__th:nth-child(9)  { width: 9%; }
 .panel--programas .programas-grid__th:nth-child(10) { width: 8%; }
-.panel--programas .programas-grid__th:nth-child(11) { width: 5%; }
-.panel--programas .programas-grid__th:nth-child(12) { width: 8%; }
+.panel--programas .programas-grid__th:nth-child(11) { width: 15%; }
+.panel--programas .programas-grid__th:nth-child(12) { width: 7%; }
+.panel--programas .programas-grid__th:nth-child(13) { width: 5%; }
+.panel--programas .programas-grid__th:nth-child(14) { width: 7%; }
 
 .programas-grid td {
     padding: 6px 7px;
@@ -2630,6 +2866,22 @@ body.receta-lightbox-open {
     vertical-align: top;
 }
 
+.panel--programas .programas-grid__code-pg {
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+    hyphens: auto;
+}
+
+.panel--programas .programas-grid__cell--familia {
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+    hyphens: auto;
+}
+
 .programas-grid__material {
     white-space: normal;
     word-break: break-word;
@@ -2667,30 +2919,33 @@ body.page-app[data-theme="dark"] .receta-filters__input {
     border-color: var(--app-line);
 }
 
-body.page-app[data-theme="dark"] .panel--programas .receta-command__shell,
-body.page-app[data-theme="dark"] .panel--proveedor .receta-command__shell {
+body.page-app[data-theme="dark"] .receta-toolbar__shell,
+body.page-app[data-theme="dark"] .proveedor-toolbar__shell {
     box-shadow: none;
 }
 
 body.page-app[data-theme="dark"] .panel--programas .receta-cmd-input,
-body.page-app[data-theme="dark"] .panel--proveedor .receta-cmd-input {
+body.page-app[data-theme="dark"] .panel--proveedor .receta-cmd-input,
+body.page-app[data-theme="dark"] .proveedor-toolbar .receta-cmd-input,
+body.page-app[data-theme="dark"] .receta-toolbar .receta-cmd-input {
     box-shadow: inset 0 0 0 1px var(--app-line);
 }
 
 body.page-app[data-theme="dark"] .panel--programas .receta-cmd-label,
 body.page-app[data-theme="dark"] .panel--programas .receta-cmd-export-inner .inventario-export__label,
 body.page-app[data-theme="dark"] .panel--proveedor .receta-cmd-label,
-body.page-app[data-theme="dark"] .panel--proveedor .receta-cmd-export-inner .inventario-export__label {
+body.page-app[data-theme="dark"] .panel--proveedor .receta-cmd-export-inner .inventario-export__label,
+body.page-app[data-theme="dark"] .receta-toolbar .receta-cmd-label {
     color: var(--ink-soft);
 }
 
-body.page-app[data-theme="dark"] .panel--programas .receta-command__stat-value,
-body.page-app[data-theme="dark"] .panel--proveedor .receta-command__stat-value {
+body.page-app[data-theme="dark"] .receta-toolbar__stat-value,
+body.page-app[data-theme="dark"] .proveedor-toolbar__stat-value {
     color: var(--sidebar-accent);
 }
 
-body.page-app[data-theme="dark"] .panel--programas .receta-command__stat-label,
-body.page-app[data-theme="dark"] .panel--proveedor .receta-command__stat-label {
+body.page-app[data-theme="dark"] .receta-toolbar__stat-label,
+body.page-app[data-theme="dark"] .proveedor-toolbar__stat-label {
     color: var(--ink-soft);
 }
 
@@ -2722,7 +2977,7 @@ body.page-app[data-theme="dark"] .export-icon--excel {
 /* ── PROVEEDOR (T_Maestra) ─────────────────────────────────── */
 
 .proveedor-grid-wrap {
-    max-height: calc(100vh - 210px);
+    max-height: calc(100vh - 180px);
     overflow: auto;
     -webkit-overflow-scrolling: touch;
 }
@@ -5846,4 +6101,434 @@ body.modal-open {
     align-self: center;
     background: var(--app-line);
     flex-shrink: 0;
+}
+
+/* ── Plan MRP ── */
+.panel--mrp {
+    padding: 16px 18px 24px;
+    --mrp-w-code: 104px;
+    --mrp-w-material: 240px;
+    --mrp-w-extra: 108px;
+}
+
+.mrp-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.mrp-toolbar__filtros {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+.mrp-toolbar__field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.mrp-toolbar__label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--purple-700);
+}
+
+.mrp-toolbar__select {
+    min-width: 280px;
+    max-width: 420px;
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--app-line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    font-size: 12px;
+}
+
+.mrp-toolbar__select:focus {
+    outline: none;
+    border-color: var(--purple-500);
+    box-shadow: 0 0 0 3px var(--purple-soft);
+}
+
+.mrp-toolbar__input {
+    min-width: 220px;
+    padding: 7px 10px;
+    border: 1px solid var(--app-line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink);
+}
+
+.mrp-toolbar__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.mrp-import-form__file {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.mrp-meta {
+    margin: 0 0 14px;
+    font-size: 13px;
+    color: var(--ink-muted);
+}
+
+.mrp-empty {
+    padding: 28px 16px;
+    text-align: center;
+    color: var(--ink-muted);
+}
+
+.mrp-section {
+    margin-bottom: 20px;
+}
+
+.mrp-section__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.mrp-section__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.mrp-section__title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.mrp-section__expand {
+    flex-shrink: 0;
+}
+
+.mrp-section--plan.is-editing .mrp-grid-wrap {
+    outline: 2px solid rgba(91, 79, 168, 0.35);
+    outline-offset: -1px;
+}
+
+.mrp-grid__qty--editable {
+    padding: 4px 8px;
+}
+
+.mrp-grid__input {
+    width: 100%;
+    min-width: 72px;
+    max-width: 96px;
+    padding: 4px 6px;
+    border: 1px solid var(--app-line);
+    border-radius: 6px;
+    background: var(--app-surface);
+    color: var(--ink);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.mrp-grid__input:focus {
+    outline: none;
+    border-color: var(--purple-500);
+    box-shadow: 0 0 0 2px rgba(91, 79, 168, 0.2);
+}
+
+.panel--mrp .mrp-section.is-expanded .mrp-grid-wrap {
+    height: min(480px, calc(100vh - 220px));
+    max-height: min(480px, calc(100vh - 220px));
+    min-height: min(480px, calc(100vh - 220px));
+}
+
+.panel--mrp .mrp-grid-wrap {
+    height: 220px;
+    max-height: 220px;
+    min-height: 220px;
+    overflow: auto;
+    border: 1px solid var(--app-line);
+    border-radius: var(--radius-sm);
+    -webkit-overflow-scrolling: touch;
+}
+
+.mrp-grid {
+    min-width: max-content;
+    width: max-content;
+    table-layout: auto;
+}
+
+.mrp-grid thead {
+    position: static;
+}
+
+.mrp-grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+}
+
+.mrp-grid .programas-grid__th,
+.mrp-grid td {
+    padding: 8px 14px;
+}
+
+.mrp-grid__th--sticky,
+.mrp-grid__td--sticky {
+    position: sticky;
+    z-index: 2;
+}
+
+.mrp-grid thead .mrp-grid__th--sticky {
+    z-index: 6;
+    top: 0;
+    background: #5a6c7d;
+    color: #fff;
+    border-right-color: rgba(255, 255, 255, 0.14);
+}
+
+.mrp-grid .mrp-grid__td--sticky {
+    background: #edf1f5;
+    box-shadow: 2px 0 4px rgba(15, 23, 42, 0.06);
+}
+
+.mrp-grid tbody tr:nth-child(even) .mrp-grid__td--sticky {
+    background: #e3e9ef;
+}
+
+.mrp-grid tbody tr:hover td {
+    background: #f3f6f9;
+}
+
+.mrp-grid tbody tr:hover .mrp-grid__td--sticky {
+    background: #d9e1e9;
+}
+
+.mrp-grid__th--code,
+.mrp-grid__td--code {
+    left: 0;
+    width: var(--mrp-w-code);
+    min-width: var(--mrp-w-code);
+    max-width: var(--mrp-w-code);
+}
+
+.mrp-grid__th--material,
+.mrp-grid__td--material {
+    left: var(--mrp-w-code);
+    width: var(--mrp-w-material);
+    min-width: var(--mrp-w-material);
+    max-width: var(--mrp-w-material);
+}
+
+.mrp-grid--plan .mrp-grid__th--material,
+.mrp-grid--plan .mrp-grid__td--material {
+    width: calc(var(--mrp-w-material) + var(--mrp-w-extra));
+    min-width: calc(var(--mrp-w-material) + var(--mrp-w-extra));
+    max-width: calc(var(--mrp-w-material) + var(--mrp-w-extra));
+}
+
+.mrp-grid__th--sem {
+    min-width: 98px;
+    white-space: nowrap;
+    font-size: 11px;
+    line-height: 1.3;
+    padding-left: 12px;
+    padding-right: 12px;
+}
+
+.mrp-grid__th--extra,
+.mrp-grid__td--extra {
+    left: calc(var(--mrp-w-code) + var(--mrp-w-material));
+    width: var(--mrp-w-extra);
+    min-width: var(--mrp-w-extra);
+    max-width: var(--mrp-w-extra);
+    padding-left: 12px;
+    padding-right: 12px;
+}
+
+.mrp-grid thead .mrp-grid__th--extra {
+    z-index: 6;
+    top: 0;
+    background: #5a6c7d;
+    color: #fff;
+    border-right-color: rgba(255, 255, 255, 0.14);
+}
+
+.mrp-grid .mrp-grid__td--material {
+    box-shadow: none;
+}
+
+.mrp-grid .mrp-grid__td--extra {
+    background: #edf1f5;
+    box-shadow: 2px 0 4px rgba(15, 23, 42, 0.06);
+}
+
+.mrp-grid tbody tr:nth-child(even) .mrp-grid__td--extra {
+    background: #e3e9ef;
+}
+
+.mrp-grid tbody tr:hover .mrp-grid__td--extra {
+    background: #d9e1e9;
+}
+
+.mrp-grid--plan .mrp-grid__td--material {
+    box-shadow: 2px 0 4px rgba(15, 23, 42, 0.06);
+}
+
+.mrp-grid td.programas-grid__qty:not(.mrp-grid__td--extra) {
+    min-width: 98px;
+    padding-left: 12px;
+    padding-right: 12px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.mrp-grid__qty--alerta {
+    color: #c62828;
+    font-weight: 700;
+}
+
+.mrp-grid--consumo td.mrp-grid__qty--alerta,
+.mrp-grid--consumo tbody tr:hover td.mrp-grid__qty--alerta,
+.mrp-grid--consumo tbody tr:nth-child(even) td.mrp-grid__qty--alerta {
+    color: #c62828;
+    font-weight: 700;
+}
+
+body.page-app[data-theme="dark"] .mrp-grid__qty--alerta,
+body.page-app[data-theme="dark"] .mrp-grid--consumo td.mrp-grid__qty--alerta,
+body.page-app[data-theme="dark"] .mrp-grid--consumo tbody tr:hover td.mrp-grid__qty--alerta {
+    color: #ff6b6b;
+}
+
+.mrp-ios-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.mrp-ios-switch__label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.mrp-ios-switch__control {
+    position: relative;
+    width: 51px;
+    height: 31px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.mrp-ios-switch__control:focus-visible .mrp-ios-switch__track {
+    box-shadow: 0 0 0 3px rgba(52, 199, 89, 0.35);
+}
+
+.mrp-ios-switch__track {
+    display: block;
+    width: 51px;
+    height: 31px;
+    border-radius: 31px;
+    background: #e9e9ea;
+    transition: background 0.22s ease;
+    position: relative;
+}
+
+.mrp-ios-switch__control.is-active .mrp-ios-switch__track {
+    background: #34c759;
+}
+
+.mrp-ios-switch__thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 27px;
+    height: 27px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15), 0 1px 1px rgba(0, 0, 0, 0.16);
+    transition: transform 0.22s ease;
+}
+
+.mrp-ios-switch__control.is-active .mrp-ios-switch__thumb {
+    transform: translateX(20px);
+}
+
+body.page-app[data-theme="dark"] .mrp-ios-switch__track {
+    background: #39393d;
+}
+
+body.page-app[data-theme="dark"] .mrp-ios-switch__control.is-active .mrp-ios-switch__track {
+    background: #30d158;
+}
+
+.mrp-grid__empty {
+    padding: 20px 12px;
+    text-align: center;
+    color: var(--ink-muted);
+}
+
+body.page-app[data-theme="dark"] .mrp-grid thead .mrp-grid__th--sticky {
+    background: #3d4f63;
+}
+
+body.page-app[data-theme="dark"] .mrp-grid .mrp-grid__td--sticky {
+    background: #2a3340;
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.25);
+}
+
+body.page-app[data-theme="dark"] .mrp-grid tbody tr:nth-child(even) .mrp-grid__td--sticky {
+    background: #323d4b;
+}
+
+body.page-app[data-theme="dark"] .mrp-grid tbody tr:hover td {
+    background: #2e3846;
+}
+
+body.page-app[data-theme="dark"] .mrp-grid tbody tr:hover .mrp-grid__td--sticky {
+    background: #3a4656;
+}
+
+body.page-app[data-theme="dark"] .mrp-grid thead .mrp-grid__th--extra {
+    background: #3d4f63;
+}
+
+body.page-app[data-theme="dark"] .mrp-grid .mrp-grid__td--extra {
+    background: #2a3340;
+}
+
+body.page-app[data-theme="dark"] .mrp-grid tbody tr:nth-child(even) .mrp-grid__td--extra {
+    background: #323d4b;
+}
+
+body.page-app[data-theme="dark"] .mrp-grid tbody tr:hover .mrp-grid__td--extra {
+    background: #3a4656;
 }
