@@ -22,6 +22,7 @@ class ProgramaFila extends Model
         'idCliente',
         'idVariedad',
         'idPrograma',
+        'idProgramaGeneral',
         'idPresentacion',
         'idMaterialPL',
         'idCantidadCaja',
@@ -59,6 +60,11 @@ class ProgramaFila extends Model
     public function programa(): BelongsTo
     {
         return $this->belongsTo(ProgramaCatalogo::class, 'idPrograma', 'idPrograma');
+    }
+
+    public function programaGeneral(): BelongsTo
+    {
+        return $this->belongsTo(ProgramaGeneral::class, 'idProgramaGeneral', 'idProgramaGeneral');
     }
 
     public function presentacion(): BelongsTo

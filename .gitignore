@@ -25,13 +25,16 @@ yarn-error.log
 # Comprobantes XML locales (no versionar)
 /*.xml
 
-# SQL de esquema local y tests (no versionar)
+# SQL de esquema local (no versionar)
 *.sql
 /database/*.sql
 /database/*.sqlite
 /database/*.sqlite-journal
-/tests
-/phpunit.xml
+
+# Logs y artefactos de carga/QA
+/jmeter.log
+/qa-report
+/storage/logs/performance-report*.json
 
 # Leftovers locales (no versionar)
 /plantilla
@@ -44,5 +47,3 @@ yarn-error.log
 /resources/views/partials/pagination-inventario.blade.php
 /resources/views/partials/icons/familias.blade.php
 /resources/views/partials/icons/materiales.blade.php
-/app/Console/Commands/PerformanceReportCommand.php
-/database/factories

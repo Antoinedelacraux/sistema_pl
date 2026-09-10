@@ -5,6 +5,10 @@
 @section('heading', 'Receta')
 @section('crumbs', 'Planeamiento · materiales por receta')
 
+@push('head')
+<link rel="stylesheet" href="{{ asset('css/receta.css') }}?v=1">
+@endpush
+
 @section('page')
 @php
     $exportParams = array_filter([
@@ -151,8 +155,8 @@
                         <td class="programas-grid__num">{{ $fila->nroFila }}</td>
                         <td class="programas-grid__cell programas-grid__cell--short">{{ $fila->mercado?->nomMercado }}</td>
                         <td class="programas-grid__cell">{{ $fila->cliente?->nomCliente }}</td>
-                        <td class="programas-grid__cell">{{ $fila->programa?->programaGeneral?->nombre ?? '—' }}</td>
-                        <td class="programas-grid__code programas-grid__code-pg">{{ $fila->programa?->programaGeneral?->CodigoProGeneral ?? '—' }}</td>
+                        <td class="programas-grid__cell">{{ $fila->programaGeneral?->nombre ?? $fila->programa?->programaGeneral?->nombre ?? '—' }}</td>
+                        <td class="programas-grid__code programas-grid__code-pg">{{ $fila->programaGeneral?->CodigoProGeneral ?? $fila->programa?->programaGeneral?->CodigoProGeneral ?? '—' }}</td>
                         <td class="programas-grid__cell">{{ $fila->programa?->nomPrograma }}</td>
                         <td class="programas-grid__cell">{{ $fila->variedad?->nomVariedad }}</td>
                         <td class="programas-grid__cell">{{ $fila->presentacion?->nomPresentacion }}</td>

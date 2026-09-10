@@ -1,0 +1,183 @@
+/* Inventario */
+
+body.page-app[data-theme="dark"] .panel--inventario .inventario-filters__label{
+    color: var(--ink-soft);
+}
+
+/* ── INVENTARIO (stock por almacén) ────────────────────────── */
+
+.inventario-tabs{
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--app-line);
+    background: var(--app-surface);
+}
+
+.inventario-tabs__btn{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 12px 20px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink-muted);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.inventario-tabs__btn:hover{
+    color: var(--ink);
+    background: var(--muted-surface);
+}
+
+.inventario-tabs__btn.is-active{
+    color: var(--purple-600);
+    border-bottom-color: var(--purple-500);
+    background: var(--purple-soft);
+}
+
+.inventario-tabs__sub{
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+}
+
+.inventario-tabs__btn.is-active .inventario-tabs__sub{
+    color: var(--purple-600);
+}
+
+.panel--inventario .inventario-toolbar{
+    padding: 14px 14px 0;
+    background: var(--app-surface);
+}
+
+.inventario-filters{
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--app-surface);
+    border: 1px solid var(--app-line);
+    border-radius: var(--radius-md);
+    box-shadow: 0 1px 3px rgba(50, 42, 68, 0.06);
+}
+
+.inventario-filters__main{
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+.inventario-filters__field{
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.inventario-filters__field--search{
+    flex: 1;
+    min-width: 180px;
+    max-width: 320px;
+}
+
+.inventario-filters__clear-wrap{
+    display: flex;
+    align-items: flex-end;
+    padding-bottom: 1px;
+    flex-shrink: 0;
+}
+
+.inventario-filters__label{
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--purple-700);
+}
+
+.inventario-filters__input{
+    width: 100%;
+    min-height: 36px;
+    padding: 8px 10px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: var(--input-bg);
+    box-shadow: inset 0 0 0 1px var(--app-line);
+    color: var(--ink);
+    font-size: 13px;
+}
+
+.inventario-filters__input:focus{
+    outline: none;
+    background: var(--input-bg-focus);
+    box-shadow: inset 0 0 0 1px var(--purple-500), 0 0 0 3px var(--purple-soft);
+}
+
+.inventario-filters__input--search{
+    padding-left: 34px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b8b93' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 10px center;
+}
+
+.inventario-kpis{
+    padding: 14px;
+    border-bottom: 1px solid var(--app-line);
+    background: var(--app-bg);
+}
+
+.inventario-grid-wrap{
+    max-height: calc(100vh - 420px);
+}
+
+.inventario-grid{
+    width: 100%;
+    min-width: 640px;
+}
+
+.inventario-grid .programas-grid__th:first-child,
+.inventario-grid .programas-grid__code{
+    width: 104px;
+    min-width: 104px;
+    max-width: 104px;
+}
+
+.inventario-grid .inventario-grid__th--material,
+.inventario-grid .programas-grid__material{
+    width: 100%;
+    min-width: 220px;
+}
+
+.inventario-grid .programas-grid__th--num,
+.inventario-grid .programas-grid__qty{
+    width: 80px;
+    min-width: 80px;
+    max-width: 80px;
+}
+
+.inventario-grid .inventario-grid__th--estado,
+.inventario-grid td:last-child{
+    width: 64px;
+    min-width: 64px;
+    max-width: 64px;
+    text-align: center;
+}
+
+.inventario-grid .stock-badge{
+    min-width: 0;
+    padding: 2px 6px;
+    font-size: 9px;
+}
+
+.inventario-stock-cell{
+    font-weight: 700;
+    color: var(--ink);
+}

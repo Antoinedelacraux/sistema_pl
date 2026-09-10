@@ -5,6 +5,10 @@
 @section('heading', 'Receta')
 @section('crumbs', 'Planeamiento · pallets y conformación')
 
+@push('head')
+<link rel="stylesheet" href="{{ asset('css/receta.css') }}?v=1">
+@endpush
+
 @section('page')
 @php
     $programaSeleccionado = (int) ($filtros['programa'] ?? 0);

@@ -9,8 +9,8 @@ use App\Services\Mrp\MrpGridService;
 use App\Services\Mrp\MrpImportService;
 use App\Services\Mrp\MrpPlanUpdateService;
 use App\Support\AuditoriaAccion;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
 
 class MrpController extends Controller
@@ -24,9 +24,7 @@ class MrpController extends Controller
 
     public function index(Request $request): View
     {
-        $filtros = [
-            'familia' => filled($request->query('familia')) ? (int) $request->query('familia') : null,
-        ];
+        $filtros = $this->filtrosDesdeRequest($request);
         $datos = $this->gridService->datos($filtros);
 
         return view('mrp.index', [
@@ -43,7 +41,43 @@ class MrpController extends Controller
         ]);
     }
 
-    public function importExcel(ImportMrpExcelRequest $request): RedirectResponse
+    public function seccion(Request $request, string $tipo): View|Response
+    {
+        abort_unless(in_array($tipo, ['consumo', 'ingresos'], true), 404);
+
+        $filtros = $this->filtrosDesdeRequest($request);
+        $seccion = $tipo === 'consumo' ? 'consumo_real' : 'ingresos';
+        $datos = $this->gridService->datos($filtros, [$seccion]);
+
+        $viewData = [
+            'semanas' => $datos['semanas'],
+            'scrollId' => $tipo === 'consumo' ? 'mrp-scroll-consumo' : 'mrp-scroll-ingresos',
+            'mensajeVacio' => 'Sin materiales en el plan.',
+        ];
+
+        if ($tipo === 'consumo') {
+            $viewData['filas'] = $datos['consumo_real'];
+            $viewData['resaltarNegativos'] = true;
+            $viewData['columnasExtra'] = [
+                ['key' => 'stock_actual', 'label' => 'Stock actual'],
+            ];
+        } else {
+            $viewData['filas'] = $datos['ingresos'];
+            $viewData['columnasExtra'] = [
+                ['key' => 'ingreso_total', 'label' => 'Ingreso total'],
+            ];
+        }
+
+        $html = view('mrp._tabla_matriz', $viewData)->render();
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response($html);
+        }
+
+        return view('mrp._tabla_matriz', $viewData);
+    }
+
+    public function importExcel(ImportMrpExcelRequest $request): \Illuminate\Http\RedirectResponse
     {
         try {
             $resultado = $this->importService->importar($request->file('archivo_excel'));
@@ -52,6 +86,8 @@ class MrpController extends Controller
                 ->route('mrp.index')
                 ->with('error', $exception->getMessage());
         }
+
+        $this->gridService->forgetCaches();
 
         $this->auditoria->registrar(
             accion: AuditoriaAccion::MRP_IMPORTAR,
@@ -74,9 +110,10 @@ class MrpController extends Controller
             );
     }
 
-    public function vaciarPlan(Request $request): RedirectResponse
+    public function vaciarPlan(Request $request): \Illuminate\Http\RedirectResponse
     {
         $this->importService->vaciarPlan();
+        $this->gridService->forgetCaches();
 
         $this->auditoria->registrar(
             accion: AuditoriaAccion::MRP_VACIAR,
@@ -91,7 +128,7 @@ class MrpController extends Controller
             ->with('status', 'Plan MRP vaciado. Importe el Excel para cargar semanas y consumo planificado.');
     }
 
-    public function updatePlan(UpdateMrpPlanRequest $request): RedirectResponse
+    public function updatePlan(UpdateMrpPlanRequest $request): \Illuminate\Http\RedirectResponse
     {
         $cantidades = $request->validated('cantidades');
         $cambios = $this->planUpdateService->actualizar($cantidades);
@@ -108,12 +145,22 @@ class MrpController extends Controller
         return redirect()
             ->route('mrp.index', array_filter([
                 'familia' => $request->input('familia'),
-            ]))
+            ], static fn ($v) => $v !== null && $v !== ''))
             ->with(
                 'status',
                 $cambios > 0
                     ? sprintf('Plan de consumo actualizado (%d cambio(s)).', $cambios)
                     : 'No hubo cambios en el plan de consumo.'
             );
+    }
+
+    /**
+     * @return array{familia: int|null}
+     */
+    private function filtrosDesdeRequest(Request $request): array
+    {
+        return [
+            'familia' => filled($request->query('familia')) ? (int) $request->query('familia') : null,
+        ];
     }
 }

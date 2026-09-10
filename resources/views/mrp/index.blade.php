@@ -5,6 +5,10 @@
 @section('heading', 'Plan MRP')
 @section('crumbs', 'Planeamiento · consumo planificado y real')
 
+@push('head')
+<link rel="stylesheet" href="{{ asset('css/mrp.css') }}?v=1">
+@endpush
+
 @section('page')
 <div class="mrp-page">
 @include('partials.flash')
@@ -73,35 +77,7 @@
             <div class="mrp-section__head">
                 <h2 class="mrp-section__title">Plan de consumo</h2>
                 <div class="mrp-section__actions">
-                    @if ($puedeEditar)
-                        <button
-                            type="button"
-                            class="btn btn--outline btn--sm"
-                            id="mrp-plan-edit"
-                            data-mrp-edit
-                        >
-                            Editar
-                        </button>
-                        <button
-                            type="submit"
-                            class="btn btn--purple btn--sm"
-                            form="mrp-plan-form"
-                            id="mrp-plan-save"
-                            data-mrp-save
-                            hidden
-                        >
-                            Guardar
-                        </button>
-                        <button
-                            type="button"
-                            class="btn btn--ghost btn--sm"
-                            id="mrp-plan-cancel"
-                            data-mrp-cancel
-                            hidden
-                        >
-                            Cancelar
-                        </button>
-                    @endif
+                    <span class="mrp-section__note">Sincronizado desde Plan de Producción</span>
                     <button
                         type="button"
                         class="btn btn--outline btn--sm mrp-section__expand"
@@ -112,31 +88,20 @@
                     </button>
                 </div>
             </div>
-            <form
-                id="mrp-plan-form"
-                method="POST"
-                action="{{ route('mrp.plan.update') }}"
-                data-confirm="¿Está seguro de guardar estos cambios en el plan de consumo?"
-                data-confirm-title="Guardar plan de consumo"
-                data-confirm-ok="Sí, guardar"
-                data-confirm-variant="warning"
-            >
-                @csrf
-                @method('PUT')
-                <input type="hidden" name="familia" value="{{ $filtros['familia'] ?? '' }}">
-                @include('mrp._tabla_matriz', [
-                    'semanas' => $semanas,
-                    'filas' => $plan,
-                    'scrollId' => 'mrp-scroll-plan',
-                    'editablePlan' => true,
-                    'mensajeVacio' => 'Sin materiales en el plan.',
-                ])
-            </form>
+            @include('mrp._tabla_matriz', [
+                'semanas' => $semanas,
+                'filas' => $plan,
+                'scrollId' => 'mrp-scroll-plan',
+                'layoutPlan' => true,
+                'editablePlan' => false,
+                'mensajeVacio' => 'Sin materiales en el plan.',
+            ])
         </div>
 
         <div class="mrp-section">
             <div class="mrp-section__head">
                 <h2 class="mrp-section__title">Consumo real</h2>
+                <span class="mrp-section__note">Rojo: déficit proyectado · Número: días de stock según consumo registrado</span>
             </div>
             @include('mrp._tabla_matriz', [
                 'semanas' => $semanas,
@@ -164,6 +129,7 @@
                 'mensajeVacio' => 'Sin materiales en el plan.',
             ])
         </div>
+
     @endif
 </section>
 </div>
@@ -171,153 +137,5 @@
 
 @push('scripts')
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script>
-(function () {
-    var importBtn = document.getElementById('mrp-importar-excel');
-    var importInput = document.getElementById('mrp-archivo-excel');
-    var importForm = document.getElementById('mrp-import-form');
-
-    if (importBtn && importInput && importForm) {
-        importBtn.addEventListener('click', function () {
-            importInput.value = '';
-            importInput.click();
-        });
-
-        importInput.addEventListener('change', function () {
-            if (!importInput.files || !importInput.files.length) {
-                return;
-            }
-            importBtn.disabled = true;
-            importBtn.textContent = 'Importando…';
-            importForm.submit();
-        });
-    }
-
-    var syncBtn = document.getElementById('mrp-sync-toggle');
-    var scrollPanes = Array.prototype.slice.call(document.querySelectorAll('[data-mrp-scroll]'));
-    var syncKey = 'mrp-scroll-sync';
-    var syncing = false;
-    var syncEnabled = false;
-
-    function setSyncState(active) {
-        syncEnabled = active;
-        if (!syncBtn) {
-            return;
-        }
-        syncBtn.setAttribute('aria-checked', active ? 'true' : 'false');
-        syncBtn.classList.toggle('is-active', active);
-        try {
-            localStorage.setItem(syncKey, active ? '1' : '0');
-        } catch (e) {}
-    }
-
-    if (syncBtn && scrollPanes.length > 1) {
-        try {
-            setSyncState(localStorage.getItem(syncKey) === '1');
-        } catch (e) {
-            setSyncState(false);
-        }
-
-        syncBtn.addEventListener('click', function () {
-            setSyncState(!syncEnabled);
-        });
-
-        scrollPanes.forEach(function (pane) {
-            pane.addEventListener('scroll', function () {
-                if (!syncEnabled || syncing) {
-                    return;
-                }
-                syncing = true;
-                scrollPanes.forEach(function (otro) {
-                    if (otro === pane) {
-                        return;
-                    }
-                    otro.scrollTop = pane.scrollTop;
-                    otro.scrollLeft = pane.scrollLeft;
-                });
-                syncing = false;
-            }, { passive: true });
-        });
-    }
-
-    document.querySelectorAll('[data-mrp-expand]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var section = btn.closest('.mrp-section');
-            if (!section) {
-                return;
-            }
-
-            var expanded = section.classList.toggle('is-expanded');
-            btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-            btn.textContent = expanded ? 'Contraer' : 'Expandir';
-        });
-    });
-
-    function initMrpEditSection(config) {
-        var section = document.getElementById(config.sectionId);
-        var editBtn = document.getElementById(config.editBtnId);
-        var saveBtn = document.getElementById(config.saveBtnId);
-        var cancelBtn = document.getElementById(config.cancelBtnId);
-        var form = document.getElementById(config.formId);
-
-        function setEditMode(active) {
-            if (!section) {
-                return;
-            }
-
-            section.classList.toggle('is-editing', active);
-
-            section.querySelectorAll('.mrp-grid__input').forEach(function (input) {
-                input.hidden = !active;
-                input.disabled = !active;
-            });
-
-            section.querySelectorAll('.mrp-grid__valor').forEach(function (span) {
-                span.hidden = active;
-            });
-
-            if (editBtn) {
-                editBtn.hidden = active;
-            }
-            if (saveBtn) {
-                saveBtn.hidden = !active;
-            }
-            if (cancelBtn) {
-                cancelBtn.hidden = !active;
-            }
-        }
-
-        if (editBtn && section) {
-            editBtn.addEventListener('click', function () {
-                setEditMode(true);
-            });
-        }
-
-        if (cancelBtn && section) {
-            cancelBtn.addEventListener('click', function () {
-                section.querySelectorAll('.mrp-grid__input').forEach(function (input) {
-                    input.value = input.getAttribute('data-original') || '';
-                });
-                setEditMode(false);
-            });
-        }
-
-        if (form && section) {
-            form.addEventListener('submit', function () {
-                section.querySelectorAll('.mrp-grid__input').forEach(function (input) {
-                    input.disabled = false;
-                });
-            });
-        }
-    }
-
-    initMrpEditSection({
-        sectionId: 'mrp-section-plan',
-        editBtnId: 'mrp-plan-edit',
-        saveBtnId: 'mrp-plan-save',
-        cancelBtnId: 'mrp-plan-cancel',
-        formId: 'mrp-plan-form',
-    });
-})();
-</script>
+<script src="{{ asset('js/mrp.js') }}" defer></script>
 @endpush

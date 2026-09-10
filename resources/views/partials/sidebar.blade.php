@@ -25,6 +25,8 @@
 
         ['key' => 'mrp', 'label' => 'Plan MRP', 'route' => 'mrp.index', 'modulo' => 'mrp'],
 
+        ['key' => 'plan_produccion', 'label' => 'Plan Producción', 'route' => 'plan-produccion.index', 'modulo' => 'plan_produccion'],
+
         ['key' => 'maestros', 'label' => 'Crud', 'route' => 'maestros.index', 'modulo' => 'maestros'],
 
         ['key' => 'proveedor', 'label' => 'Proveedor', 'route' => 'proveedor.index', 'modulo' => 'proveedor'],

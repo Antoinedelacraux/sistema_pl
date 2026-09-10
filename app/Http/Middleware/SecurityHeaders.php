@@ -8,7 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Adds defensive HTTP security headers without breaking Blade/Vite inline needs.
- * Strict CSP is not enforced (see qa-report/NOTES.md); Report-Only is optional via env.
+ * Strict CSP is not enforced; Report-Only es opcional vía env.
  */
 class SecurityHeaders
 {

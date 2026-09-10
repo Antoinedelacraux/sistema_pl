@@ -5,6 +5,10 @@
 @section('heading', 'Inventario · '.$tabActiva)
 @section('crumbs', ($almacenActivo->nomAlmacen ?? $tabActiva).' · materiales con stock')
 
+@push('head')
+<link rel="stylesheet" href="{{ asset('css/inventario.css') }}?v=1">
+@endpush
+
 @section('page')
 @php
     $exportParams = array_filter([

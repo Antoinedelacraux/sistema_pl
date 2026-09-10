@@ -56,10 +56,19 @@ class ProgramaGridService
     /** Programas distintos presentes en la grilla de receta (no el catálogo CRUD). */
     public function totalProgramasDistintos(array $filtros = []): int
     {
-        return (int) $this->queryFilas($filtros)
-            ->select('idPrograma')
+        $query = $this->queryFilas($filtros);
+
+        $porGeneral = (clone $query)
+            ->whereNotNull('idProgramaGeneral')
+            ->distinct()
+            ->count('idProgramaGeneral');
+
+        $sinGeneral = (clone $query)
+            ->whereNull('idProgramaGeneral')
             ->distinct()
             ->count('idPrograma');
+
+        return $porGeneral + $sinGeneral;
     }
 
     public function catalogos(): array
@@ -246,6 +255,7 @@ class ProgramaGridService
             'cliente',
             'variedad',
             'programa.programaGeneral',
+            'programaGeneral',
             'presentacion',
             'material',
             'cantidadCaja',
@@ -266,12 +276,7 @@ class ProgramaGridService
             $this->aplicarFiltroFamilia($query, (int) $filtros['familia']);
         }
 
-        if (! empty($filtros['programa_general'])) {
-            $idProgramaGeneral = (int) $filtros['programa_general'];
-            $query->whereHas('programa', function (Builder $q) use ($idProgramaGeneral) {
-                $q->where('idProgramaGeneral', $idProgramaGeneral);
-            });
-        }
+        $this->aplicarFiltroProgramaGeneral($query, $filtros);
 
         if (! empty($filtros['programa'])) {
             $query->where('idPrograma', (int) $filtros['programa']);
@@ -304,12 +309,7 @@ class ProgramaGridService
             $query->where('idCliente', (int) $filtros['cliente']);
         }
 
-        if (! empty($filtros['programa_general'])) {
-            $idProgramaGeneral = (int) $filtros['programa_general'];
-            $query->whereHas('programa', function (Builder $q) use ($idProgramaGeneral) {
-                $q->where('idProgramaGeneral', $idProgramaGeneral);
-            });
-        }
+        $this->aplicarFiltroProgramaGeneral($query, $filtros);
 
         if (! empty($filtros['programa'])) {
             $query->where('idPrograma', (int) $filtros['programa']);
@@ -373,15 +373,19 @@ class ProgramaGridService
 
     private function opcionesProgramaGeneralFiltro(): Collection
     {
-        // Muestra todos los ProgramaGeneral que tienen al menos un Programa
-        // referenciado en ProgramaFila.
-        $idsProgramas = ProgramaFila::query()->distinct()->pluck('idPrograma');
-
-        $idsGeneral = ProgramaCatalogo::query()
-            ->whereIn('idPrograma', $idsProgramas)
+        $idsGeneral = ProgramaFila::query()
             ->whereNotNull('idProgramaGeneral')
             ->distinct()
             ->pluck('idProgramaGeneral');
+
+        if ($idsGeneral->isEmpty()) {
+            $idsProgramas = ProgramaFila::query()->distinct()->pluck('idPrograma');
+            $idsGeneral = ProgramaCatalogo::query()
+                ->whereIn('idPrograma', $idsProgramas)
+                ->whereNotNull('idProgramaGeneral')
+                ->distinct()
+                ->pluck('idProgramaGeneral');
+        }
 
         return ProgramaGeneral::query()
             ->activo()
@@ -399,16 +403,11 @@ class ProgramaGridService
             ->distinct()
             ->pluck('idPrograma');
 
-        $query = ProgramaCatalogo::query()
+        return ProgramaCatalogo::query()
             ->activo()
-            ->whereIn('idPrograma', $ids);
-
-        // Si hay ProgramaGeneral seleccionado, además filtrar por FK
-        if (! empty($filtros['programa_general'])) {
-            $query->where('idProgramaGeneral', (int) $filtros['programa_general']);
-        }
-
-        return $query->orderBy('nomPrograma')->get();
+            ->whereIn('idPrograma', $ids)
+            ->orderBy('nomPrograma')
+            ->get();
     }
 
     /**
@@ -453,6 +452,27 @@ class ProgramaGridService
             ->whereIn('idFamilia', $idsFamilia)
             ->orderBy('nomFamilia')
             ->get();
+    }
+
+    /**
+     * @param  array<string, mixed>  $filtros
+     */
+    private function aplicarFiltroProgramaGeneral(Builder $query, array $filtros): void
+    {
+        if (empty($filtros['programa_general'])) {
+            return;
+        }
+
+        $idProgramaGeneral = (int) $filtros['programa_general'];
+        $query->where(function (Builder $q) use ($idProgramaGeneral) {
+            $q->where('idProgramaGeneral', $idProgramaGeneral)
+                ->orWhere(function (Builder $legacy) use ($idProgramaGeneral) {
+                    $legacy->whereNull('idProgramaGeneral')
+                        ->whereHas('programa', function (Builder $programa) use ($idProgramaGeneral) {
+                            $programa->where('idProgramaGeneral', $idProgramaGeneral);
+                        });
+                });
+        });
     }
 
     private function aplicarFiltroFamilia(Builder $query, int $idFamilia): void

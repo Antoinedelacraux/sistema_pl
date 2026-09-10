@@ -23,15 +23,23 @@ class ConsumoRecetaService
     public function programasGeneralesDisponibles(): Collection
     {
         return Cache::remember('catalogo.programas_generales_consumo', 60, function () {
-            $idsGeneral = ProgramaCatalogo::query()
-                ->activo()
-                ->whereIn('idPrograma', ProgramaFila::query()
-                    ->select('idPrograma')
-                    ->where('Estado', Estado::ACTIVO)
-                    ->distinct())
+            $idsGeneral = ProgramaFila::query()
+                ->where('Estado', Estado::ACTIVO)
                 ->whereNotNull('idProgramaGeneral')
                 ->distinct()
                 ->pluck('idProgramaGeneral');
+
+            if ($idsGeneral->isEmpty()) {
+                $idsGeneral = ProgramaCatalogo::query()
+                    ->activo()
+                    ->whereIn('idPrograma', ProgramaFila::query()
+                        ->select('idPrograma')
+                        ->where('Estado', Estado::ACTIVO)
+                        ->distinct())
+                    ->whereNotNull('idProgramaGeneral')
+                    ->distinct()
+                    ->pluck('idProgramaGeneral');
+            }
 
             return ProgramaGeneral::query()
                 ->activo()

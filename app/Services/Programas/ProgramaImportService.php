@@ -38,8 +38,8 @@ class ProgramaImportService
     /** @var array<string, true> */
     private array $cacheConformacionUpsert = [];
 
-    /** @var array<int, string> */
-    private array $cacheVinculoProgramaGeneral = [];
+    /** @var array<string, int> */
+    private array $cacheProgramaGeneralId = [];
 
     /** @var array<string, MaterialProgramaPL> */
     private array $cacheMaterialPl = [];
@@ -509,12 +509,11 @@ class ProgramaImportService
         $idPrograma = $this->catalogoId(ProgramaCatalogo::class, 'nomPrograma', $filaExcel['Programa']);
         $idPresentacion = $this->catalogoId(Presentacion::class, 'nomPresentacion', trim($filaExcel['Presentación']));
 
-        // Si el Excel trae Programa General / código, vincular al Programa
         $nombreGeneral = trim($filaExcel['Programa General'] ?? '');
         $codigoGeneral = trim($filaExcel['Codigo Programa General'] ?? '');
-        if ($nombreGeneral !== '' || $codigoGeneral !== '') {
-            $this->vincularProgramaGeneral($idPrograma, $nombreGeneral, $codigoGeneral);
-        }
+        $idProgramaGeneral = ($nombreGeneral !== '' || $codigoGeneral !== '')
+            ? $this->resolverProgramaGeneralId($nombreGeneral, $codigoGeneral)
+            : null;
 
         $this->upsertConformacionDesdeExcel(
             $idPrograma,
@@ -528,6 +527,7 @@ class ProgramaImportService
             'idCliente' => $this->catalogoId(Cliente::class, 'nomCliente', $filaExcel['Cliente']),
             'idVariedad' => $this->catalogoId(Variedad::class, 'nomVariedad', $filaExcel['Variedad']),
             'idPrograma' => $idPrograma,
+            'idProgramaGeneral' => $idProgramaGeneral,
             'idPresentacion' => $idPresentacion,
             'idMaterialPL' => $material->idMaterialPL,
             'idCantidadCaja' => $cantidad->idCantidadCaja,
@@ -616,21 +616,16 @@ class ProgramaImportService
     }
 
     /**
-     * Crea o reutiliza ProgramaGeneral y lo vincula al Programa dado.
-     * Usa el código exacto del Excel cuando viene informado.
+     * Crea o reutiliza ProgramaGeneral por código (prioridad) o nombre.
      */
-    private function vincularProgramaGeneral(int $idPrograma, string $nombre, string $codigo = ''): void
+    private function resolverProgramaGeneralId(string $nombre, string $codigo = ''): int
     {
         $nombre = trim($nombre);
         $codigo = trim($codigo);
 
-        if ($nombre === '' && $codigo === '') {
-            return;
-        }
-
-        $firma = mb_strtolower($nombre).'|'.mb_strtolower($codigo);
-        if (($this->cacheVinculoProgramaGeneral[$idPrograma] ?? null) === $firma) {
-            return;
+        $cacheKey = mb_strtolower($codigo).'|'.mb_strtolower($nombre);
+        if (isset($this->cacheProgramaGeneralId[$cacheKey])) {
+            return $this->cacheProgramaGeneralId[$cacheKey];
         }
 
         $programaGeneral = null;
@@ -677,12 +672,10 @@ class ProgramaImportService
             ]);
         }
 
-        $programa = ProgramaCatalogo::query()->find($idPrograma);
-        if ($programa && (int) $programa->idProgramaGeneral !== (int) $programaGeneral->idProgramaGeneral) {
-            $programa->update(['idProgramaGeneral' => $programaGeneral->idProgramaGeneral]);
-        }
+        $id = (int) $programaGeneral->idProgramaGeneral;
+        $this->cacheProgramaGeneralId[$cacheKey] = $id;
 
-        $this->cacheVinculoProgramaGeneral[$idPrograma] = $firma;
+        return $id;
     }
 
     private function generarCodigoProgramaGeneral(string $nombre): string
@@ -757,7 +750,7 @@ class ProgramaImportService
         $this->cacheCatalogo = [];
         $this->cacheCantidadCaja = [];
         $this->cacheConformacionUpsert = [];
-        $this->cacheVinculoProgramaGeneral = [];
+        $this->cacheProgramaGeneralId = [];
         $this->cacheMaterialPl = [];
         $this->idSituadoImport = null;
     }

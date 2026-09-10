@@ -5,8 +5,10 @@ namespace App\Services\Mrp;
 use App\Models\Estado;
 use App\Models\Programas\MaterialProgramaPL;
 use App\Models\Stock\PlanConsumo;
+use App\Models\Stock\PlanConsumoOrden;
 use App\Models\Stock\SemConsumo;
 use App\Support\MaterialProgramaLookup;
+use App\Support\PlanConsumoOrdenSupport;
 use App\Support\SemConsumoSupport;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -55,6 +57,8 @@ class MrpImportService
             SemConsumo::query()->delete();
             PlanConsumo::query()->delete();
 
+            $idsOrden = [];
+
             foreach ($mapaSemanas as $orden => $semana) {
                 SemConsumo::query()->create([
                     'etiqueta' => $semana['etiqueta'],
@@ -77,6 +81,7 @@ class MrpImportService
                     reactivar: true,
                     actualizarNombre: true
                 );
+                $idsOrden[] = (int) $material->idMaterialPL;
 
                 foreach ($fila['cantidades'] as $nroOrden => $cantidad) {
                     if ($cantidad == 0.0) {
@@ -96,6 +101,8 @@ class MrpImportService
                     ]);
                 }
             }
+
+            PlanConsumoOrdenSupport::reemplazarOrden($idsOrden);
         });
 
         return [
@@ -108,7 +115,9 @@ class MrpImportService
     {
         DB::transaction(function () {
             PlanConsumo::query()->delete();
+            PlanConsumoOrden::query()->delete();
             SemConsumo::query()->delete();
+            PlanConsumoOrdenSupport::olvidarCache();
         });
     }
 

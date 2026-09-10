@@ -1,0 +1,378 @@
+/* Plan de Produccion */
+.plan-prod-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.plan-prod-toolbar__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.plan-prod-import-form__file {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.plan-prod-meta {
+    margin: 0 0 14px;
+    font-size: 13px;
+    color: var(--ink-muted);
+}
+
+.plan-prod-meta--toolbar {
+    margin: 0;
+}
+
+.plan-prod-empty {
+    padding: 28px 16px;
+    text-align: center;
+    color: var(--ink-muted);
+}
+
+.plan-prod-page {
+    /* Mismas medidas que mrp-grid--plan (Código PL + Material PL) */
+    --mrp-w-code: 118px;
+    --mrp-w-material: 240px;
+    --mrp-w-extra: 108px;
+    --plan-prod-w-programa: calc(var(--mrp-w-code) + var(--mrp-w-material) + var(--mrp-w-extra));
+}
+
+.plan-prod-grid-wrap {
+    overflow: auto;
+    max-height: min(340px, calc(100vh - 400px));
+    border: 1px solid var(--app-line);
+    border-radius: var(--radius-sm);
+    -webkit-overflow-scrolling: touch;
+}
+
+.plan-prod-grid {
+    min-width: max-content;
+    width: max-content;
+    table-layout: auto;
+}
+
+.plan-prod-grid .programas-grid__th,
+.plan-prod-grid td {
+    padding: 5px 8px;
+    box-sizing: border-box;
+}
+
+.plan-prod-grid thead .programas-grid__th {
+    height: 34px;
+    max-height: 34px;
+    font-size: 10px;
+    line-height: 1.2;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.plan-prod-grid__row--pg td {
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+.plan-prod-grid__th--programa,
+.plan-prod-grid__cell--programa,
+.plan-prod-grid__cell--material {
+    width: var(--plan-prod-w-programa);
+    min-width: var(--plan-prod-w-programa);
+    max-width: var(--plan-prod-w-programa);
+    box-sizing: border-box;
+}
+
+.plan-prod-grid__th--programa {
+    text-align: left;
+    padding-left: 14px;
+    background: #5a6c7d !important;
+    color: #fff;
+    border-right-color: rgba(255, 255, 255, 0.14);
+    white-space: nowrap;
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+}
+
+.plan-prod-grid__cell--programa {
+    vertical-align: middle;
+}
+
+.plan-prod-grid__th--sem {
+    width: 98px;
+    min-width: 98px;
+    padding-left: 12px;
+    padding-right: 12px;
+}
+
+.plan-prod-grid .programas-grid__th--num.plan-prod-grid__th--sem {
+    width: 98px;
+    min-width: 98px;
+}
+
+.plan-prod-grid__cell--qty {
+    min-width: 98px;
+}
+
+.plan-prod-expand {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.plan-prod-expand:disabled {
+    cursor: default;
+    opacity: 0.85;
+}
+
+.plan-prod-expand__icon {
+    flex-shrink: 0;
+    width: 0;
+    height: 0;
+    margin-top: 5px;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 7px solid var(--purple-700);
+    transition: transform 0.15s ease;
+}
+
+.plan-prod-expand.is-expanded .plan-prod-expand__icon {
+    transform: rotate(180deg);
+}
+
+.plan-prod-expand:disabled .plan-prod-expand__icon {
+    opacity: 0.35;
+}
+
+.plan-prod-expand__label {
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.plan-prod-expand__cal {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--purple-soft);
+    color: var(--purple-700);
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.plan-prod-grid__row--pg td {
+    background: #f8fafc;
+    font-weight: 600;
+}
+
+.plan-prod-grid__row--pg:nth-child(4n+1) td,
+.plan-prod-grid tbody tr.plan-prod-grid__row--pg:nth-child(odd) td {
+    background: #f8fafc;
+}
+
+.plan-prod-grid tbody tr.plan-prod-grid__row--mat td {
+    background: #f0ebf8 !important;
+    font-size: 10.5px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    vertical-align: middle;
+}
+
+.plan-prod-grid tbody tr.plan-prod-grid__row--mat:nth-child(even) td {
+    background: #e8dff5 !important;
+}
+
+.plan-prod-grid tbody tr.plan-prod-grid__row--mat:hover td {
+    background: #e0d4f0 !important;
+}
+
+.plan-prod-grid__cell--material {
+    padding-left: 28px !important;
+    line-height: 1.25;
+}
+
+.plan-prod-grid__mat-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.plan-prod-grid__mat-code {
+    display: inline;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: var(--purple-700);
+}
+
+.plan-prod-grid__mat-factor {
+    display: inline;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--ink-muted);
+    white-space: nowrap;
+}
+
+.plan-prod-grid__mat-name {
+    display: block;
+    color: var(--ink);
+    line-height: 1.25;
+    margin-top: 1px;
+}
+
+.plan-prod-grid__cell--pg-qty {
+    font-weight: 700;
+    background: #eef2f7 !important;
+}
+
+.plan-prod-grid__cell--mat-qty {
+    color: var(--ink-muted);
+}
+
+.plan-prod-grid__empty {
+    padding: 24px 12px;
+    text-align: center;
+    color: var(--ink-muted);
+}
+
+body.page-app[data-theme="dark"] .plan-prod-grid__row--pg td {
+    background: #2a3340;
+}
+
+body.page-app[data-theme="dark"] .plan-prod-grid__cell--pg-qty {
+    background: #323d4b !important;
+}
+
+body.page-app[data-theme="dark"] .plan-prod-grid tbody tr.plan-prod-grid__row--mat td {
+    background: #3a3248 !important;
+}
+
+body.page-app[data-theme="dark"] .plan-prod-grid tbody tr.plan-prod-grid__row--mat:nth-child(even) td {
+    background: #423850 !important;
+}
+
+body.page-app[data-theme="dark"] .plan-prod-grid tbody tr.plan-prod-grid__row--mat:hover td {
+    background: #4a4058 !important;
+}
+
+.plan-prod-section {
+    margin-bottom: 16px;
+}
+
+.plan-prod-section__head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 6px;
+}
+
+.plan-prod-section__title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.plan-prod-section__note {
+    font-size: 12px;
+    color: var(--ink-muted);
+}
+
+.plan-prod-section--plan.is-editing .plan-prod-grid-wrap {
+    outline: 2px solid rgba(91, 79, 168, 0.35);
+    outline-offset: -1px;
+}
+
+.plan-prod-grid__input {
+    width: 100%;
+    min-width: 76px;
+    max-width: 108px;
+    padding: 5px 8px;
+    border: 1px solid var(--app-line);
+    border-radius: 6px;
+    background: var(--app-surface);
+    color: var(--ink);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.plan-prod-grid__input::-webkit-outer-spin-button,
+.plan-prod-grid__input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.plan-prod-grid__input:focus {
+    outline: none;
+    border-color: var(--purple-500);
+    box-shadow: 0 0 0 2px rgba(91, 79, 168, 0.2);
+}
+
+.plan-prod-section--consumo .mrp-grid-wrap {
+    height: min(280px, calc(100vh - 420px));
+    max-height: min(280px, calc(100vh - 420px));
+    min-height: 180px;
+    overflow: auto;
+    border: 1px solid var(--app-line);
+    border-radius: var(--radius-sm);
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Filas y cabecera compactas solo en Plan de Producción · Plan de consumo (no afecta MRP) */
+.plan-prod-section--consumo .mrp-grid tbody tr {
+    height: auto;
+}
+
+.plan-prod-section--consumo .mrp-grid thead th,
+.plan-prod-section--consumo .mrp-grid--cabecera-plana thead th {
+    height: 34px;
+    max-height: 34px;
+    padding: 5px 8px;
+    font-size: 10px;
+    line-height: 1.2;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.plan-prod-section--consumo .mrp-grid .programas-grid__th,
+.plan-prod-section--consumo .mrp-grid td {
+    padding: 5px 8px;
+    font-size: 11px;
+    line-height: 1.25;
+    vertical-align: middle;
+}
+
+.plan-prod-section--consumo .mrp-grid .programas-grid__code,
+.plan-prod-section--consumo .mrp-grid .programas-grid__material {
+    line-height: 1.25;
+    white-space: nowrap;
+}
+
+.plan-prod-section--consumo .mrp-grid__th--code,
+.plan-prod-section--consumo .mrp-grid__th--material {
+    white-space: nowrap;
+    font-size: 10px;
+    letter-spacing: 0.02em;
+}

@@ -5,6 +5,10 @@
 @section('heading', 'Registro')
 @section('crumbs', 'Stock · ingresos, consumos y traslados')
 
+@push('head')
+<link rel="stylesheet" href="{{ asset('css/registro.css') }}?v=1">
+@endpush
+
 @section('page')
 @php
     $tabActiva = $tab ?? 'ingresos';

@@ -38,6 +38,12 @@ class AuditoriaAccion
 
     public const MRP_PLAN_ACTUALIZAR = 'mrp.plan.actualizar';
 
+    public const PLAN_PRODUCCION_IMPORTAR = 'plan_produccion.importar';
+
+    public const PLAN_PRODUCCION_VACIAR = 'plan_produccion.vaciar';
+
+    public const PLAN_PRODUCCION_ACTUALIZAR = 'plan_produccion.actualizar';
+
     public const REGISTRO_INGRESO_CREAR = 'registro.ingreso.crear';
 
     public const REGISTRO_INGRESO_ACTUALIZAR = 'registro.ingreso.actualizar';
@@ -77,6 +83,9 @@ class AuditoriaAccion
             self::MRP_IMPORTAR => 'Plan MRP importado',
             self::MRP_VACIAR => 'Plan MRP vaciado',
             self::MRP_PLAN_ACTUALIZAR => 'Plan de consumo actualizado',
+            self::PLAN_PRODUCCION_IMPORTAR => 'Plan de producción importado',
+            self::PLAN_PRODUCCION_VACIAR => 'Plan de producción vaciado',
+            self::PLAN_PRODUCCION_ACTUALIZAR => 'Plan de producción actualizado',
             self::REGISTRO_INGRESO_CREAR => 'Ingreso registrado',
             self::REGISTRO_INGRESO_ACTUALIZAR => 'Ingreso actualizado',
             self::REGISTRO_EGRESO_CREAR => 'Consumo registrado',
