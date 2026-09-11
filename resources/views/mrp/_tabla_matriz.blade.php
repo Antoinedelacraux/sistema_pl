@@ -1,5 +1,7 @@
 @php
-    $formatearCantidad = static function ($valor): string {
+    use App\Support\CantidadCajaSupport;
+
+    $formatearCantidad = static function ($valor, ?string $nomFamilia = null) use (&$layoutPlan): string {
         if (is_array($valor)) {
             $valor = $valor['valor'] ?? 0;
         }
@@ -9,17 +11,29 @@
             return '—';
         }
 
+        if ($layoutPlan) {
+            return CantidadCajaSupport::formatearVisualizacionCelda($num, $nomFamilia);
+        }
+
         return number_format($num, 2, '.', '');
     };
 
-    $celdaSemana = static function (array $fila, string $clave): array {
+    $editablePlan = ! empty($editablePlan);
+    $layoutPlan = ! empty($layoutPlan) || $editablePlan;
+
+    $celdaSemana = static function (array $fila, string $clave) use ($layoutPlan): array {
         $dato = $fila[$clave] ?? 0;
+        $nomFamilia = (string) ($fila['nom_familia'] ?? '');
 
         if (is_array($dato)) {
             $num = (float) ($dato['valor'] ?? 0);
 
             return [
-                'texto' => $num == 0.0 ? '—' : number_format($num, 2, '.', ''),
+                'texto' => $num == 0.0 ? '—' : (
+                    $layoutPlan
+                        ? CantidadCajaSupport::formatearVisualizacionCelda($num, $nomFamilia)
+                        : number_format($num, 2, '.', '')
+                ),
                 'alerta' => (bool) ($dato['alerta'] ?? false),
                 'negativo' => (bool) ($dato['negativo'] ?? false) || $num < 0 || (bool) ($dato['alerta'] ?? false),
                 'num' => $num,
@@ -29,18 +43,20 @@
         $num = (float) $dato;
 
         return [
-            'texto' => $num == 0.0 ? '—' : number_format($num, 2, '.', ''),
+            'texto' => $num == 0.0 ? '—' : (
+                $layoutPlan
+                    ? CantidadCajaSupport::formatearVisualizacionCelda($num, $nomFamilia)
+                    : number_format($num, 2, '.', '')
+            ),
             'alerta' => false,
             'negativo' => $num < 0,
             'num' => $num,
         ];
     };
-
-    $editablePlan = ! empty($editablePlan);
-    $layoutPlan = ! empty($layoutPlan) || $editablePlan;
     $resaltarNegativos = ! empty($resaltarNegativos);
     $columnasExtra = $columnasExtra ?? [];
     $cabeceraUnaLinea = ! empty($cabeceraUnaLinea);
+    $mostrarTotal = ! empty($mostrarTotal);
 @endphp
 <div class="programas-grid-wrap mrp-grid-wrap" @if(!empty($scrollId)) id="{{ $scrollId }}" data-mrp-scroll @endif>
 <table @class(['programas-grid', 'mrp-grid', 'mrp-grid--plan' => $layoutPlan, 'mrp-grid--consumo' => $resaltarNegativos, 'mrp-grid--cabecera-plana' => $cabeceraUnaLinea])>
@@ -59,31 +75,39 @@
 @foreach ($semanas as $sem)
 <th @class(['programas-grid__th', 'programas-grid__th--num', 'mrp-grid__th--sem', 'programas-grid__th--stack' => ! $cabeceraUnaLinea]) title="{{ $sem->fechaInicio?->format('d/m/Y') }}">{{ $sem->etiqueta }}</th>
 @endforeach
+@if ($mostrarTotal)
+<th class="programas-grid__th programas-grid__th--num mrp-grid__th--total">Total</th>
+@endif
 </tr>
 </thead>
 <tbody>
 @forelse ($filas as $fila)
-<tr>
+<tr @if(! empty($fila['idMaterialPL'])) data-mat-id="{{ $fila['idMaterialPL'] }}" @endif>
 <td class="programas-grid__code mrp-grid__td--sticky mrp-grid__td--code">{{ $fila['codigoPL'] }}</td>
 <td class="programas-grid__material mrp-grid__td--sticky mrp-grid__td--material">{{ $fila['descripcion'] }}</td>
 @foreach ($columnasExtra as $col)
-<td class="programas-grid__qty mrp-grid__td--sticky mrp-grid__td--extra">{{ $formatearCantidad($fila[$col['key']] ?? 0) }}</td>
+<td class="programas-grid__qty mrp-grid__td--sticky mrp-grid__td--extra">{{ $formatearCantidad($fila[$col['key']] ?? 0, $fila['nom_familia'] ?? null) }}</td>
 @endforeach
+@php $totalFila = 0.0; @endphp
 @foreach ($semanas as $sem)
 @php
     $clave = 'sem_'.$sem->idSemConsumo;
     $celda = $celdaSemana($fila, $clave);
+    $totalFila += $celda['num'];
 @endphp
 @if ($editablePlan)
 <td class="programas-grid__qty mrp-grid__qty--editable" data-mat="{{ $fila['idMaterialPL'] }}" data-sem="{{ $sem->idSemConsumo }}" data-val="{{ $celda['num'] == 0.0 ? '' : number_format($celda['num'], 2, '.', '') }}"><span class="mrp-grid__valor">{{ $celda['texto'] }}</span></td>
 @else
-<td @class(['programas-grid__qty', 'mrp-grid__qty--alerta' => $resaltarNegativos && $celda['negativo']])>{{ $celda['texto'] }}</td>
+<td @class(['programas-grid__qty', 'mrp-grid__qty--alerta' => $resaltarNegativos && $celda['negativo']]) data-mat="{{ $fila['idMaterialPL'] }}" data-sem="{{ $sem->idSemConsumo }}">{{ $celda['texto'] }}</td>
 @endif
 @endforeach
+@if ($mostrarTotal)
+<td class="programas-grid__qty mrp-grid__cell--total">{{ $totalFila == 0.0 ? '—' : $formatearCantidad($totalFila, $fila['nom_familia'] ?? null) }}</td>
+@endif
 </tr>
 @empty
 <tr>
-<td colspan="{{ 2 + count($columnasExtra) + $semanas->count() }}" class="mrp-grid__empty">{{ $mensajeVacio ?? 'Sin datos.' }}</td>
+<td colspan="{{ 2 + count($columnasExtra) + $semanas->count() + ($mostrarTotal ? 1 : 0) }}" class="mrp-grid__empty">{{ $mensajeVacio ?? 'Sin datos.' }}</td>
 </tr>
 @endforelse
 </tbody>

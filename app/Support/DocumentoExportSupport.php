@@ -6,6 +6,7 @@ use App\Models\Usuario;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Table;
 use PhpOffice\PhpSpreadsheet\Worksheet\Table\TableStyle;
@@ -22,6 +23,8 @@ class DocumentoExportSupport
     /**
      * @param  list<string>  $encabezados
      * @param  list<array<int, string|int|float|null>>  $filas
+     * @param  list<int>  $indicesColumnaTexto
+     * @param  list<int>  $indicesFilaNegrita
      */
     public static function exportarExcel(
         array $encabezados,
@@ -29,7 +32,9 @@ class DocumentoExportSupport
         ?Usuario $usuario,
         string $tituloHoja,
         string $prefijoArchivo,
-        string $nombreTabla
+        string $nombreTabla,
+        array $indicesColumnaTexto = [],
+        array $indicesFilaNegrita = []
     ): StreamedResponse {
         ini_set('memory_limit', '512M');
         set_time_limit(120);
@@ -49,11 +54,30 @@ class DocumentoExportSupport
         }
 
         $filaDatos = $filaEncabezados + 1;
-        foreach ($filas as $fila) {
+        $ultimaColumnaIndice = self::TABLA_INICIO_COLUMNA + count($encabezados) - 1;
+
+        foreach ($filas as $indiceFila => $fila) {
+            $esNegrita = in_array($indiceFila, $indicesFilaNegrita, true);
+
             foreach ($fila as $indice => $valor) {
                 $columna = Coordinate::stringFromColumnIndex(self::TABLA_INICIO_COLUMNA + $indice);
-                $sheet->setCellValue($columna.$filaDatos, $valor);
+                $celda = $columna.$filaDatos;
+
+                if (in_array($indice, $indicesColumnaTexto, true)) {
+                    $sheet->setCellValueExplicit($celda, (string) ($valor ?? ''), DataType::TYPE_STRING);
+                } else {
+                    $sheet->setCellValue($celda, $valor);
+                }
             }
+
+            if ($esNegrita) {
+                $columnaInicio = Coordinate::stringFromColumnIndex(self::TABLA_INICIO_COLUMNA);
+                $columnaFin = Coordinate::stringFromColumnIndex($ultimaColumnaIndice);
+                $sheet->getStyle($columnaInicio.$filaDatos.':'.$columnaFin.$filaDatos)
+                    ->getFont()
+                    ->setBold(true);
+            }
+
             $filaDatos++;
         }
 

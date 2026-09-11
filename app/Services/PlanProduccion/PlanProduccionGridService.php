@@ -68,9 +68,16 @@ class PlanProduccionGridService
             ->get()
             ->groupBy('idProgramaGeneral');
 
+        $overrides = PlanProduccionMaterial::query()
+            ->activo()
+            ->whereIn('idSemProduccion', $idsSem)
+            ->get()
+            ->groupBy('idProgramaGeneral');
+
+        $idsPgTodos = $cantidades->keys()->merge($overrides->keys())->unique()->values();
         $programas = ProgramaGeneral::query()
             ->activo()
-            ->whereIn('idProgramaGeneral', $cantidades->keys())
+            ->whereIn('idProgramaGeneral', $idsPgTodos)
             ->get()
             ->keyBy('idProgramaGeneral');
 
@@ -81,11 +88,16 @@ class PlanProduccionGridService
             ->orderBy('nroOrden')
             ->get();
 
-        $overrides = PlanProduccionMaterial::query()
-            ->activo()
-            ->whereIn('idSemProduccion', $idsSem)
-            ->get()
-            ->groupBy('idProgramaGeneral');
+        $nombresPorIdPg = [];
+        foreach ($idsPgTodos as $idPgRaw) {
+            $idPg = (int) $idPgRaw;
+            $pg = $programas->get($idPg);
+            if ($pg) {
+                $nombresPorIdPg[$idPg] = $pg->nombre;
+            }
+        }
+
+        $materialesPorPg = $this->recetaService->materialesUnificadosPorProgramas($nombresPorIdPg);
 
         $filas = [];
         foreach ($ordenPg as $item) {
@@ -106,7 +118,7 @@ class PlanProduccionGridService
             $materiales = [];
             $overridePg = ($overrides->get($idPg) ?? collect())->groupBy('idMaterialPL');
 
-            foreach ($this->recetaService->materialesUnificadosParaPlan($pg->nombre) as $mat) {
+            foreach ($materialesPorPg[$idPg] ?? [] as $mat) {
                 $overrideMap = [];
                 foreach ($overridePg->get($mat['id_material_pl']) ?? collect() as $overrideRow) {
                     $overrideMap[(string) $overrideRow->idSemProduccion] = (float) $overrideRow->cantidad;
@@ -118,8 +130,8 @@ class PlanProduccionGridService
                     'descripcion' => $mat['nom_material'],
                     'nom_familia' => $mat['nom_familia'],
                     'es_caja' => (bool) ($mat['es_caja'] ?? false),
-                    'decimales_cantidad' => (int) ($mat['decimales_cantidad'] ?? 2),
-                    'cantidad_por_caja' => CantidadCajaSupport::formatear(
+                    'decimales_cantidad' => CantidadCajaSupport::decimalesVisualizacionCelda($mat['nom_familia'] ?? null),
+                    'cantidad_por_caja' => CantidadCajaSupport::formatearVisualizacionFactor(
                         (float) $mat['cantidad_por_caja'],
                         $mat['nom_familia']
                     ),
@@ -137,7 +149,7 @@ class PlanProduccionGridService
             ] + $porSem;
         }
 
-        $planConsumo = $this->syncService->planConsumoAlineado($semanas);
+        $planConsumo = $this->syncService->planConsumoAlineado($semanas, $materialesPorPg);
 
         return [
             'semanas' => $semanas,

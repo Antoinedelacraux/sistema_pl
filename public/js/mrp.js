@@ -5,6 +5,7 @@
     var syncing = false;
     var syncEnabled = false;
     var syncRaf = 0;
+    var scrollEndTimers = new WeakMap();
 
     function collectScrollPanes() {
         scrollPanes = Array.prototype.slice.call(document.querySelectorAll('[data-mrp-scroll]'));
@@ -20,6 +21,17 @@
         try {
             localStorage.setItem(syncKey, active ? '1' : '0');
         } catch (e) {}
+    }
+
+    function marcarScrollActivo(pane) {
+        pane.classList.add('is-scrolling');
+        var prev = scrollEndTimers.get(pane);
+        if (prev) {
+            clearTimeout(prev);
+        }
+        scrollEndTimers.set(pane, setTimeout(function () {
+            pane.classList.remove('is-scrolling');
+        }, 120));
     }
 
     function syncScroll(source) {
@@ -42,6 +54,21 @@
             otro.scrollLeft = otroMaxLeft > 0 ? Math.round(ratioLeft * otroMaxLeft) : 0;
         });
         syncing = false;
+    }
+
+    function onPaneScroll(pane) {
+        marcarScrollActivo(pane);
+        if (!syncEnabled || syncing) {
+            return;
+        }
+        if (syncRaf) {
+            cancelAnimationFrame(syncRaf);
+        }
+        var src = pane;
+        syncRaf = requestAnimationFrame(function () {
+            syncRaf = 0;
+            syncScroll(src);
+        });
     }
 
     function bindScrollSync() {
@@ -69,17 +96,7 @@
             }
             pane.dataset.syncBound = '1';
             pane.addEventListener('scroll', function () {
-                if (!syncEnabled) {
-                    return;
-                }
-                if (syncRaf) {
-                    cancelAnimationFrame(syncRaf);
-                }
-                var src = pane;
-                syncRaf = requestAnimationFrame(function () {
-                    syncRaf = 0;
-                    syncScroll(src);
-                });
+                onPaneScroll(pane);
             }, { passive: true });
         });
     }
@@ -117,5 +134,68 @@
         });
     }
 
+    function whenIdle(fn) {
+        if (typeof window.requestIdleCallback === 'function') {
+            window.requestIdleCallback(fn, { timeout: 2500 });
+        } else {
+            setTimeout(fn, 500);
+        }
+    }
+
+    function cargarSeccionLazy(section) {
+        var url = section.getAttribute('data-mrp-lazy-url');
+        if (!url || section.dataset.mrpLazyLoaded === '1') {
+            return Promise.resolve();
+        }
+
+        return fetch(url, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'text/html' },
+            credentials: 'same-origin',
+        })
+            .then(function (res) {
+                if (!res.ok) {
+                    throw new Error('HTTP ' + res.status);
+                }
+                return res.text();
+            })
+            .then(function (html) {
+                var placeholder = section.querySelector('.mrp-section__lazy');
+                if (placeholder) {
+                    placeholder.remove();
+                }
+                section.insertAdjacentHTML('beforeend', html);
+                section.dataset.mrpLazyLoaded = '1';
+                bindScrollSync();
+            })
+            .catch(function () {
+                var placeholder = section.querySelector('.mrp-section__lazy');
+                if (placeholder) {
+                    placeholder.textContent = 'No se pudo cargar esta sección.';
+                }
+            });
+    }
+
+    function cargarSeccionesLazy() {
+        var secciones = Array.prototype.slice.call(document.querySelectorAll('[data-mrp-lazy-url]'));
+        if (!secciones.length) {
+            return;
+        }
+
+        var indice = 0;
+        function cargarSiguiente() {
+            if (indice >= secciones.length) {
+                return;
+            }
+            var section = secciones[indice];
+            indice += 1;
+            cargarSeccionLazy(section).finally(function () {
+                whenIdle(cargarSiguiente);
+            });
+        }
+
+        whenIdle(cargarSiguiente);
+    }
+
     bindScrollSync();
+    cargarSeccionesLazy();
 })();

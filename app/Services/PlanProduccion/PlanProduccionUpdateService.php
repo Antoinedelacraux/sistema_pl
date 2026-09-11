@@ -6,11 +6,22 @@ use App\Models\Estado;
 use App\Models\Programas\PlanProduccion;
 use App\Models\Programas\PlanProduccionMaterial;
 use App\Models\Programas\ProgramaGeneral;
+use App\Models\Programas\SemProduccion;
+use App\Models\Stock\SemConsumo;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class PlanProduccionUpdateService
 {
+    /** @var array<string, array{idMaterialPL: int, idSemConsumo: int}> */
+    private array $celdasAfectadas = [];
+
+    /** @var array<int, list<array<string, mixed>>> */
+    private array $catalogoPorPg = [];
+
+    /** @var array<int, int>|null */
+    private ?array $semProdAMrp = null;
+
     public function __construct(
         private readonly PlanProduccionMrpSyncService $syncService,
         private readonly PlanProduccionRecetaService $recetaService,
@@ -20,10 +31,14 @@ class PlanProduccionUpdateService
     /**
      * @param  array<int|string, array<int|string, mixed>>  $cantidades
      * @param  array<int|string, array<int|string, array<int|string, mixed>>>  $materiales
+     * @return array{cambios: int, celdasAfectadas: list<array{idMaterialPL: int, idSemConsumo: int}>}
      */
-    public function actualizar(array $cantidades, array $materiales = []): int
+    public function actualizar(array $cantidades, array $materiales = []): array
     {
         $cambios = 0;
+        $this->celdasAfectadas = [];
+        $this->catalogoPorPg = [];
+        $this->semProdAMrp = null;
 
         DB::transaction(function () use ($cantidades, $materiales, &$cambios) {
             $cajasPorPgSem = $this->cajasPorProgramaSemana();
@@ -33,7 +48,10 @@ class PlanProduccionUpdateService
 
         $this->syncService->sincronizarPlanConsumo();
 
-        return $cambios;
+        return [
+            'cambios' => $cambios,
+            'celdasAfectadas' => array_values($this->celdasAfectadas),
+        ];
     }
 
     /**
@@ -95,6 +113,7 @@ class PlanProduccionUpdateService
                         $registro->delete();
                         unset($cajasPorPgSem[$idPg][$idSem]);
                         $cambios++;
+                        $this->marcarMaterialesProgramaSemana($idPg, $idSem);
                     }
 
                     continue;
@@ -106,6 +125,7 @@ class PlanProduccionUpdateService
                     if ((float) $registro->cantidad !== $cantidad) {
                         $registro->update(['cantidad' => $cantidad]);
                         $cambios++;
+                        $this->marcarMaterialesProgramaSemana($idPg, $idSem);
                     }
 
                     continue;
@@ -121,6 +141,7 @@ class PlanProduccionUpdateService
                     'Estado' => Estado::ACTIVO,
                 ]);
                 $cambios++;
+                $this->marcarMaterialesProgramaSemana($idPg, $idSem);
             }
         }
 
@@ -144,8 +165,8 @@ class PlanProduccionUpdateService
             ->pluck('nombre', 'idProgramaGeneral');
         $catalogoPorPg = [];
         foreach ($idsPg as $idPg) {
-            $lista = $this->recetaService->materialesUnificadosParaPlan((string) ($nombresPg[$idPg] ?? ''));
-            $catalogoPorPg[$idPg] = collect($lista)->keyBy('id_material_pl');
+            $catalogoPorPg[$idPg] = collect($this->catalogoPrograma($idPg, (string) ($nombresPg[$idPg] ?? '')))
+                ->keyBy('id_material_pl');
         }
 
         $overrides = PlanProduccionMaterial::query()
@@ -200,6 +221,7 @@ class PlanProduccionUpdateService
                             $registro->delete();
                             $overrides->forget($clave);
                             $cambios++;
+                            $this->marcarCeldaMaterial($idMat, $idSem);
                         }
 
                         continue;
@@ -209,6 +231,7 @@ class PlanProduccionUpdateService
                         if ((float) $registro->cantidad !== $cantidad) {
                             $registro->update(['cantidad' => $cantidad]);
                             $cambios++;
+                            $this->marcarCeldaMaterial($idMat, $idSem);
                         }
 
                         continue;
@@ -222,10 +245,80 @@ class PlanProduccionUpdateService
                         'Estado' => Estado::ACTIVO,
                     ]);
                     $cambios++;
+                    $this->marcarCeldaMaterial($idMat, $idSem);
                 }
             }
         }
 
         return $cambios;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function catalogoPrograma(int $idPg, string $nombrePg): array
+    {
+        if (! isset($this->catalogoPorPg[$idPg])) {
+            $this->catalogoPorPg[$idPg] = $this->recetaService->materialesUnificadosParaPlan($nombrePg);
+        }
+
+        return $this->catalogoPorPg[$idPg];
+    }
+
+    /**
+     * @return array<int, int> idSemProduccion => idSemConsumo
+     */
+    private function mapaSemProdAMrp(): array
+    {
+        if ($this->semProdAMrp !== null) {
+            return $this->semProdAMrp;
+        }
+
+        $semanasMrp = SemConsumo::query()->activo()->get()->keyBy('codigoSemana');
+        $mapa = [];
+
+        foreach (SemProduccion::query()->activo()->get(['idSemProduccion', 'codigoSemana']) as $semProd) {
+            $semMrp = $semanasMrp->get($semProd->codigoSemana);
+            if ($semMrp) {
+                $mapa[(int) $semProd->idSemProduccion] = (int) $semMrp->idSemConsumo;
+            }
+        }
+
+        $this->semProdAMrp = $mapa;
+
+        return $mapa;
+    }
+
+    private function marcarCeldaMaterial(int $idMaterial, int $idSemProduccion): void
+    {
+        if ($idMaterial <= 0 || $idSemProduccion <= 0) {
+            return;
+        }
+
+        $idSemConsumo = $this->mapaSemProdAMrp()[$idSemProduccion] ?? null;
+        if (! $idSemConsumo) {
+            return;
+        }
+
+        $clave = $idMaterial.'|'.$idSemConsumo;
+        $this->celdasAfectadas[$clave] = [
+            'idMaterialPL' => $idMaterial,
+            'idSemConsumo' => $idSemConsumo,
+        ];
+    }
+
+    private function marcarMaterialesProgramaSemana(int $idPg, int $idSemProduccion): void
+    {
+        if ($idPg <= 0 || $idSemProduccion <= 0) {
+            return;
+        }
+
+        $nombrePg = ProgramaGeneral::query()
+            ->whereKey($idPg)
+            ->value('nombre');
+
+        foreach ($this->catalogoPrograma($idPg, (string) ($nombrePg ?? '')) as $mat) {
+            $this->marcarCeldaMaterial((int) ($mat['id_material_pl'] ?? 0), $idSemProduccion);
+        }
     }
 }

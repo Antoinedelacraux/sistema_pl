@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Programas\ImportProgramaExcelRequest;
 use App\Http\Requests\Programas\StoreProgramaFilaRequest;
 use App\Http\Requests\Programas\UpdateProgramaFilaImagenRequest;
+use App\Http\Requests\Programas\UpdateProgramaFilaRequest;
 use App\Models\Programas\ProgramaFila;
 use App\Services\Auditoria\AuditoriaService;
+use App\Services\PlanProduccion\PlanProduccionGridService;
 use App\Services\Programas\ProgramaExportService;
 use App\Services\Programas\ProgramaGridService;
 use App\Services\Programas\ProgramaImportService;
@@ -24,6 +26,7 @@ class ProgramaController extends Controller
         private readonly ProgramaGridService $gridService,
         private readonly ProgramaExportService $exportService,
         private readonly ProgramaImportService $importService,
+        private readonly PlanProduccionGridService $planGridService,
         private readonly AuditoriaService $auditoria
     ) {}
 
@@ -64,6 +67,8 @@ class ProgramaController extends Controller
     {
         try {
             $resultado = $this->importService->importar($request->file('archivo_excel'));
+            $this->gridService->olvidarCaches();
+            $this->planGridService->forgetCaches();
         } catch (\InvalidArgumentException $exception) {
             return redirect()
                 ->route('programas.index')
@@ -145,6 +150,36 @@ class ProgramaController extends Controller
         return redirect()
             ->route('programas.index')
             ->with('status', 'Registro agregado a la receta.');
+    }
+
+    public function update(UpdateProgramaFilaRequest $request, int $idProgramaFila): RedirectResponse
+    {
+        $fila = $this->gridService->actualizarFila(
+            $idProgramaFila,
+            $request->validated(),
+            $request->file('imagen')
+        );
+
+        $this->auditoria->registrar(
+            accion: AuditoriaAccion::PROGRAMA_ACTUALIZAR,
+            entidad: 'ProgramaFila',
+            idEntidad: $fila->idProgramaFila,
+            descripcion: 'Fila de receta actualizada',
+            datosNuevos: $request->validated(),
+            request: $request,
+        );
+
+        return redirect()
+            ->route('programas.index', array_filter([
+                'mercado' => $request->input('mercado'),
+                'cliente' => $request->input('cliente'),
+                'programa_general' => $request->input('programa_general'),
+                'familia' => $request->input('familia'),
+                'programa' => $request->input('programa'),
+                'presentacion' => $request->input('presentacion'),
+                'buscar' => $request->input('buscar'),
+            ], fn ($valor) => filled($valor)))
+            ->with('status', 'Registro de receta actualizado.');
     }
 
     public function updateImagen(UpdateProgramaFilaImagenRequest $request, int $idProgramaFila): RedirectResponse

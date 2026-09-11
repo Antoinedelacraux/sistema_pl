@@ -139,6 +139,9 @@
                     <th class="programas-grid__th programas-grid__th--stack">Observación</th>
                     <th class="programas-grid__th programas-grid__th--stack programas-grid__th--qty">Cantidad x<br>caja</th>
                     <th class="programas-grid__th programas-grid__th--stack programas-grid__th--img">Imagen</th>
+                    @if ($puedeEditar)
+                        <th class="programas-grid__th programas-grid__th--actions"></th>
+                    @endif
                 </tr>
             </thead>
             <tbody>
@@ -202,10 +205,34 @@
                                 @endif
                             </div>
                         </td>
+                        @if ($puedeEditar)
+                            <td class="programas-grid__cell programas-grid__cell--actions">
+                                <button
+                                    type="button"
+                                    class="icon-action icon-action--edit"
+                                    data-receta-editar
+                                    data-id="{{ $fila->idProgramaFila }}"
+                                    data-id-mercado="{{ $fila->idMercado }}"
+                                    data-id-cliente="{{ $fila->idCliente }}"
+                                    data-id-programa="{{ $fila->idPrograma }}"
+                                    data-id-presentacion="{{ $fila->idPresentacion }}"
+                                    data-id-variedad="{{ $fila->idVariedad }}"
+                                    data-id-familia="{{ $fila->idFamilia }}"
+                                    data-id-uso="{{ $fila->idUso }}"
+                                    data-id-situado="{{ $fila->idSituado }}"
+                                    data-codigo-pl="{{ $fila->material?->CodigoPL }}"
+                                    data-nom-material="{{ $fila->material?->nomMaterial }}"
+                                    data-cantidad="{{ $fila->cantidadCaja?->cantidad !== null ? \App\Support\CantidadCajaSupport::formatear((float) $fila->cantidadCaja->cantidad, $fila->familia?->nomFamilia) : '' }}"
+                                    data-action="{{ route('programas.update', $fila->idProgramaFila) }}"
+                                    title="Editar"
+                                    aria-label="Editar fila {{ $fila->nroFila }}"
+                                >@include('partials.icons.edit')</button>
+                            </td>
+                        @endif
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="14" class="data-table__empty">No hay registros con esos filtros.</td>
+                        <td colspan="{{ $puedeEditar ? 15 : 14 }}" class="data-table__empty">No hay registros con esos filtros.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -217,7 +244,7 @@
 </section>
 </div>
 
-@if ($puedeCrear)
+@if ($puedeCrear || $puedeEditar)
     @include('programas._modal')
 @endif
 
@@ -237,11 +264,13 @@
 @push('scripts')
 <script>
     window.recetaMaterialUrl = @json(route('programas.material-por-codigo'));
+    window.recetaStoreUrl = @json(route('programas.store'));
     window.recetaEditarImagenId = @json(session('receta_editar_imagen'));
+    window.recetaEditarFilaId = @json(session('receta_editar_fila'));
 </script>
 <script src="{{ asset('js/receta-filters.js') }}?v=2" defer></script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script src="{{ asset('js/receta.js') }}?v=5" defer></script>
+<script src="{{ asset('js/receta.js') }}?v=6" defer></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         var importBtn = document.getElementById('receta-importar-excel');

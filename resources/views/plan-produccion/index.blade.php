@@ -7,7 +7,7 @@
 
 @push('head')
 <link rel="stylesheet" href="{{ asset('css/mrp.css') }}?v=1">
-<link rel="stylesheet" href="{{ asset('css/plan-produccion.css') }}?v=8">
+<link rel="stylesheet" href="{{ asset('css/plan-produccion.css') }}?v=15">
 @endpush
 
 @section('page')
@@ -70,7 +70,20 @@
         @endphp
         <div class="plan-prod-section plan-prod-section--plan" id="plan-prod-section-plan">
             <div class="plan-prod-section__head">
-                <h2 class="plan-prod-section__title">Plan de ventas</h2>
+                <div class="plan-prod-section__head-left">
+                    <h2 class="plan-prod-section__title">Plan de ventas</h2>
+                </div>
+                <div class="plan-prod-section__export-wrap">
+                    <label class="plan-prod-export-desglose">
+                        <input type="checkbox" id="plan-prod-export-desglose">
+                        Desglosar materiales
+                    </label>
+                    @include('partials.export-actions', [
+                        'pdfUrl' => route('plan-produccion.export.pdf', ['seccion' => 'ventas']),
+                        'excelUrl' => route('plan-produccion.export.excel', ['seccion' => 'ventas']),
+                        'class' => 'plan-prod-section__export inventario-export',
+                    ])
+                </div>
             </div>
             <form
                 id="plan-prod-form"
@@ -91,6 +104,7 @@
                                 @foreach ($semanas as $sem)
                                     <th class="programas-grid__th programas-grid__th--num plan-prod-grid__th plan-prod-grid__th--sem" data-sem="{{ $sem->idSemProduccion }}" title="{{ $sem->fechaInicio?->format('d/m/Y') }}">{{ $sem->codigoSemana }}</th>
                                 @endforeach
+                                <th class="programas-grid__th programas-grid__th--num plan-prod-grid__th plan-prod-grid__th--total">Total</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -108,7 +122,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="{{ 1 + $semanas->count() }}" class="plan-prod-grid__empty">Sin programas en el plan.</td>
+                                    <td colspan="{{ 2 + $semanas->count() }}" class="plan-prod-grid__empty">Sin programas en el plan.</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -122,8 +136,11 @@
                             if (tr.getAttribute('data-pg-painted') === '1') return;
                             var pgId = tr.getAttribute('data-plan-prod-pg') || '';
                             var vals = String(tr.getAttribute('data-vals') || '').split(',');
+                            var total = 0;
                             semIds.forEach(function (semId, idx) {
                                 var valor = vals[idx] != null ? String(vals[idx]) : '';
+                                var num = valor ? Number(valor) : 0;
+                                total += num;
                                 var td = document.createElement('td');
                                 td.className = 'programas-grid__qty plan-prod-grid__cell--qty plan-prod-grid__cell--pg-qty plan-prod-grid__qty--editable';
                                 td.setAttribute('data-pg', pgId);
@@ -131,10 +148,17 @@
                                 td.setAttribute('data-val', valor);
                                 var span = document.createElement('span');
                                 span.className = 'plan-prod-grid__valor';
-                                span.textContent = valor ? Number(valor).toLocaleString('es-PE', { maximumFractionDigits: 0 }) : '—';
+                                span.textContent = valor ? num.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '—';
                                 td.appendChild(span);
                                 tr.appendChild(td);
                             });
+                            var tdTotal = document.createElement('td');
+                            tdTotal.className = 'programas-grid__qty plan-prod-grid__cell--qty plan-prod-grid__cell--pg-qty plan-prod-grid__cell--total';
+                            var spanTotal = document.createElement('span');
+                            spanTotal.className = 'plan-prod-grid__valor';
+                            spanTotal.textContent = total > 0 ? total.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '—';
+                            tdTotal.appendChild(spanTotal);
+                            tr.appendChild(tdTotal);
                             tr.setAttribute('data-pg-painted', '1');
                         });
                     })();
@@ -144,11 +168,22 @@
             <script type="application/json" id="plan-prod-mats-data">@json($matsPayload)</script>
         </div>
 
+        @if (session()->has('plan_prod_cells_highlight'))
+            <script type="application/json" id="plan-prod-cells-highlight">@json(session('plan_prod_cells_highlight'))</script>
+        @endif
+
         @if ($semanasPlanConsumo->isNotEmpty())
             <div class="plan-prod-section plan-prod-section--consumo">
                 <div class="plan-prod-section__head">
-                    <h2 class="plan-prod-section__title">Plan de consumo</h2>
-                    <span class="plan-prod-section__note">Suma por material · sincronizado con MRP</span>
+                    <div class="plan-prod-section__head-left">
+                        <h2 class="plan-prod-section__title">Plan de consumo</h2>
+                        <span class="plan-prod-section__note">Suma por material · sincronizado con MRP</span>
+                    </div>
+                    @include('partials.export-actions', [
+                        'pdfUrl' => route('plan-produccion.export.pdf', ['seccion' => 'consumo']),
+                        'excelUrl' => route('plan-produccion.export.excel', ['seccion' => 'consumo']),
+                        'class' => 'plan-prod-section__export inventario-export',
+                    ])
                 </div>
                 @include('mrp._tabla_matriz', [
                     'semanas' => $semanasPlanConsumo,
@@ -156,6 +191,7 @@
                     'scrollId' => 'plan-prod-scroll-consumo',
                     'layoutPlan' => true,
                     'cabeceraUnaLinea' => true,
+                    'mostrarTotal' => true,
                     'mensajeVacio' => 'Sin materiales en el plan.',
                 ])
             </div>
@@ -166,12 +202,32 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/plan-produccion.js') }}"></script>
+<script src="{{ asset('js/plan-produccion.js') }}?v=7"></script>
 <script>
 (function () {
     var importBtn = document.getElementById('plan-prod-importar-excel');
     var importInput = document.getElementById('plan-prod-archivo-excel');
     var importForm = document.getElementById('plan-prod-import-form');
+
+    var desgloseCheck = document.getElementById('plan-prod-export-desglose');
+    var exportWrap = document.querySelector('.plan-prod-section--plan .plan-prod-section__export');
+    if (desgloseCheck && exportWrap) {
+        var pdfLink = exportWrap.querySelector('.export-icon--pdf');
+        var excelLink = exportWrap.querySelector('.export-icon--excel');
+        if (pdfLink && excelLink) {
+            pdfLink.setAttribute('data-base-href', pdfLink.getAttribute('href') || '');
+            excelLink.setAttribute('data-base-href', excelLink.getAttribute('href') || '');
+
+            function actualizarEnlacesExport() {
+                var q = desgloseCheck.checked ? '?desglose=1' : '';
+                pdfLink.href = pdfLink.getAttribute('data-base-href') + q;
+                excelLink.href = excelLink.getAttribute('data-base-href') + q;
+            }
+
+            desgloseCheck.addEventListener('change', actualizarEnlacesExport);
+            actualizarEnlacesExport();
+        }
+    }
 
     if (importBtn && importInput && importForm) {
         importBtn.addEventListener('click', function () {

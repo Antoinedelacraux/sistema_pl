@@ -17,7 +17,7 @@ class PlanProduccionCantidadService
 
         $factor = (float) ($material['cantidad_por_caja'] ?? 0);
 
-        return CantidadCajaSupport::redondear(
+        return CantidadCajaSupport::redondearVisualizacion(
             $cajas * $factor,
             $material['nom_familia'] ?? null
         );
@@ -49,6 +49,6 @@ class PlanProduccionCantidadService
             return '—';
         }
 
-        return CantidadCajaSupport::formatear($valor, $material['nom_familia'] ?? null);
+        return CantidadCajaSupport::formatearVisualizacion($valor, $material['nom_familia'] ?? null);
     }
 }

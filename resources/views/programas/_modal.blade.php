@@ -8,6 +8,14 @@
 
         <form method="POST" action="{{ route('programas.store') }}" class="modal__form" id="receta-form" enctype="multipart/form-data">
             @csrf
+            <input type="hidden" name="_method" id="receta-form-method" value="PUT" disabled>
+            <input type="hidden" name="mercado" value="{{ request('mercado') }}">
+            <input type="hidden" name="cliente" value="{{ request('cliente') }}">
+            <input type="hidden" name="programa_general" value="{{ request('programa_general') }}">
+            <input type="hidden" name="familia" value="{{ request('familia') }}">
+            <input type="hidden" name="programa" value="{{ request('programa') }}">
+            <input type="hidden" name="presentacion" value="{{ request('presentacion') }}">
+            <input type="hidden" name="buscar" value="{{ request('buscar') }}">
 
             <div class="modal__grid">
                 <label class="field">
@@ -108,11 +116,12 @@
                 <label class="field">
                     <span class="field__label">Cantidad x caja</span>
                     <input
-                        type="number"
-                        step="0.0001"
-                        min="0"
+                        type="text"
+                        inputmode="decimal"
+                        autocomplete="off"
                         class="field__input @error('cantidad') is-invalid @enderror"
                         name="cantidad"
+                        id="receta-cantidad"
                         value="{{ old('cantidad', '1') }}"
                         required
                     >
@@ -152,7 +161,7 @@
 
             <footer class="modal__actions">
                 <button type="button" class="btn btn--outline" data-cerrar-modal>Cancelar</button>
-                <button type="submit" class="btn btn--purple">Guardar</button>
+                <button type="submit" class="btn btn--purple" id="receta-form-submit">Guardar</button>
             </footer>
         </form>
     </div>

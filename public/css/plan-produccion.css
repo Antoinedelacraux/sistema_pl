@@ -122,6 +122,20 @@
     min-width: 98px;
 }
 
+.plan-prod-grid__th--total,
+.plan-prod-grid__cell--total {
+    min-width: 88px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.plan-prod-section--consumo .mrp-grid__th--total,
+.plan-prod-section--consumo .mrp-grid td.mrp-grid__cell--total {
+    min-width: 88px;
+    font-weight: 700;
+    text-align: center;
+}
+
 .plan-prod-expand {
     display: flex;
     align-items: flex-start;
@@ -278,9 +292,17 @@ body.page-app[data-theme="dark"] .plan-prod-grid tbody tr.plan-prod-grid__row--m
 
 .plan-prod-section__head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
+    justify-content: space-between;
     gap: 12px;
     margin-bottom: 6px;
+}
+
+.plan-prod-section__head-left {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    min-width: 0;
 }
 
 .plan-prod-section__title {
@@ -295,9 +317,99 @@ body.page-app[data-theme="dark"] .plan-prod-grid tbody tr.plan-prod-grid__row--m
     color: var(--ink-muted);
 }
 
+.plan-prod-section__export-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.plan-prod-export-desglose {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-muted);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+}
+
+.plan-prod-export-desglose input {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    cursor: pointer;
+}
+
+.plan-prod-section__export.inventario-export {
+    flex-shrink: 0;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+.plan-prod-section__export .inventario-export__label {
+    margin: 0;
+    white-space: nowrap;
+}
+
+.plan-prod-section__export .inventario-export__actions {
+    gap: 6px;
+}
+
 .plan-prod-section--plan.is-editing .plan-prod-grid-wrap {
     outline: 2px solid rgba(91, 79, 168, 0.35);
     outline-offset: -1px;
+}
+
+/* Filas compactas al editar plan de ventas */
+.plan-prod-section--plan.is-editing .plan-prod-grid td {
+    padding: 2px 6px;
+    line-height: 1.15;
+    vertical-align: middle;
+}
+
+.plan-prod-section--plan.is-editing .plan-prod-grid tbody tr.plan-prod-grid__row--mat td,
+.plan-prod-section--plan.is-editing .plan-prod-grid__row--pg td {
+    padding-top: 2px;
+    padding-bottom: 2px;
+}
+
+.plan-prod-section--plan.is-editing .plan-prod-grid__cell--material {
+    padding-left: 24px !important;
+}
+
+.plan-prod-section--plan.is-editing .plan-prod-grid__mat-head {
+    gap: 4px;
+}
+
+.plan-prod-section--plan.is-editing .plan-prod-grid__mat-name {
+    margin-top: 0;
+    font-size: 10px;
+    line-height: 1.15;
+}
+
+.plan-prod-section--plan.is-editing .plan-prod-grid__mat-code,
+.plan-prod-section--plan.is-editing .plan-prod-grid__mat-factor {
+    font-size: 10px;
+    line-height: 1.15;
+}
+
+.plan-prod-section--plan.is-editing .plan-prod-grid__input.field__input {
+    height: 24px;
+    min-height: 24px;
+    padding: 1px 5px;
+    font-size: 10px;
+    border-radius: 4px;
+    box-shadow: none;
+}
+
+.plan-prod-section--plan.is-editing .plan-prod-grid__input.field__input:focus {
+    box-shadow: 0 0 0 2px rgba(91, 79, 168, 0.2);
 }
 
 .plan-prod-grid__input {
@@ -331,10 +443,8 @@ body.page-app[data-theme="dark"] .plan-prod-grid tbody tr.plan-prod-grid__row--m
 }
 
 .plan-prod-section--consumo .mrp-grid-wrap {
-    height: min(280px, calc(100vh - 420px));
-    max-height: min(280px, calc(100vh - 420px));
-    min-height: 180px;
     overflow: auto;
+    max-height: min(340px, calc(100vh - 400px));
     border: 1px solid var(--app-line);
     border-radius: var(--radius-sm);
     -webkit-overflow-scrolling: touch;
@@ -375,4 +485,15 @@ body.page-app[data-theme="dark"] .plan-prod-grid tbody tr.plan-prod-grid__row--m
     white-space: nowrap;
     font-size: 10px;
     letter-spacing: 0.02em;
+}
+
+.plan-prod-section--consumo .mrp-grid td.plan-prod-consumo-cell--updated {
+    background: #dcfce7 !important;
+    color: #14532d;
+    font-weight: 700;
+}
+
+body.page-app[data-theme="dark"] .plan-prod-section--consumo .mrp-grid td.plan-prod-consumo-cell--updated {
+    background: #166534 !important;
+    color: #ecfdf5;
 }

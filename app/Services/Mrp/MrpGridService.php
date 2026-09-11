@@ -17,6 +17,10 @@ class MrpGridService
 {
     private const CACHE_TTL_FAMILIAS = 300;
 
+    private const CACHE_TTL_DATOS_PLAN = 600;
+
+    private const CACHE_TTL_DATOS_STOCK = 60;
+
     /**
      * @return Collection<int, SemConsumo>
      */
@@ -40,6 +44,30 @@ class MrpGridService
      * }
      */
     public function datos(array $filtros, array $secciones = ['plan', 'consumo_real', 'ingresos']): array
+    {
+        $secciones = array_values(array_unique($secciones));
+        sort($secciones);
+
+        $version = (int) Cache::get('mrp.cache_version', 0);
+        $familia = (int) ($filtros['familia'] ?? 0);
+        $cacheKey = 'mrp.datos.v'.$version.'.f'.$familia.'.'.implode('-', $secciones);
+        $ttl = $this->ttlDatos($secciones);
+
+        return Cache::remember($cacheKey, $ttl, fn () => $this->buildDatos($filtros, $secciones));
+    }
+
+    /**
+     * @param  array{familia?: mixed}  $filtros
+     * @param  list<'plan'|'consumo_real'|'ingresos'>  $secciones
+     * @return array{
+     *     semanas: Collection<int, SemConsumo>,
+     *     plan: list<array<string, mixed>>,
+     *     consumo_real: list<array<string, mixed>>,
+     *     ingresos: list<array<string, mixed>>,
+     *     total_materiales: int
+     * }
+     */
+    private function buildDatos(array $filtros, array $secciones): array
     {
         $semanas = $this->semanas();
         $vacío = [
@@ -200,7 +228,19 @@ class MrpGridService
 
     public function forgetCaches(): void
     {
+        $version = (int) Cache::get('mrp.cache_version', 0);
+        Cache::forever('mrp.cache_version', $version + 1);
         Cache::forget('mrp.familias_filtro.v1');
+    }
+
+    /**
+     * @param  list<'plan'|'consumo_real'|'ingresos'>  $secciones
+     */
+    private function ttlDatos(array $secciones): int
+    {
+        $soloPlan = $secciones === ['plan'];
+
+        return $soloPlan ? self::CACHE_TTL_DATOS_PLAN : self::CACHE_TTL_DATOS_STOCK;
     }
 
     /**

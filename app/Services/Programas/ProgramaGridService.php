@@ -29,6 +29,11 @@ use Illuminate\Support\Facades\DB;
 
 class ProgramaGridService
 {
+    private const CACHE_TTL = 600;
+
+    /** @var array<string, Collection> */
+    private array $opcionesFiltroMemo = [];
+
     public function __construct(
         private readonly ProgramaImagenService $imagenService
     ) {}
@@ -73,7 +78,7 @@ class ProgramaGridService
 
     public function catalogos(): array
     {
-        return [
+        return Cache::remember('programa.catalogos.v1', self::CACHE_TTL, fn () => [
             'programasGenerales' => ProgramaGeneral::query()->activo()->orderBy('nombre')->get(),
             'mercados' => Mercado::query()->activo()->orderBy('nomMercado')->get(),
             'clientes' => Cliente::query()->activo()->orderBy('nomCliente')->get(),
@@ -83,7 +88,7 @@ class ProgramaGridService
             'usos' => Uso::query()->activo()->orderBy('nomUso')->get(),
             'situados' => Situado::query()->activo()->orderBy('nomSituado')->get(),
             'familias' => Familia::query()->activo()->orderBy('nomFamilia')->get(),
-        ];
+        ]);
     }
 
     /**
@@ -94,14 +99,24 @@ class ProgramaGridService
      */
     public function catalogosFiltro(array $filtros = []): array
     {
-        return [
+        $version = (int) Cache::get('programa.cache_version', 0);
+        $cacheKey = 'programa.catalogos_filtro.v'.$version.'.'.md5(json_encode([
+            'mercado' => $filtros['mercado'] ?? null,
+            'cliente' => $filtros['cliente'] ?? null,
+            'programa_general' => $filtros['programa_general'] ?? null,
+            'programa' => $filtros['programa'] ?? null,
+            'presentacion' => $filtros['presentacion'] ?? null,
+            'familia' => $filtros['familia'] ?? null,
+        ]));
+
+        return Cache::remember($cacheKey, self::CACHE_TTL, fn () => [
             'mercados' => $this->opcionesMercadoFiltro(),
             'clientes' => $this->opcionesClienteFiltro($filtros),
             'programasGenerales' => $this->opcionesProgramaGeneralFiltro(),
             'programas' => $this->opcionesProgramaFiltro($filtros),
             'presentaciones' => $this->opcionesPresentacionFiltro($filtros),
             'familias' => $this->opcionesFamiliaFiltro($filtros),
-        ];
+        ]);
     }
 
     /**
@@ -184,8 +199,7 @@ class ProgramaGridService
             );
 
             $familia = Familia::query()->findOrFail($datos['id_familia']);
-            $cantidadValor = CantidadCajaSupport::normalizarValor($datos['cantidad'], $familia->nomFamilia);
-            $claveCantidad = CantidadCajaSupport::clave($cantidadValor, $familia->nomFamilia);
+            $claveCantidad = CantidadCajaSupport::claveCantidad($datos['cantidad'], $familia->nomFamilia);
 
             $cantidad = CantidadCaja::query()->firstOrCreate(
                 ['cantidad' => $claveCantidad],
@@ -194,12 +208,17 @@ class ProgramaGridService
 
             $nroFila = (int) ProgramaFila::query()->max('nroFila') + 1;
 
+            $idProgramaGeneral = ProgramaCatalogo::query()
+                ->whereKey($datos['id_programa'])
+                ->value('idProgramaGeneral');
+
             $fila = ProgramaFila::query()->create([
                 'nroFila' => $nroFila,
                 'idMercado' => $datos['id_mercado'],
                 'idCliente' => $datos['id_cliente'],
                 'idVariedad' => $datos['id_variedad'],
                 'idPrograma' => $datos['id_programa'],
+                'idProgramaGeneral' => $idProgramaGeneral,
                 'idPresentacion' => $datos['id_presentacion'],
                 'idMaterialPL' => $material->idMaterialPL,
                 'idCantidadCaja' => $cantidad->idCantidadCaja,
@@ -216,6 +235,8 @@ class ProgramaGridService
                     $fila->update(['imagen' => $ruta]);
                 }
             }
+
+            $this->olvidarCaches();
 
             return $fila->fresh()->load([
                 'mercado', 'cliente', 'variedad', 'programa', 'presentacion',
@@ -245,6 +266,59 @@ class ProgramaGridService
             }
 
             return $fila->fresh();
+        });
+    }
+
+    public function actualizarFila(int $idProgramaFila, array $datos, ?UploadedFile $imagen = null): ProgramaFila
+    {
+        return DB::transaction(function () use ($idProgramaFila, $datos, $imagen) {
+            $fila = ProgramaFila::query()->findOrFail($idProgramaFila);
+
+            $material = MaterialProgramaLookup::resolverPorCodigo(
+                $datos['codigo_pl'],
+                $datos['nom_material']
+            );
+
+            $familia = Familia::query()->findOrFail($datos['id_familia']);
+            $claveCantidad = CantidadCajaSupport::claveCantidad($datos['cantidad'], $familia->nomFamilia);
+
+            $cantidad = CantidadCaja::query()->firstOrCreate(
+                ['cantidad' => $claveCantidad],
+                ['Estado' => 1]
+            );
+
+            $idProgramaGeneral = ProgramaCatalogo::query()
+                ->whereKey($datos['id_programa'])
+                ->value('idProgramaGeneral');
+
+            $fila->update([
+                'idMercado' => $datos['id_mercado'],
+                'idCliente' => $datos['id_cliente'],
+                'idVariedad' => $datos['id_variedad'],
+                'idPrograma' => $datos['id_programa'],
+                'idProgramaGeneral' => $idProgramaGeneral,
+                'idPresentacion' => $datos['id_presentacion'],
+                'idMaterialPL' => $material->idMaterialPL,
+                'idCantidadCaja' => $cantidad->idCantidadCaja,
+                'idUso' => $datos['id_uso'],
+                'idSituado' => $datos['id_situado'],
+                'idFamilia' => $datos['id_familia'],
+            ]);
+
+            if ($imagen) {
+                $ruta = $this->imagenService->reemplazar($imagen, $idProgramaFila, $fila->imagen);
+
+                if ($ruta) {
+                    $fila->update(['imagen' => $ruta]);
+                }
+            }
+
+            $this->olvidarCaches();
+
+            return $fila->fresh()->load([
+                'mercado', 'cliente', 'variedad', 'programa', 'presentacion',
+                'material', 'cantidadCaja', 'uso', 'situado', 'familia',
+            ]);
         });
     }
 
@@ -346,13 +420,15 @@ class ProgramaGridService
 
     private function opcionesMercadoFiltro(): Collection
     {
-        $ids = ProgramaFila::query()->distinct()->pluck('idMercado');
+        return $this->memoOpcionesFiltro('mercado', function (): Collection {
+            $ids = ProgramaFila::query()->distinct()->pluck('idMercado');
 
-        return Mercado::query()
-            ->activo()
-            ->whereIn('idMercado', $ids)
-            ->orderBy('nomMercado')
-            ->get();
+            return Mercado::query()
+                ->activo()
+                ->whereIn('idMercado', $ids)
+                ->orderBy('nomMercado')
+                ->get();
+        });
     }
 
     /**
@@ -360,38 +436,44 @@ class ProgramaGridService
      */
     private function opcionesClienteFiltro(array $filtros): Collection
     {
-        $ids = $this->queryIdsReceta($this->soloFiltros($filtros, ['mercado']))
-            ->distinct()
-            ->pluck('idCliente');
+        $mercado = $filtros['mercado'] ?? null;
 
-        return Cliente::query()
-            ->activo()
-            ->whereIn('idCliente', $ids)
-            ->orderBy('nomCliente')
-            ->get();
+        return $this->memoOpcionesFiltro('cliente:'.(string) $mercado, function () use ($filtros): Collection {
+            $ids = $this->queryIdsReceta($this->soloFiltros($filtros, ['mercado']))
+                ->distinct()
+                ->pluck('idCliente');
+
+            return Cliente::query()
+                ->activo()
+                ->whereIn('idCliente', $ids)
+                ->orderBy('nomCliente')
+                ->get();
+        });
     }
 
     private function opcionesProgramaGeneralFiltro(): Collection
     {
-        $idsGeneral = ProgramaFila::query()
-            ->whereNotNull('idProgramaGeneral')
-            ->distinct()
-            ->pluck('idProgramaGeneral');
-
-        if ($idsGeneral->isEmpty()) {
-            $idsProgramas = ProgramaFila::query()->distinct()->pluck('idPrograma');
-            $idsGeneral = ProgramaCatalogo::query()
-                ->whereIn('idPrograma', $idsProgramas)
+        return $this->memoOpcionesFiltro('programa_general', function (): Collection {
+            $idsGeneral = ProgramaFila::query()
                 ->whereNotNull('idProgramaGeneral')
                 ->distinct()
                 ->pluck('idProgramaGeneral');
-        }
 
-        return ProgramaGeneral::query()
-            ->activo()
-            ->whereIn('idProgramaGeneral', $idsGeneral)
-            ->orderBy('nombre')
-            ->get();
+            if ($idsGeneral->isEmpty()) {
+                $idsProgramas = ProgramaFila::query()->distinct()->pluck('idPrograma');
+                $idsGeneral = ProgramaCatalogo::query()
+                    ->whereIn('idPrograma', $idsProgramas)
+                    ->whereNotNull('idProgramaGeneral')
+                    ->distinct()
+                    ->pluck('idProgramaGeneral');
+            }
+
+            return ProgramaGeneral::query()
+                ->activo()
+                ->whereIn('idProgramaGeneral', $idsGeneral)
+                ->orderBy('nombre')
+                ->get();
+        });
     }
 
     /**
@@ -399,15 +481,19 @@ class ProgramaGridService
      */
     private function opcionesProgramaFiltro(array $filtros): Collection
     {
-        $ids = $this->queryIdsReceta($this->soloFiltros($filtros, ['mercado', 'cliente', 'programa_general']))
-            ->distinct()
-            ->pluck('idPrograma');
+        $cacheKey = 'programa:'.md5(json_encode($this->soloFiltros($filtros, ['mercado', 'cliente', 'programa_general'])));
 
-        return ProgramaCatalogo::query()
-            ->activo()
-            ->whereIn('idPrograma', $ids)
-            ->orderBy('nomPrograma')
-            ->get();
+        return $this->memoOpcionesFiltro($cacheKey, function () use ($filtros): Collection {
+            $ids = $this->queryIdsReceta($this->soloFiltros($filtros, ['mercado', 'cliente', 'programa_general']))
+                ->distinct()
+                ->pluck('idPrograma');
+
+            return ProgramaCatalogo::query()
+                ->activo()
+                ->whereIn('idPrograma', $ids)
+                ->orderBy('nomPrograma')
+                ->get();
+        });
     }
 
     /**
@@ -419,15 +505,19 @@ class ProgramaGridService
             return collect();
         }
 
-        $ids = $this->queryIdsReceta($this->soloFiltros($filtros, ['mercado', 'cliente', 'programa']))
-            ->distinct()
-            ->pluck('idPresentacion');
+        $cacheKey = 'presentacion:'.md5(json_encode($this->soloFiltros($filtros, ['mercado', 'cliente', 'programa'])));
 
-        return Presentacion::query()
-            ->activo()
-            ->whereIn('idPresentacion', $ids)
-            ->orderBy('nomPresentacion')
-            ->get();
+        return $this->memoOpcionesFiltro($cacheKey, function () use ($filtros): Collection {
+            $ids = $this->queryIdsReceta($this->soloFiltros($filtros, ['mercado', 'cliente', 'programa']))
+                ->distinct()
+                ->pluck('idPresentacion');
+
+            return Presentacion::query()
+                ->activo()
+                ->whereIn('idPresentacion', $ids)
+                ->orderBy('nomPresentacion')
+                ->get();
+        });
     }
 
     /**
@@ -435,23 +525,46 @@ class ProgramaGridService
      */
     private function opcionesFamiliaFiltro(array $filtros): Collection
     {
-        $idsMaterial = $this->queryIdsReceta($this->soloFiltros($filtros, [
+        $cacheKey = 'familia:'.md5(json_encode($this->soloFiltros($filtros, [
             'mercado', 'cliente', 'programa', 'presentacion',
-        ]))
-            ->distinct()
-            ->pluck('idMaterialPL');
+        ])));
 
-        $idsFamilia = MaterialFamiliaSupport::idsFamiliaDeMateriales($idsMaterial);
+        return $this->memoOpcionesFiltro($cacheKey, function () use ($filtros): Collection {
+            $idsMaterial = $this->queryIdsReceta($this->soloFiltros($filtros, [
+                'mercado', 'cliente', 'programa', 'presentacion',
+            ]))
+                ->distinct()
+                ->pluck('idMaterialPL');
 
-        if ($idsFamilia === []) {
-            return collect();
+            $idsFamilia = MaterialFamiliaSupport::idsFamiliaDeMateriales($idsMaterial);
+
+            if ($idsFamilia === []) {
+                return collect();
+            }
+
+            return Familia::query()
+                ->activo()
+                ->whereIn('idFamilia', $idsFamilia)
+                ->orderBy('nomFamilia')
+                ->get();
+        });
+    }
+
+    private function memoOpcionesFiltro(string $key, callable $resolver): Collection
+    {
+        if (! isset($this->opcionesFiltroMemo[$key])) {
+            $this->opcionesFiltroMemo[$key] = $resolver();
         }
 
-        return Familia::query()
-            ->activo()
-            ->whereIn('idFamilia', $idsFamilia)
-            ->orderBy('nomFamilia')
-            ->get();
+        return $this->opcionesFiltroMemo[$key];
+    }
+
+    public function olvidarCaches(): void
+    {
+        Cache::forget('programa.catalogos.v1');
+        Cache::forget('catalogo.programas_consumo');
+        $version = (int) Cache::get('programa.cache_version', 0);
+        Cache::forever('programa.cache_version', $version + 1);
     }
 
     /**
@@ -507,7 +620,7 @@ class ProgramaGridService
             ProgramaPresentacionParam::query()->delete();
         });
 
-        Cache::forget('catalogo.programas_consumo');
+        $this->olvidarCaches();
 
         return [
             'filas' => $filas,

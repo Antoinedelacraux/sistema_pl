@@ -6,7 +6,7 @@
 @section('crumbs', 'Planeamiento · consumo planificado y real')
 
 @push('head')
-<link rel="stylesheet" href="{{ asset('css/mrp.css') }}?v=1">
+<link rel="stylesheet" href="{{ asset('css/mrp.css') }}?v=2">
 @endpush
 
 @section('page')
@@ -98,36 +98,29 @@
             ])
         </div>
 
-        <div class="mrp-section">
+        <div
+            class="mrp-section"
+            id="mrp-section-consumo"
+            data-mrp-lazy="consumo"
+            data-mrp-lazy-url="{{ route('mrp.seccion', ['tipo' => 'consumo'] + array_filter($filtros ?? [])) }}"
+        >
             <div class="mrp-section__head">
                 <h2 class="mrp-section__title">Consumo real</h2>
                 <span class="mrp-section__note">Rojo: déficit proyectado · Número: días de stock según consumo registrado</span>
             </div>
-            @include('mrp._tabla_matriz', [
-                'semanas' => $semanas,
-                'filas' => $consumoReal,
-                'scrollId' => 'mrp-scroll-consumo',
-                'resaltarNegativos' => true,
-                'columnasExtra' => [
-                    ['key' => 'stock_actual', 'label' => 'Stock actual'],
-                ],
-                'mensajeVacio' => 'Sin materiales en el plan.',
-            ])
+            <div class="mrp-section__lazy" aria-live="polite">Cargando consumo real…</div>
         </div>
 
-        <div class="mrp-section">
+        <div
+            class="mrp-section"
+            id="mrp-section-ingresos"
+            data-mrp-lazy="ingresos"
+            data-mrp-lazy-url="{{ route('mrp.seccion', ['tipo' => 'ingresos'] + array_filter($filtros ?? [])) }}"
+        >
             <div class="mrp-section__head">
                 <h2 class="mrp-section__title">Ingresos</h2>
             </div>
-            @include('mrp._tabla_matriz', [
-                'semanas' => $semanas,
-                'filas' => $ingresos,
-                'scrollId' => 'mrp-scroll-ingresos',
-                'columnasExtra' => [
-                    ['key' => 'ingreso_total', 'label' => 'Ingreso total'],
-                ],
-                'mensajeVacio' => 'Sin materiales en el plan.',
-            ])
+            <div class="mrp-section__lazy" aria-live="polite">Cargando ingresos…</div>
         </div>
 
     @endif
@@ -137,5 +130,5 @@
 
 @push('scripts')
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script src="{{ asset('js/mrp.js') }}" defer></script>
+<script src="{{ asset('js/mrp.js') }}?v=3" defer></script>
 @endpush

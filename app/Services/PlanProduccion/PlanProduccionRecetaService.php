@@ -7,6 +7,7 @@ use App\Models\Programas\ProgramaFila;
 use App\Models\Programas\ProgramaGeneral;
 use App\Support\CantidadCajaSupport;
 use App\Support\FamiliaMaterialSupport;
+use App\Support\PlanProduccionRecetaAliasSupport;
 
 class PlanProduccionRecetaService
 {
@@ -22,7 +23,28 @@ class PlanProduccionRecetaService
             return [];
         }
 
-        $lower = mb_strtolower($nombre);
+        $ids = $this->idsPorNombreProgramaGeneral($nombre);
+        $programasCliente = PlanProduccionRecetaAliasSupport::programasClienteParaPlan($nombre);
+
+        if ($programasCliente !== []) {
+            $ids = array_values(array_unique(array_merge(
+                $ids,
+                $this->idsPorProgramasCliente($programasCliente)
+            )));
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function idsPorNombreProgramaGeneral(string $nombrePlan): array
+    {
+        $lower = mb_strtolower(trim($nombrePlan));
+        if ($lower === '') {
+            return [];
+        }
 
         return ProgramaGeneral::query()
             ->activo()
@@ -40,6 +62,27 @@ class PlanProduccionRecetaService
             ->orderBy('nombre')
             ->pluck('idProgramaGeneral')
             ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /**
+     * @param  list<string>  $nombresPrograma
+     * @return list<int>
+     */
+    private function idsPorProgramasCliente(array $nombresPrograma): array
+    {
+        if ($nombresPrograma === []) {
+            return [];
+        }
+
+        return ProgramaFila::query()
+            ->activo()
+            ->whereNotNull('idProgramaGeneral')
+            ->whereHas('programa', fn ($q) => $q->whereIn('nomPrograma', $nombresPrograma))
+            ->distinct()
+            ->pluck('idProgramaGeneral')
+            ->map(fn ($id) => (int) $id)
+            ->values()
             ->all();
     }
 
@@ -64,30 +107,54 @@ class PlanProduccionRecetaService
         }
 
         $porPg = $this->materialesPorProgramaGeneral($ids);
-        $merged = [];
 
-        foreach ($porPg as $lista) {
-            foreach ($lista as $mat) {
-                $idMat = (int) $mat['id_material_pl'];
-                if (! isset($merged[$idMat])) {
-                    $merged[$idMat] = $mat;
+        return $this->unificarListasMateriales(array_values($porPg));
+    }
 
-                    continue;
-                }
-
-                $nomFamilia = $mat['nom_familia'] ?? $merged[$idMat]['nom_familia'];
-                $merged[$idMat]['cantidad_por_caja'] = CantidadCajaSupport::redondear(
-                    (float) $merged[$idMat]['cantidad_por_caja'] + (float) $mat['cantidad_por_caja'],
-                    $nomFamilia
-                );
-                $merged[$idMat]['es_caja'] = ($merged[$idMat]['es_caja'] ?? false) || ($mat['es_caja'] ?? false);
-            }
+    /**
+     * @param  array<int, string>  $nombresPorIdPg
+     * @return array<int, list<array{
+     *   id_material_pl: int,
+     *   codigo_pl: string|null,
+     *   nom_material: string|null,
+     *   nom_familia: string|null,
+     *   cantidad_por_caja: float,
+     *   es_caja: bool,
+     *   decimales_cantidad: int
+     * }>>
+     */
+    public function materialesUnificadosPorProgramas(array $nombresPorIdPg): array
+    {
+        if ($nombresPorIdPg === []) {
+            return [];
         }
 
-        $lista = array_values($merged);
-        usort($lista, static fn ($a, $b) => strcmp($a['nom_material'] ?? '', $b['nom_material'] ?? ''));
+        $idsPorPg = $this->idsRecetaRelacionadosPorProgramas($nombresPorIdPg);
+        $allIds = [];
+        foreach ($idsPorPg as $ids) {
+            $allIds = array_merge($allIds, $ids);
+        }
+        $allIds = array_values(array_unique($allIds));
 
-        return $lista;
+        if ($allIds === []) {
+            return array_fill_keys(array_keys($nombresPorIdPg), []);
+        }
+
+        $porPgRaw = $this->materialesPorProgramaGeneral($allIds);
+        $resultado = [];
+
+        foreach ($nombresPorIdPg as $idPg => $nombre) {
+            $ids = $idsPorPg[$idPg] ?? [];
+            $listas = [];
+            foreach ($ids as $idReceta) {
+                if (isset($porPgRaw[$idReceta])) {
+                    $listas[] = $porPgRaw[$idReceta];
+                }
+            }
+            $resultado[$idPg] = $this->unificarListasMateriales($listas);
+        }
+
+        return $resultado;
     }
 
     /**
@@ -146,7 +213,7 @@ class PlanProduccionRecetaService
                     'nom_familia' => $nomFamilia,
                     'cantidad_por_caja' => $qty,
                     'es_caja' => FamiliaMaterialSupport::esCajas($nomFamilia),
-                    'decimales_cantidad' => CantidadCajaSupport::decimales($nomFamilia),
+                    'decimales_cantidad' => CantidadCajaSupport::decimalesVisualizacionCelda($nomFamilia),
                 ];
             } else {
                 $resultado[$idPg][$idMat]['cantidad_por_caja'] = max(
@@ -164,5 +231,77 @@ class PlanProduccionRecetaService
         }
 
         return $ordenado;
+    }
+
+    /**
+     * @param  array<int, string>  $nombresPorIdPg
+     * @return array<int, list<int>>
+     */
+    private function idsRecetaRelacionadosPorProgramas(array $nombresPorIdPg): array
+    {
+        $resultado = [];
+        foreach ($nombresPorIdPg as $idPg => $nombre) {
+            $ids = $this->idsPorNombreProgramaGeneral($nombre);
+            $programasCliente = PlanProduccionRecetaAliasSupport::programasClienteParaPlan($nombre);
+
+            if ($programasCliente !== []) {
+                $ids = array_values(array_unique(array_merge(
+                    $ids,
+                    $this->idsPorProgramasCliente($programasCliente)
+                )));
+            }
+
+            $resultado[$idPg] = $ids;
+        }
+
+        return $resultado;
+    }
+
+    /**
+     * @param  list<list<array{
+     *   id_material_pl: int,
+     *   codigo_pl: string|null,
+     *   nom_material: string|null,
+     *   nom_familia: string|null,
+     *   cantidad_por_caja: float,
+     *   es_caja: bool,
+     *   decimales_cantidad: int
+     * }>>  $listas
+     * @return list<array{
+     *   id_material_pl: int,
+     *   codigo_pl: string|null,
+     *   nom_material: string|null,
+     *   nom_familia: string|null,
+     *   cantidad_por_caja: float,
+     *   es_caja: bool,
+     *   decimales_cantidad: int
+     * }>
+     */
+    private function unificarListasMateriales(array $listas): array
+    {
+        $merged = [];
+
+        foreach ($listas as $lista) {
+            foreach ($lista as $mat) {
+                $idMat = (int) $mat['id_material_pl'];
+                if (! isset($merged[$idMat])) {
+                    $merged[$idMat] = $mat;
+
+                    continue;
+                }
+
+                $nomFamilia = $mat['nom_familia'] ?? $merged[$idMat]['nom_familia'];
+                $merged[$idMat]['cantidad_por_caja'] = CantidadCajaSupport::redondear(
+                    (float) $merged[$idMat]['cantidad_por_caja'] + (float) $mat['cantidad_por_caja'],
+                    $nomFamilia
+                );
+                $merged[$idMat]['es_caja'] = ($merged[$idMat]['es_caja'] ?? false) || ($mat['es_caja'] ?? false);
+            }
+        }
+
+        $resultado = array_values($merged);
+        usort($resultado, static fn ($a, $b) => strcmp($a['nom_material'] ?? '', $b['nom_material'] ?? ''));
+
+        return $resultado;
     }
 }

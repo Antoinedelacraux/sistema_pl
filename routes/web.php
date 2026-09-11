@@ -73,6 +73,16 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         ->middleware('permiso:plan_produccion,ver')
         ->name('plan-produccion.index');
 
+    Route::get('/plan-produccion/export/excel/{seccion}', [PlanProduccionController::class, 'exportExcel'])
+        ->middleware('permiso:plan_produccion,ver')
+        ->where('seccion', 'ventas|consumo')
+        ->name('plan-produccion.export.excel');
+
+    Route::get('/plan-produccion/export/pdf/{seccion}', [PlanProduccionController::class, 'exportPdf'])
+        ->middleware('permiso:plan_produccion,ver')
+        ->where('seccion', 'ventas|consumo')
+        ->name('plan-produccion.export.pdf');
+
     Route::post('/plan-produccion/import', [PlanProduccionController::class, 'importExcel'])
         ->middleware('permiso:plan_produccion,crear')
         ->name('plan-produccion.import');
@@ -88,6 +98,11 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
     Route::post('/programas', [ProgramaController::class, 'store'])
         ->middleware('permiso:programas,crear')
         ->name('programas.store');
+
+    Route::put('/programas/fila/{idProgramaFila}', [ProgramaController::class, 'update'])
+        ->middleware('permiso:programas,editar')
+        ->whereNumber('idProgramaFila')
+        ->name('programas.update');
 
     Route::put('/programas/fila/{idProgramaFila}/imagen', [ProgramaController::class, 'updateImagen'])
         ->middleware('permiso:programas,editar')

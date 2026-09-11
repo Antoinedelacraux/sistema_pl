@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\PlanProduccion\ImportPlanProduccionExcelRequest;
 use App\Http\Requests\PlanProduccion\UpdatePlanProduccionRequest;
 use App\Services\Auditoria\AuditoriaService;
+use App\Services\PlanProduccion\PlanProduccionExportService;
 use App\Services\PlanProduccion\PlanProduccionGridService;
 use App\Services\PlanProduccion\PlanProduccionImportService;
 use App\Services\PlanProduccion\PlanProduccionUpdateService;
@@ -12,6 +13,8 @@ use App\Support\AuditoriaAccion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PlanProduccionController extends Controller
 {
@@ -19,6 +22,7 @@ class PlanProduccionController extends Controller
         private readonly PlanProduccionGridService $gridService,
         private readonly PlanProduccionImportService $importService,
         private readonly PlanProduccionUpdateService $updateService,
+        private readonly PlanProduccionExportService $exportService,
         private readonly AuditoriaService $auditoria
     ) {}
 
@@ -36,6 +40,24 @@ class PlanProduccionController extends Controller
             'puedeEditar' => $request->user()?->puede('plan_produccion', 'editar') ?? false,
             'activeNav' => 'plan_produccion',
         ]);
+    }
+
+    public function exportExcel(Request $request, string $seccion): StreamedResponse
+    {
+        return $this->exportService->exportarExcel(
+            $seccion,
+            $request->user(),
+            $seccion === 'ventas' && $request->boolean('desglose')
+        );
+    }
+
+    public function exportPdf(Request $request, string $seccion): Response
+    {
+        return $this->exportService->exportarPdf(
+            $seccion,
+            $request->user(),
+            $seccion === 'ventas' && $request->boolean('desglose')
+        );
     }
 
     public function importExcel(ImportPlanProduccionExcelRequest $request): RedirectResponse
@@ -84,10 +106,11 @@ class PlanProduccionController extends Controller
 
     public function updatePlan(UpdatePlanProduccionRequest $request): RedirectResponse
     {
-        $cambios = $this->updateService->actualizar(
+        $resultado = $this->updateService->actualizar(
             $request->validated('cantidades'),
             $request->validated('materiales') ?? []
         );
+        $cambios = $resultado['cambios'];
         $this->gridService->forgetCaches();
 
         $this->auditoria->registrar(
@@ -95,18 +118,24 @@ class PlanProduccionController extends Controller
             entidad: 'PlanProduccion',
             idEntidad: null,
             descripcion: 'Plan de producción editado (sincronizado con MRP)',
-            datosNuevos: ['cambios' => $cambios],
+            datosNuevos: ['cambios' => $cambios, 'celdasAfectadas' => $resultado['celdasAfectadas']],
             request: $request,
         );
 
-        return redirect()
-            ->route('plan-produccion.index')
-            ->with(
-                'status',
-                $cambios > 0
-                    ? sprintf('Plan actualizado (%d cambio(s)). Plan de consumo MRP sincronizado.', $cambios)
-                    : 'No hubo cambios en el plan.'
-            );
+        $redirect = redirect()->route('plan-produccion.index');
+
+        if ($resultado['celdasAfectadas'] !== []) {
+            $redirect = $redirect->with('plan_prod_cells_highlight', $resultado['celdasAfectadas']);
+        } else {
+            $redirect = $redirect->with('plan_prod_cells_highlight', []);
+        }
+
+        return $redirect->with(
+            'status',
+            $cambios > 0
+                ? sprintf('Plan actualizado (%d cambio(s)). Plan de consumo MRP sincronizado.', $cambios)
+                : 'No hubo cambios en el plan.'
+        );
     }
 
     public function vaciar(Request $request): RedirectResponse

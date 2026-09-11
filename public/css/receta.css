@@ -355,9 +355,14 @@
     white-space: nowrap;
 }
 
-.receta-params-grid .programas-grid__cell--actions{
+.receta-params-grid .programas-grid__cell--actions,
+.programas-grid .programas-grid__cell--actions{
     text-align: center;
     white-space: nowrap;
+}
+
+.programas-grid .programas-grid__th--actions{
+    width: 48px;
 }
 
 .panel--receta-params .grid-table-section{

@@ -18,6 +18,6 @@ class CantidadCaja extends Model
     protected $fillable = ['cantidad', 'Estado'];
 
     protected $casts = [
-        'cantidad' => 'decimal:6',
+        'cantidad' => 'decimal:7',
     ];
 }

@@ -25,13 +25,11 @@ class MrpController extends Controller
     public function index(Request $request): View
     {
         $filtros = $this->filtrosDesdeRequest($request);
-        $datos = $this->gridService->datos($filtros);
+        $datos = $this->gridService->datos($filtros, ['plan']);
 
         return view('mrp.index', [
             'semanas' => $datos['semanas'],
             'plan' => $datos['plan'],
-            'consumoReal' => $datos['consumo_real'],
-            'ingresos' => $datos['ingresos'],
             'totalMateriales' => $datos['total_materiales'],
             'familiasFiltro' => $this->gridService->familiasParaFiltro(),
             'filtros' => $filtros,
@@ -132,6 +130,7 @@ class MrpController extends Controller
     {
         $cantidades = $request->validated('cantidades');
         $cambios = $this->planUpdateService->actualizar($cantidades);
+        $this->gridService->forgetCaches();
 
         $this->auditoria->registrar(
             accion: AuditoriaAccion::MRP_PLAN_ACTUALIZAR,

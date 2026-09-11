@@ -19,6 +19,11 @@
     var lightbox = document.getElementById('receta-lightbox');
     var lightboxImg = lightbox ? lightbox.querySelector('.receta-lightbox__img') : null;
     var lookupUrl = window.recetaMaterialUrl || '';
+    var storeUrl = window.recetaStoreUrl || '';
+    var form = document.getElementById('receta-form');
+    var formMethod = document.getElementById('receta-form-method');
+    var modalTitle = document.getElementById('receta-modal-title');
+    var formSubmit = document.getElementById('receta-form-submit');
     var lookupTimer = null;
     var previewUrl = null;
     var previewNuevaUrl = null;
@@ -144,6 +149,30 @@
     enlazarCompresionAlEnviar(document.getElementById('receta-form'));
     enlazarCompresionAlEnviar(imagenForm);
 
+    function setSelectValue(select, value) {
+        if (!select) return;
+        select.value = value || '';
+    }
+
+    function resetModalCreate() {
+        if (!form) return;
+
+        form.action = storeUrl || form.getAttribute('action') || '';
+        if (formMethod) {
+            formMethod.disabled = true;
+        }
+        if (modalTitle) {
+            modalTitle.textContent = 'Agregar a receta';
+        }
+        if (formSubmit) {
+            formSubmit.textContent = 'Guardar';
+        }
+        if (imagenInput) {
+            imagenInput.value = '';
+        }
+        limpiarPreview();
+    }
+
     function abrirModal() {
         if (!modal) return;
         modal.classList.add('is-open');
@@ -156,6 +185,49 @@
         modal.classList.remove('is-open');
         modal.setAttribute('aria-hidden', 'true');
         document.body.classList.remove('modal-open');
+        resetModalCreate();
+    }
+
+    function abrirModalEditar(button) {
+        if (!form || !button) return;
+
+        resetModalCreate();
+
+        form.action = button.getAttribute('data-action') || '';
+        if (formMethod) {
+            formMethod.disabled = false;
+        }
+        if (modalTitle) {
+            modalTitle.textContent = 'Editar receta';
+        }
+        if (formSubmit) {
+            formSubmit.textContent = 'Guardar cambios';
+        }
+
+        setSelectValue(form.querySelector('[name="id_mercado"]'), button.getAttribute('data-id-mercado'));
+        setSelectValue(form.querySelector('[name="id_cliente"]'), button.getAttribute('data-id-cliente'));
+        setSelectValue(form.querySelector('[name="id_programa"]'), button.getAttribute('data-id-programa'));
+        setSelectValue(form.querySelector('[name="id_presentacion"]'), button.getAttribute('data-id-presentacion'));
+        setSelectValue(form.querySelector('[name="id_variedad"]'), button.getAttribute('data-id-variedad'));
+        setSelectValue(form.querySelector('[name="id_familia"]'), button.getAttribute('data-id-familia'));
+        setSelectValue(form.querySelector('[name="id_uso"]'), button.getAttribute('data-id-uso'));
+        setSelectValue(form.querySelector('[name="id_situado"]'), button.getAttribute('data-id-situado'));
+
+        if (codigoInput) {
+            codigoInput.value = button.getAttribute('data-codigo-pl') || '';
+        }
+
+        if (materialInput) {
+            materialInput.value = button.getAttribute('data-nom-material') || '';
+            materialInput.readOnly = true;
+        }
+
+        var cantidadInput = form.querySelector('[name="cantidad"]');
+        if (cantidadInput) {
+            cantidadInput.value = button.getAttribute('data-cantidad') || '';
+        }
+
+        abrirModal();
     }
 
     function limpiarPreview() {
@@ -263,8 +335,17 @@
     }
 
     if (abrir) {
-        abrir.addEventListener('click', abrirModal);
+        abrir.addEventListener('click', function () {
+            resetModalCreate();
+            abrirModal();
+        });
     }
+
+    document.querySelectorAll('[data-receta-editar]').forEach(function (node) {
+        node.addEventListener('click', function () {
+            abrirModalEditar(node);
+        });
+    });
 
     document.querySelectorAll('[data-cerrar-modal]').forEach(function (node) {
         node.addEventListener('click', cerrarModal);
@@ -291,7 +372,27 @@
     });
 
     if (modal && modal.querySelector('.modal__errors')) {
-        abrirModal();
+        var editarFilaId = window.recetaEditarFilaId;
+        var botonEditarFila = editarFilaId
+            ? document.querySelector('[data-receta-editar][data-id="' + editarFilaId + '"]')
+            : null;
+
+        if (botonEditarFila && form) {
+            form.action = botonEditarFila.getAttribute('data-action') || '';
+            if (formMethod) {
+                formMethod.disabled = false;
+            }
+            if (modalTitle) {
+                modalTitle.textContent = 'Editar receta';
+            }
+            if (formSubmit) {
+                formSubmit.textContent = 'Guardar cambios';
+            }
+            abrirModal();
+        } else {
+            resetModalCreate();
+            abrirModal();
+        }
     }
 
     if (imagenModal && imagenModal.querySelector('.modal__errors')) {

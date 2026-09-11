@@ -99,11 +99,14 @@
         }
 
         var familia = normalizarFamiliaConsumo(nomFamilia);
+        if (familia === 'temperature recorder') {
+            return 7;
+        }
+
         if (
             familia === 'carton' || familia === 'cartons' || familia === 'cartones'
             || familia === 'pallet' || familia === 'pallets'
             || familia === 'parihuela' || familia === 'parihuelas'
-            || familia === 'temperature recorder'
         ) {
             return 4;
         }

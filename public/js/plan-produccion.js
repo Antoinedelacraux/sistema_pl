@@ -4,34 +4,24 @@
             return Number(decimalesApi);
         }
 
-        var familia = String(nomFamilia || '').toLowerCase();
-        if (
-            familia.indexOf('carton') !== -1 || familia.indexOf('pallet') !== -1
-            || familia.indexOf('parihuela') !== -1 || familia.indexOf('temperature recorder') !== -1
-        ) {
-            return 4;
-        }
-
-        return 2;
+        return 0;
     }
 
     function redondear(valor, nomFamilia, decimalesApi) {
-        var dec = decimalesFamilia(nomFamilia, decimalesApi);
-        var factor = Math.pow(10, dec);
-
-        return Math.round(Number(valor || 0) * factor) / factor;
+        return Math.round(Number(valor || 0));
     }
 
-    function formatear(valor, nomFamilia, decimalesApi) {
-        var num = redondear(valor, nomFamilia, decimalesApi);
-        if (num === 0) {
+    function formatearCelda(valor) {
+        var num = Math.round(Number(valor || 0));
+        if (!num) {
             return '—';
         }
 
-        return num.toLocaleString('es-PE', {
-            minimumFractionDigits: decimalesFamilia(nomFamilia, decimalesApi),
-            maximumFractionDigits: decimalesFamilia(nomFamilia, decimalesApi),
-        });
+        return num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    }
+
+    function formatear(valor, nomFamilia, decimalesApi) {
+        return formatearCelda(redondear(valor, nomFamilia, decimalesApi));
     }
 
     function parseMatsData() {
@@ -71,6 +61,37 @@
     var cancelBtn = document.getElementById('plan-prod-cancel');
     var form = document.getElementById('plan-prod-form');
 
+    function sumRowQtyCells(tr) {
+        var total = 0;
+        tr.querySelectorAll('td[data-sem]').forEach(function (td) {
+            total += Number(String(td.getAttribute('data-val') || '0').replace(/,/g, '')) || 0;
+        });
+
+        return total;
+    }
+
+    function formatTotal(total) {
+        return formatearCelda(total);
+    }
+
+    function updateRowTotal(tr, className, decimales) {
+        var td = tr.querySelector('td.plan-prod-grid__cell--total');
+        if (!td) {
+            td = document.createElement('td');
+            td.className = className;
+            tr.appendChild(td);
+        }
+
+        var span = td.querySelector('.plan-prod-grid__valor');
+        if (!span) {
+            span = document.createElement('span');
+            span.className = 'plan-prod-grid__valor';
+            td.appendChild(span);
+        }
+
+        span.textContent = formatTotal(sumRowQtyCells(tr));
+    }
+
     function paintPgQtyCells() {
         document.querySelectorAll('tr.plan-prod-grid__row--pg[data-vals]').forEach(function (tr) {
             if (tr.getAttribute('data-pg-painted') === '1') {
@@ -90,12 +111,16 @@
 
                 var span = document.createElement('span');
                 span.className = 'plan-prod-grid__valor';
-                span.textContent = valor
-                    ? Number(valor).toLocaleString('es-PE', { maximumFractionDigits: 0 })
-                    : '—';
+                span.textContent = formatearCelda(valor);
                 td.appendChild(span);
                 tr.appendChild(td);
             });
+
+            updateRowTotal(
+                tr,
+                'programas-grid__qty plan-prod-grid__cell--qty plan-prod-grid__cell--pg-qty plan-prod-grid__cell--total',
+                0
+            );
 
             tr.setAttribute('data-pg-painted', '1');
         });
@@ -146,7 +171,7 @@
 
         var span = td.querySelector('.plan-prod-grid__valor');
         if (span) {
-            span.textContent = cajas > 0 ? Number(cajas).toLocaleString('es-PE', { maximumFractionDigits: 0 }) : '—';
+            span.textContent = formatearCelda(cajas);
         }
 
         var input = td.querySelector('.plan-prod-grid__input');
@@ -281,6 +306,12 @@
                 tr.appendChild(td);
             });
 
+            updateRowTotal(
+                tr,
+                'programas-grid__qty plan-prod-grid__cell--qty plan-prod-grid__cell--mat-qty plan-prod-grid__cell--total',
+                decimalesFamilia(mat.f || '', mat.dec)
+            );
+
             frag.appendChild(tr);
         });
 
@@ -339,7 +370,21 @@
             var qty = redondear(cajas * factor, nomFamilia, decimales);
 
             setMaterialQty(td, qty);
+            updateRowTotal(
+                tr,
+                'programas-grid__qty plan-prod-grid__cell--qty plan-prod-grid__cell--mat-qty plan-prod-grid__cell--total',
+                decimalesFamilia(nomFamilia, decimales)
+            );
         });
+
+        var pgTr = pgRow(pgId);
+        if (pgTr) {
+            updateRowTotal(
+                pgTr,
+                'programas-grid__qty plan-prod-grid__cell--qty plan-prod-grid__cell--pg-qty plan-prod-grid__cell--total',
+                0
+            );
+        }
     }
 
     document.querySelectorAll('[data-plan-prod-toggle]').forEach(function (btn) {
@@ -438,6 +483,12 @@
 
                     if (tr && tr.getAttribute('data-es-caja') === '1') {
                         recalcularSemana(pg, sem, 'caja-mat');
+                    } else if (tr) {
+                        updateRowTotal(
+                            tr,
+                            'programas-grid__qty plan-prod-grid__cell--qty plan-prod-grid__cell--mat-qty plan-prod-grid__cell--total',
+                            decimalesFamilia(tr.getAttribute('data-nom-familia') || '', tr.getAttribute('data-decimales') || '2')
+                        );
                     }
                     return;
                 }
@@ -498,9 +549,7 @@
                 td.removeAttribute('data-manual');
                 var span = td.querySelector('.plan-prod-grid__valor');
                 if (span) {
-                    span.textContent = original
-                        ? Number(original).toLocaleString('es-PE', { maximumFractionDigits: 0 })
-                        : '—';
+                    span.textContent = formatearCelda(original);
                 }
             });
 
@@ -539,4 +588,97 @@
             });
         });
     }
+
+    (function initConsumoHighlights() {
+        var STORAGE_KEY = 'plan-prod-cells-highlight';
+        var TTL_MS = 5 * 60 * 1000;
+        var wrap = document.getElementById('plan-prod-scroll-consumo');
+        if (!wrap) {
+            return;
+        }
+
+        function normalizeCells(raw) {
+            if (!Array.isArray(raw)) {
+                return [];
+            }
+
+            return raw.map(function (item) {
+                if (!item || typeof item !== 'object') {
+                    return null;
+                }
+
+                var mat = item.idMaterialPL != null ? String(item.idMaterialPL) : '';
+                var sem = item.idSemConsumo != null ? String(item.idSemConsumo) : '';
+                if (!mat || !sem) {
+                    return null;
+                }
+
+                return { m: mat, s: sem };
+            }).filter(Boolean);
+        }
+
+        var highlightEl = document.getElementById('plan-prod-cells-highlight');
+        var fromServer = null;
+        if (highlightEl) {
+            try {
+                fromServer = JSON.parse(highlightEl.textContent || '[]');
+            } catch (e) {
+                fromServer = [];
+            }
+        }
+
+        var now = Date.now();
+        var cells = [];
+        var startedAt = now;
+
+        if (fromServer !== null) {
+            cells = normalizeCells(fromServer);
+            if (cells.length) {
+                sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ cells: cells, at: now }));
+            } else {
+                sessionStorage.removeItem(STORAGE_KEY);
+            }
+        } else {
+            try {
+                var stored = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || 'null');
+                if (stored && Array.isArray(stored.cells) && stored.at && (now - stored.at) < TTL_MS) {
+                    cells = stored.cells;
+                    startedAt = stored.at;
+                } else {
+                    sessionStorage.removeItem(STORAGE_KEY);
+                }
+            } catch (e) {
+                sessionStorage.removeItem(STORAGE_KEY);
+            }
+        }
+
+        function clearHighlights() {
+            wrap.querySelectorAll('td.plan-prod-consumo-cell--updated').forEach(function (td) {
+                td.classList.remove('plan-prod-consumo-cell--updated');
+            });
+        }
+
+        function applyHighlights() {
+            clearHighlights();
+            if (!cells.length) {
+                return;
+            }
+
+            cells.forEach(function (cell) {
+                wrap.querySelectorAll('td[data-mat="' + cell.m + '"][data-sem="' + cell.s + '"]').forEach(function (td) {
+                    td.classList.add('plan-prod-consumo-cell--updated');
+                });
+            });
+        }
+
+        applyHighlights();
+
+        var remaining = TTL_MS - (now - startedAt);
+        if (cells.length && remaining > 0) {
+            window.setTimeout(function () {
+                clearHighlights();
+                sessionStorage.removeItem(STORAGE_KEY);
+            }, remaining);
+        }
+    })();
 })();

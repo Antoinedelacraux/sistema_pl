@@ -40,7 +40,7 @@ class PlanProduccionMrpSyncService
 
         foreach (array_keys($materiales) as $idMat) {
             foreach ($totales[$idMat] ?? [] as $idSem => $qtyRaw) {
-                $qty = CantidadCajaSupport::redondear((float) $qtyRaw, null);
+                $qty = CantidadCajaSupport::redondearVisualizacion((float) $qtyRaw, $materiales[$idMat]['nom_familia'] ?? null);
                 if ($qty == 0.0) {
                     continue;
                 }
@@ -67,7 +67,10 @@ class PlanProduccionMrpSyncService
      *   filas: list<array<string, mixed>>
      * }
      */
-    public function planConsumoAlineado(Collection $semanasProd): array
+    /**
+     * @param  array<int, list<array<string, mixed>>>|null  $materialesPorPg
+     */
+    public function planConsumoAlineado(Collection $semanasProd, ?array $materialesPorPg = null): array
     {
         $semanasMrp = SemConsumo::query()->activo()->orderBy('nroOrden')->get();
         $codigosProd = $semanasProd->pluck('codigoSemana')->all();
@@ -80,7 +83,7 @@ class PlanProduccionMrpSyncService
             return ['semanas' => collect(), 'filas' => []];
         }
 
-        $calculo = $this->calcularTotalesConsumo();
+        $calculo = $this->calcularTotalesConsumo($materialesPorPg);
         if ($calculo === null) {
             return ['semanas' => $semanasVisibles, 'filas' => []];
         }
@@ -93,11 +96,15 @@ class PlanProduccionMrpSyncService
                 'idMaterialPL' => $idMat,
                 'codigoPL' => $meta['codigoPL'],
                 'descripcion' => $meta['descripcion'],
+                'nom_familia' => $meta['nom_familia'] ?? '',
             ];
 
             foreach ($semanasVisibles as $sem) {
                 $idSem = (int) $sem->idSemConsumo;
-                $fila['sem_'.$idSem] = CantidadCajaSupport::redondear((float) ($totales[$idMat][$idSem] ?? 0), null);
+                $fila['sem_'.$idSem] = CantidadCajaSupport::redondearVisualizacion(
+                    (float) ($totales[$idMat][$idSem] ?? 0),
+                    $meta['nom_familia'] ?? null
+                );
             }
 
             $filas[] = $fila;
@@ -120,7 +127,10 @@ class PlanProduccionMrpSyncService
      *   materiales: array<int, array{codigoPL: string, descripcion: string}>
      * }|null
      */
-    private function calcularTotalesConsumo(): ?array
+    /**
+     * @param  array<int, list<array<string, mixed>>>|null  $materialesPorPg
+     */
+    private function calcularTotalesConsumo(?array $materialesPorPg = null): ?array
     {
         $semanasProd = SemProduccion::query()->activo()->orderBy('nroOrden')->get();
         if ($semanasProd->isEmpty()) {
@@ -159,7 +169,8 @@ class PlanProduccionMrpSyncService
         $materiales = [];
 
         foreach ($idsPg as $idPg) {
-            $materialesPlan = $this->recetaService->materialesUnificadosParaPlan((string) ($nombresPg[$idPg] ?? ''));
+            $materialesPlan = $materialesPorPg[$idPg]
+                ?? $this->recetaService->materialesUnificadosParaPlan((string) ($nombresPg[$idPg] ?? ''));
 
             foreach ($semanasProd as $semProd) {
                 $idSemProd = (int) $semProd->idSemProduccion;
@@ -175,7 +186,7 @@ class PlanProduccionMrpSyncService
                     $override = $overrides[$idPg][$idMat][$idSemProd] ?? null;
 
                     if ($override !== null) {
-                        $qty = CantidadCajaSupport::redondear((float) $override, $mat['nom_familia'] ?? null);
+                        $qty = CantidadCajaSupport::redondearVisualizacion((float) $override, $mat['nom_familia'] ?? null);
                     } else {
                         $qty = $this->cantidadService->calcularDesdeCajas($cajas, $mat);
                     }
@@ -192,6 +203,7 @@ class PlanProduccionMrpSyncService
                     $materiales[$idMat] = [
                         'codigoPL' => (string) $mat['codigo_pl'],
                         'descripcion' => (string) $mat['nom_material'],
+                        'nom_familia' => (string) ($mat['nom_familia'] ?? ''),
                     ];
                 }
             }

@@ -13,10 +13,13 @@ use App\Support\MaestrosCatalogo;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
 
 class MaestroCatalogoService
 {
+    private const CACHE_TTL = 300;
+
     /**
      * @return LengthAwarePaginator<int, Model>
      */
@@ -25,15 +28,33 @@ class MaestroCatalogoService
         $definicion = MaestrosCatalogo::definicion($tab);
         $modelClass = $definicion['model'];
         $columnaNombre = $definicion['nombre'];
+        $page = max(1, (int) $request->query('page', 1));
 
-        $query = $modelClass::query()->orderBy($columnaNombre);
+        if ($buscar === '') {
+            $version = (int) Cache::get('maestros.cache_version', 0);
+            $cacheKey = 'maestros.list.v'.$version.'.'.$tab.'.p'.$page;
 
-        if ($buscar !== '') {
-            $termino = mb_strtolower($buscar);
-            $query->whereRaw('LOWER('.$columnaNombre.') LIKE ?', ['%'.$termino.'%']);
+            return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($modelClass, $columnaNombre, $request) {
+                return $modelClass::query()
+                    ->orderBy($columnaNombre)
+                    ->paginate(GridPagination::PER_PAGE)
+                    ->withQueryString();
+            });
         }
 
-        return $query->paginate(GridPagination::PER_PAGE)->withQueryString();
+        $termino = mb_strtolower($buscar);
+
+        return $modelClass::query()
+            ->orderBy($columnaNombre)
+            ->whereRaw('LOWER('.$columnaNombre.') LIKE ?', ['%'.$termino.'%'])
+            ->paginate(GridPagination::PER_PAGE)
+            ->withQueryString();
+    }
+
+    public function olvidarCaches(): void
+    {
+        $version = (int) Cache::get('maestros.cache_version', 0);
+        Cache::forever('maestros.cache_version', $version + 1);
     }
 
     /**
@@ -57,6 +78,8 @@ class MaestroCatalogoService
                     $extras
                 ));
 
+                $this->olvidarCaches();
+
                 return $existente->fresh();
             }
 
@@ -65,10 +88,13 @@ class MaestroCatalogoService
             );
         }
 
-        return $modelClass::query()->create(array_merge(
+        $registro = $modelClass::query()->create(array_merge(
             [$columnaNombre => $nombre, 'Estado' => Estado::ACTIVO],
             $extras
         ));
+        $this->olvidarCaches();
+
+        return $registro;
     }
 
     /**
@@ -85,6 +111,7 @@ class MaestroCatalogoService
             [$columnaNombre => trim($nombre), 'Estado' => $estado],
             $extras
         ));
+        $this->olvidarCaches();
 
         return $registro->fresh();
     }
@@ -100,6 +127,7 @@ class MaestroCatalogoService
         $modelClass = $definicion['model'];
 
         $modelClass::query()->findOrFail($id)->update(['Estado' => Estado::INACTIVO]);
+        $this->olvidarCaches();
     }
 
     public function activar(string $tab, int $id): Model
@@ -109,6 +137,7 @@ class MaestroCatalogoService
 
         $registro = $modelClass::query()->findOrFail($id);
         $registro->update(['Estado' => Estado::ACTIVO]);
+        $this->olvidarCaches();
 
         return $registro->fresh();
     }

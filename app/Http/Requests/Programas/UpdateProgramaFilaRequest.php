@@ -1,0 +1,65 @@
+<?php
+
+namespace App\Http\Requests\Programas;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class UpdateProgramaFilaRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return $this->user()?->puede('programas', 'editar') ?? false;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'id_mercado' => ['required', 'integer', Rule::exists('Mercado', 'idMercado')],
+            'id_cliente' => ['required', 'integer', Rule::exists('Cliente', 'idCliente')],
+            'id_variedad' => ['required', 'integer', Rule::exists('Variedad', 'idVariedad')],
+            'id_programa' => ['required', 'integer', Rule::exists('Programa', 'idPrograma')],
+            'id_presentacion' => ['required', 'integer', Rule::exists('Presentacion', 'idPresentacion')],
+            'codigo_pl' => ['required', 'string', 'max:20'],
+            'nom_material' => ['required', 'string', 'max:255'],
+            'cantidad' => ['required', 'numeric', 'min:0'],
+            'id_uso' => ['required', 'integer', Rule::exists('Uso', 'idUso')],
+            'id_situado' => ['required', 'integer', Rule::exists('Situado', 'idSituado')],
+            'id_familia' => ['required', 'integer', Rule::exists('Familia', 'idFamilia')],
+            'imagen' => ['nullable', 'file', 'image', 'mimes:jpeg,jpg,png,webp,gif', 'max:5120'],
+        ];
+    }
+
+    public function attributes(): array
+    {
+        return [
+            'id_mercado' => 'mercado',
+            'id_cliente' => 'cliente',
+            'id_variedad' => 'variedad',
+            'id_programa' => 'programa',
+            'id_presentacion' => 'producto',
+            'codigo_pl' => 'código PL',
+            'nom_material' => 'descripción material',
+            'cantidad' => 'cantidad x caja',
+            'id_uso' => 'observación',
+            'id_situado' => 'situado',
+            'id_familia' => 'material',
+            'imagen' => 'imagen',
+        ];
+    }
+
+    protected function getRedirectUrl(): string
+    {
+        session()->flash('receta_editar_fila', $this->route('idProgramaFila'));
+
+        return route('programas.index', array_filter([
+            'mercado' => $this->input('mercado'),
+            'cliente' => $this->input('cliente'),
+            'programa_general' => $this->input('programa_general'),
+            'familia' => $this->input('familia'),
+            'programa' => $this->input('programa'),
+            'presentacion' => $this->input('presentacion'),
+            'buscar' => $this->input('buscar'),
+        ], fn ($valor) => filled($valor)));
+    }
+}
