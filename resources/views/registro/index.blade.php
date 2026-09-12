@@ -318,13 +318,7 @@
         'pallets_fuera' => old('pallets_fuera'),
     ];
 
-    $registroProgramasPorGeneral = collect($programas ?? [])
-        ->groupBy(fn ($programa) => (string) ($programa->idProgramaGeneral ?? ''))
-        ->map(fn ($grupo) => $grupo->map(fn ($programa) => [
-            'id_programa' => $programa->idPrograma,
-            'nom_programa' => $programa->nomPrograma,
-        ])->values())
-        ->all();
+    $registroProgramasPorGeneral = $programasPorGeneral ?? [];
 
     $registroMaterialesMap = collect($materiales ?? [])->mapWithKeys(function ($m) {
         return [

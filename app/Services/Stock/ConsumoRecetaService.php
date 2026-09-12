@@ -59,20 +59,79 @@ class ConsumoRecetaService
             : 'catalogo.programas_consumo';
 
         return Cache::remember($cacheKey, 60, function () use ($idProgramaGeneral) {
-            $query = ProgramaCatalogo::query()
-                ->activo()
-                ->whereIn('idPrograma', ProgramaFila::query()
-                    ->select('idPrograma')
-                    ->where('Estado', Estado::ACTIVO)
-                    ->distinct());
+            $filasQuery = ProgramaFila::query()
+                ->select('idPrograma')
+                ->where('Estado', Estado::ACTIVO)
+                ->distinct();
 
             if ($idProgramaGeneral !== null && $idProgramaGeneral > 0) {
-                $query->where('idProgramaGeneral', $idProgramaGeneral);
+                $filasQuery->where(function ($query) use ($idProgramaGeneral) {
+                    $query->where('idProgramaGeneral', $idProgramaGeneral)
+                        ->orWhereIn('idPrograma', ProgramaCatalogo::query()
+                            ->select('idPrograma')
+                            ->activo()
+                            ->where('idProgramaGeneral', $idProgramaGeneral));
+                });
             }
 
-            return $query
+            return ProgramaCatalogo::query()
+                ->activo()
+                ->whereIn('idPrograma', $filasQuery)
                 ->orderBy('nomPrograma')
                 ->get(['idPrograma', 'nomPrograma', 'idProgramaGeneral']);
+        });
+    }
+
+    /**
+     * Mapa idProgramaGeneral → programas (desde filas de receta, no solo catálogo).
+     *
+     * @return array<string, list<array{id_programa: int, nom_programa: string|null}>>
+     */
+    public function programasAgrupadosPorGeneral(): array
+    {
+        return Cache::remember('catalogo.programas_por_general_consumo', 60, function () {
+            $pares = ProgramaFila::query()
+                ->where('Estado', Estado::ACTIVO)
+                ->whereNotNull('idProgramaGeneral')
+                ->select(['idProgramaGeneral', 'idPrograma'])
+                ->distinct()
+                ->get();
+
+            if ($pares->isEmpty()) {
+                return [];
+            }
+
+            $programas = ProgramaCatalogo::query()
+                ->activo()
+                ->whereIn('idPrograma', $pares->pluck('idPrograma')->unique())
+                ->get(['idPrograma', 'nomPrograma'])
+                ->keyBy('idPrograma');
+
+            $agrupado = [];
+            foreach ($pares as $par) {
+                $idPg = (string) $par->idProgramaGeneral;
+                $prog = $programas->get($par->idPrograma);
+                if ($prog === null) {
+                    continue;
+                }
+
+                $idProg = (string) $prog->idPrograma;
+                $agrupado[$idPg][$idProg] = [
+                    'id_programa' => (int) $prog->idPrograma,
+                    'nom_programa' => $prog->nomPrograma,
+                ];
+            }
+
+            foreach ($agrupado as $idPg => $items) {
+                $lista = array_values($items);
+                usort($lista, static fn (array $a, array $b): int => strcmp(
+                    (string) ($a['nom_programa'] ?? ''),
+                    (string) ($b['nom_programa'] ?? '')
+                ));
+                $agrupado[$idPg] = $lista;
+            }
+
+            return $agrupado;
         });
     }
 

@@ -119,6 +119,9 @@ class MovimientoService
             'programas' => Cache::remember('catalogo.programas_consumo', 600, function () {
                 return app(ConsumoRecetaService::class)->programasDisponibles();
             }),
+            'programasPorGeneral' => Cache::remember('catalogo.programas_por_general_consumo', 600, function () {
+                return app(ConsumoRecetaService::class)->programasAgrupadosPorGeneral();
+            }),
             // Autocomplete vÃ­a registro.material-por-codigo; evita ~500KB en el HTML.
             'materiales' => collect(),
         ];

@@ -495,6 +495,7 @@ class MovimientoController extends Controller
         $idProgramaGeneral = (int) $request->query('id_programa_general', 0);
 
         Cache::forget('catalogo.programas_consumo');
+        Cache::forget('catalogo.programas_por_general_consumo');
         if ($idProgramaGeneral > 0) {
             Cache::forget('catalogo.programas_consumo.pg.'.$idProgramaGeneral);
         }
