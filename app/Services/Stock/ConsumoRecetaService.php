@@ -144,15 +144,19 @@ class ConsumoRecetaService
             return collect();
         }
 
-        return Presentacion::query()
-            ->activo()
-            ->whereIn('idPresentacion', ProgramaFila::query()
-                ->select('idPresentacion')
-                ->where('idPrograma', $idPrograma)
-                ->where('Estado', Estado::ACTIVO)
-                ->distinct())
-            ->orderBy('nomPresentacion')
-            ->get(['idPresentacion', 'nomPresentacion']);
+        $cacheKey = 'catalogo.presentaciones_consumo.pg.'.$idPrograma;
+
+        return Cache::remember($cacheKey, 300, function () use ($idPrograma) {
+            return Presentacion::query()
+                ->activo()
+                ->whereIn('idPresentacion', ProgramaFila::query()
+                    ->select('idPresentacion')
+                    ->where('idPrograma', $idPrograma)
+                    ->where('Estado', Estado::ACTIVO)
+                    ->distinct())
+                ->orderBy('nomPresentacion')
+                ->get(['idPresentacion', 'nomPresentacion']);
+        });
     }
 
     /**
@@ -540,25 +544,12 @@ class ConsumoRecetaService
             return [];
         }
 
-        $recetaPorCodigo = ProgramaFila::query()
-            ->with('material')
-            ->where('idPrograma', $idPrograma)
-            ->where('idPresentacion', $idPresentacion)
-            ->where('Estado', Estado::ACTIVO)
-            ->get()
-            ->groupBy(fn (ProgramaFila $fila) => trim((string) ($fila->material?->CodigoPL ?? '')));
-
         return $movimientos
-            ->map(function (MovimientoStock $movimiento) use ($recetaPorCodigo) {
-                $codigo = trim((string) ($movimiento->materialPl?->CodigoPL ?? ''));
-                $recetaId = (int) ($recetaPorCodigo->get($codigo)?->first()?->idMaterialPL ?? $movimiento->idMaterialPL);
-
-                return [
-                    'id_movimiento' => (int) $movimiento->idMovimiento,
-                    'id_material_pl' => $recetaId,
-                    'cantidad' => (float) $movimiento->cantidad,
-                ];
-            })
+            ->map(fn (MovimientoStock $movimiento) => [
+                'id_movimiento' => (int) $movimiento->idMovimiento,
+                'id_material_pl' => (int) $movimiento->idMaterialPL,
+                'cantidad' => (float) $movimiento->cantidad,
+            ])
             ->values()
             ->all();
     }

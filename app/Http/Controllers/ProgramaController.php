@@ -32,19 +32,29 @@ class ProgramaController extends Controller
 
     public function index(Request $request): View
     {
-        $filtros = $this->gridService->normalizarFiltros($this->filtrosDesdeRequest($request));
+        $resuelto = $this->gridService->resolverFiltrosReceta($this->filtrosDesdeRequest($request));
+        $filtros = $resuelto['filtros'];
         $filas = $this->gridService->filasPaginadas($filtros, $request);
 
-        return view('programas.index', array_merge($this->gridService->catalogos(), [
-            'catalogosFiltro' => $this->gridService->catalogosFiltro($filtros),
+        $puedeCrear = $request->user()?->puede('programas', 'crear') ?? false;
+        $puedeEditar = $request->user()?->puede('programas', 'editar') ?? false;
+
+        $viewData = [
+            'catalogosFiltro' => $resuelto['catalogos_filtro'],
             'filas' => $filas,
             'filtros' => $filtros,
             'totalFilas' => $filas->total(),
             'totalProgramas' => $this->gridService->totalProgramasDistintos($filtros),
-            'puedeCrear' => $request->user()?->puede('programas', 'crear') ?? false,
-            'puedeEditar' => $request->user()?->puede('programas', 'editar') ?? false,
+            'puedeCrear' => $puedeCrear,
+            'puedeEditar' => $puedeEditar,
             'activeNav' => 'programas',
-        ]));
+        ];
+
+        if ($puedeCrear || $puedeEditar) {
+            $viewData = array_merge($viewData, $this->gridService->catalogos());
+        }
+
+        return view('programas.index', $viewData);
     }
 
     public function exportExcel(Request $request): StreamedResponse
@@ -118,17 +128,30 @@ class ProgramaController extends Controller
     }
 
     /**
-     * @param  array{insertadas: int, duplicadas: int, omitidas: int, total: int}  $resultado
+     * @param  array{insertadas: int, actualizadas?: int, cantidades_preservadas?: int, duplicadas: int, omitidas: int, total: int}  $resultado
      */
     private function mensajeImportacion(array $resultado): string
     {
-        return sprintf(
-            'Importación: %d nueva(s), %d duplicada(s) en Excel, %d omitida(s). Total: %d.',
-            $resultado['insertadas'],
-            $resultado['duplicadas'],
-            $resultado['omitidas'],
-            $resultado['total']
-        );
+        $partes = [
+            sprintf('%d nueva(s)', $resultado['insertadas']),
+        ];
+
+        if (($resultado['actualizadas'] ?? 0) > 0) {
+            $partes[] = sprintf('%d actualizada(s)', $resultado['actualizadas']);
+        }
+
+        if (($resultado['cantidades_preservadas'] ?? 0) > 0) {
+            $partes[] = sprintf(
+                '%d cantidad(es) x caja conservada(s) (editadas en pantalla)',
+                $resultado['cantidades_preservadas']
+            );
+        }
+
+        $partes[] = sprintf('%d duplicada(s) en Excel', $resultado['duplicadas']);
+        $partes[] = sprintf('%d omitida(s)', $resultado['omitidas']);
+        $partes[] = sprintf('Total: %d', $resultado['total']);
+
+        return 'Importación: '.implode(', ', $partes).'.';
     }
 
     public function store(StoreProgramaFilaRequest $request): RedirectResponse

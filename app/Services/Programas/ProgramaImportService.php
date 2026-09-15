@@ -102,20 +102,15 @@ class ProgramaImportService
     private const OBSERVACION_VACIA = 'Oficial';
 
     /**
-     * Importa Receta desde Excel (solo inserción). La receta debe estar vacía; use «Vaciar» antes.
+     * Importa Receta desde Excel. Si ya hay filas, fusiona (actualiza catálogos/programa)
+     * y conserva cantidad x caja editada en pantalla cuando el Excel trae el valor anterior.
      *
-     * @return array{leidas: int, insertadas: int, duplicadas: int, omitidas: int, total: int}
+     * @return array{leidas: int, insertadas: int, actualizadas: int, cantidades_preservadas: int, duplicadas: int, omitidas: int, total: int}
      */
     public function importar(UploadedFile $archivo): array
     {
         @ini_set('max_execution_time', '300');
         set_time_limit(300);
-
-        if (ProgramaFila::query()->exists()) {
-            throw new InvalidArgumentException(
-                'La receta ya tiene datos. Use «Vaciar» antes de importar el Excel.'
-            );
-        }
 
         $this->resetCachesImport();
         $filasExcel = $this->leerExcel($archivo);
@@ -123,18 +118,25 @@ class ProgramaImportService
         $this->precargarMateriales($filasExcel);
 
         $insertadas = 0;
+        $actualizadas = 0;
+        $cantidadesPreservadas = 0;
         $duplicadas = 0;
         $omitidas = 0;
         $vistasEnExcel = [];
 
+        $indiceExistentes = $this->indiceFilasPorMatchKey();
+
         DB::transaction(function () use (
             $filasExcel,
+            $indiceExistentes,
             &$insertadas,
+            &$actualizadas,
+            &$cantidadesPreservadas,
             &$duplicadas,
             &$omitidas,
             &$vistasEnExcel
         ) {
-            $nroFila = 0;
+            $nroFila = (int) ProgramaFila::query()->max('nroFila');
 
             foreach ($filasExcel as $filaExcel) {
                 if (! $this->codigoPlanificacionValido($filaExcel['Codigo Planificación'])) {
@@ -150,19 +152,35 @@ class ProgramaImportService
                     continue;
                 }
 
-                $nroFila++;
-                $this->insertarFila($filaExcel, $nroFila);
                 $vistasEnExcel[$matchKey] = true;
-                $insertadas++;
+                $existentes = $indiceExistentes[$matchKey] ?? [];
+
+                if ($existentes === []) {
+                    $nroFila++;
+                    $this->insertarFila($filaExcel, $nroFila);
+                    $insertadas++;
+
+                    continue;
+                }
+
+                foreach ($existentes as $fila) {
+                    if ($this->fusionarFilaDesdeExcel($fila, $filaExcel)) {
+                        $cantidadesPreservadas++;
+                    }
+                    $actualizadas++;
+                }
             }
         });
 
         Cache::forget('catalogo.programas_consumo');
+        Cache::forget('catalogo.programas_por_general_consumo');
         $this->backfillProgramaGeneralEnFilas();
 
         return [
             'leidas' => count($filasExcel),
             'insertadas' => $insertadas,
+            'actualizadas' => $actualizadas,
+            'cantidades_preservadas' => $cantidadesPreservadas,
             'duplicadas' => $duplicadas,
             'omitidas' => $omitidas,
             'total' => ProgramaFila::query()->count(),
@@ -231,6 +249,7 @@ class ProgramaImportService
         });
 
         Cache::forget('catalogo.programas_consumo');
+        Cache::forget('catalogo.programas_por_general_consumo');
 
         return [
             'leidas' => count($filasExcel),
@@ -585,6 +604,92 @@ class ProgramaImportService
         ]);
     }
 
+    private function matchKeyDesdeFila(ProgramaFila $fila): string
+    {
+        return $this->armarFingerprint([
+            $fila->programaGeneral?->nombre ?? '',
+            $fila->programaGeneral?->CodigoProGeneral ?? '',
+            $fila->mercado?->nomMercado ?? '',
+            $fila->cliente?->nomCliente ?? '',
+            $fila->programa?->nomPrograma ?? '',
+            $fila->variedad?->nomVariedad ?? '',
+            $fila->presentacion?->nomPresentacion ?? '',
+            MaterialProgramaLookup::normalizarCodigo($fila->material?->CodigoPL ?? ''),
+            $this->valorObservacion($fila->uso?->nomUso ?? ''),
+            $this->normalizarFamiliaImport($fila->familia?->nomFamilia ?? ''),
+        ]);
+    }
+
+    /**
+     * @return array<string, list<ProgramaFila>>
+     */
+    private function indiceFilasPorMatchKey(): array
+    {
+        $indice = [];
+
+        ProgramaFila::query()
+            ->activo()
+            ->with([
+                'mercado', 'cliente', 'programa', 'programaGeneral', 'variedad',
+                'presentacion', 'material', 'uso', 'familia',
+            ])
+            ->orderBy('idProgramaFila')
+            ->lazy(500)
+            ->each(function (ProgramaFila $fila) use (&$indice) {
+                $clave = $this->matchKeyDesdeFila($fila);
+                $indice[$clave][] = $fila;
+            });
+
+        return $indice;
+    }
+
+    /**
+     * @param  array<string, string>  $filaExcel
+     * @return bool true si se conservó la cantidad editada en pantalla
+     */
+    private function fusionarFilaDesdeExcel(ProgramaFila $fila, array $filaExcel): bool
+    {
+        $datos = $this->datosFilaDesdeExcel($filaExcel, (int) $fila->nroFila);
+        unset($datos['nroFila']);
+
+        $preservarCantidad = $this->debePreservarCantidadCaja($fila, $filaExcel);
+        if ($preservarCantidad) {
+            unset($datos['idCantidadCaja'], $datos['idCantidadCajaRefExcel']);
+        }
+
+        $fila->update($datos);
+
+        return $preservarCantidad;
+    }
+
+    /**
+     * @param  array<string, string>  $filaExcel
+     */
+    private function debePreservarCantidadCaja(ProgramaFila $fila, array $filaExcel): bool
+    {
+        $idRef = (int) ($fila->idCantidadCajaRefExcel ?? $fila->idCantidadCaja);
+        $idActual = (int) $fila->idCantidadCaja;
+
+        if ($idActual === $idRef) {
+            return false;
+        }
+
+        $nomFamilia = $this->normalizarFamiliaImport($filaExcel['Material']);
+        $ref = CantidadCaja::query()->find($idRef);
+        if ($ref === null) {
+            return false;
+        }
+
+        $claveRef = CantidadCajaSupport::claveCantidad($ref->cantidad, $nomFamilia);
+        $claveExcel = CantidadCajaSupport::claveCantidad($filaExcel['Cantidad x Caja'], $nomFamilia);
+
+        if ($claveExcel === $claveRef) {
+            return true;
+        }
+
+        return false;
+    }
+
     private function codigoPlanificacionValido(string $codigo): bool
     {
         $codigo = MaterialProgramaLookup::normalizarCodigo($codigo);
@@ -660,6 +765,7 @@ class ProgramaImportService
             'idPresentacion' => $idPresentacion,
             'idMaterialPL' => $material->idMaterialPL,
             'idCantidadCaja' => $cantidad->idCantidadCaja,
+            'idCantidadCajaRefExcel' => $cantidad->idCantidadCaja,
             'idUso' => $this->catalogoId(Uso::class, 'nomUso', $this->valorObservacion($filaExcel['Observacion'])),
             'idSituado' => $this->idSituadoImport(),
             'idFamilia' => $this->catalogoId(Familia::class, 'nomFamilia', $nomFamilia),

@@ -58,41 +58,47 @@ class ProgramaGridService
         return $this->queryFilas($filtros)->count();
     }
 
-    /** Programas distintos presentes en la grilla de receta (no el catálogo CRUD). */
+    /** Programas distintos presentes en la grilla de receta (no el catÃ¡logo CRUD). */
     public function totalProgramasDistintos(array $filtros = []): int
     {
-        $query = $this->queryFilas($filtros);
+        $version = (int) Cache::get('programa.cache_version', 0);
+        $cacheKey = 'programa.total_distintos.v'.$version.'.'.md5(json_encode($filtros));
 
-        $porGeneral = (clone $query)
-            ->whereNotNull('idProgramaGeneral')
-            ->distinct()
-            ->count('idProgramaGeneral');
+        return (int) Cache::remember($cacheKey, self::CACHE_TTL, function () use ($filtros) {
+            // Evita el with() pesado de queryFilas: solo IDs de receta.
+            $base = $this->queryIdsReceta($filtros);
 
-        $sinGeneral = (clone $query)
-            ->whereNull('idProgramaGeneral')
-            ->distinct()
-            ->count('idPrograma');
+            $porGeneral = (clone $base)
+                ->whereNotNull('idProgramaGeneral')
+                ->distinct()
+                ->count('idProgramaGeneral');
 
-        return $porGeneral + $sinGeneral;
+            $sinGeneral = (clone $base)
+                ->whereNull('idProgramaGeneral')
+                ->distinct()
+                ->count('idPrograma');
+
+            return $porGeneral + $sinGeneral;
+        });
     }
 
     public function catalogos(): array
     {
-        return Cache::remember('programa.catalogos.v1', self::CACHE_TTL, fn () => [
-            'programasGenerales' => ProgramaGeneral::query()->activo()->orderBy('nombre')->get(),
-            'mercados' => Mercado::query()->activo()->orderBy('nomMercado')->get(),
-            'clientes' => Cliente::query()->activo()->orderBy('nomCliente')->get(),
-            'variedades' => Variedad::query()->activo()->orderBy('nomVariedad')->get(),
-            'programas' => ProgramaCatalogo::query()->activo()->orderBy('nomPrograma')->get(),
-            'presentaciones' => Presentacion::query()->activo()->orderBy('nomPresentacion')->get(),
-            'usos' => Uso::query()->activo()->orderBy('nomUso')->get(),
-            'situados' => Situado::query()->activo()->orderBy('nomSituado')->get(),
-            'familias' => Familia::query()->activo()->orderBy('nomFamilia')->get(),
+        return Cache::remember('programa.catalogos.v2', self::CACHE_TTL, fn () => [
+            'programasGenerales' => ProgramaGeneral::query()->activo()->orderBy('nombre')->get(['idProgramaGeneral', 'nombre', 'Estado']),
+            'mercados' => Mercado::query()->activo()->orderBy('nomMercado')->get(['idMercado', 'nomMercado', 'Estado']),
+            'clientes' => Cliente::query()->activo()->orderBy('nomCliente')->get(['idCliente', 'nomCliente', 'Estado']),
+            'variedades' => Variedad::query()->activo()->orderBy('nomVariedad')->get(['idVariedad', 'nomVariedad', 'Estado']),
+            'programas' => ProgramaCatalogo::query()->activo()->orderBy('nomPrograma')->get(['idPrograma', 'nomPrograma', 'idProgramaGeneral', 'Estado']),
+            'presentaciones' => Presentacion::query()->activo()->orderBy('nomPresentacion')->get(['idPresentacion', 'nomPresentacion', 'Estado']),
+            'usos' => Uso::query()->activo()->orderBy('nomUso')->get(['idUso', 'nomUso', 'Estado']),
+            'situados' => Situado::query()->activo()->orderBy('nomSituado')->get(['idSituado', 'nomSituado', 'Estado']),
+            'familias' => Familia::query()->activo()->orderBy('nomFamilia')->get(['idFamilia', 'nomFamilia', 'Estado']),
         ]);
     }
 
     /**
-     * Opciones de filtros según selección previa (datos reales en receta).
+     * Opciones de filtros segÃºn selecciÃ³n previa (datos reales en receta).
      *
      * @param  array{mercado?: mixed, cliente?: mixed, programa_general?: mixed, programa?: mixed, presentacion?: mixed, familia?: mixed}  $filtros
      * @return array{mercados: Collection, clientes: Collection, programasGenerales: Collection, programas: Collection, presentaciones: Collection, familias: Collection}
@@ -120,69 +126,72 @@ class ProgramaGridService
     }
 
     /**
+     * Solo opciones usadas en la grilla Receta (menos consultas que catalogosFiltro completo).
+     *
+     * @param  array<string, mixed>  $filtros
+     * @return array{programasGenerales: Collection, programas: Collection, familias: Collection}
+     */
+    public function catalogosFiltroReceta(array $filtros = []): array
+    {
+        $version = (int) Cache::get('programa.cache_version', 0);
+        $cacheKey = 'programa.catalogos_filtro_receta.v'.$version.'.'.md5(json_encode([
+            'programa_general' => $filtros['programa_general'] ?? null,
+            'programa' => $filtros['programa'] ?? null,
+            'presentacion' => $filtros['presentacion'] ?? null,
+            'familia' => $filtros['familia'] ?? null,
+        ]));
+
+        return Cache::remember($cacheKey, self::CACHE_TTL, fn () => [
+            'programasGenerales' => $this->opcionesProgramaGeneralFiltro(),
+            'programas' => $this->opcionesProgramaFiltro($filtros),
+            'familias' => $this->opcionesFamiliaFiltro($filtros),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filtros
+     * @return array{filtros: array<string, mixed>, catalogos_filtro: array<string, Collection>}
+     */
+    public function resolverFiltrosReceta(array $filtros): array
+    {
+        $parsed = $this->parseFiltrosEntrada($filtros);
+
+        for ($i = 0; $i < 5; $i++) {
+            $catalogosFiltro = $this->catalogosFiltroReceta($parsed);
+            $ajustado = $this->ajustarFiltrosRecetaConOpciones($parsed, $catalogosFiltro);
+            if ($ajustado === $parsed) {
+                return [
+                    'filtros' => $parsed,
+                    'catalogos_filtro' => $catalogosFiltro,
+                ];
+            }
+            $parsed = $ajustado;
+        }
+
+        return [
+            'filtros' => $parsed,
+            'catalogos_filtro' => $this->catalogosFiltroReceta($parsed),
+        ];
+    }
+
+    /**
      * @param  array{mercado?: mixed, cliente?: mixed, programa_general?: mixed, programa?: mixed, presentacion?: mixed, familia?: mixed, q?: string}  $filtros
      * @return array{mercado: mixed, cliente: mixed, programa_general: mixed, familia: mixed, programa: mixed, presentacion: mixed, q: string}
      */
     public function normalizarFiltros(array $filtros): array
     {
-        $mercado = filled($filtros['mercado'] ?? null) ? (int) $filtros['mercado'] : null;
-        $cliente = filled($filtros['cliente'] ?? null) ? (int) $filtros['cliente'] : null;
-        $programaGeneral = filled($filtros['programa_general'] ?? null) ? (int) $filtros['programa_general'] : null;
-        $programa = filled($filtros['programa'] ?? null) ? (int) $filtros['programa'] : null;
-        $presentacion = filled($filtros['presentacion'] ?? null) ? (int) $filtros['presentacion'] : null;
-        $familia = filled($filtros['familia'] ?? null) ? (int) $filtros['familia'] : null;
+        $parsed = $this->parseFiltrosEntrada($filtros);
 
-        if ($mercado && ! $this->opcionesMercadoFiltro()->contains('idMercado', $mercado)) {
-            $mercado = null;
+        for ($i = 0; $i < 5; $i++) {
+            $opciones = $this->catalogosFiltro($parsed);
+            $ajustado = $this->ajustarFiltrosConOpciones($parsed, $opciones);
+            if ($ajustado === $parsed) {
+                return $parsed;
+            }
+            $parsed = $ajustado;
         }
 
-        if ($cliente && ! $this->opcionesClienteFiltro(['mercado' => $mercado])->contains('idCliente', $cliente)) {
-            $cliente = null;
-        }
-
-        // ProgramaGeneral es independiente de mercado/cliente
-        if ($programaGeneral && ! $this->opcionesProgramaGeneralFiltro()->contains('idProgramaGeneral', $programaGeneral)) {
-            $programaGeneral = null;
-        }
-
-        if ($programa && ! $this->opcionesProgramaFiltro([
-            'mercado' => $mercado,
-            'cliente' => $cliente,
-            'programa_general' => $programaGeneral,
-        ])->contains('idPrograma', $programa)) {
-            $programa = null;
-        }
-
-        if (! $programa) {
-            $presentacion = null;
-        } elseif ($presentacion && ! $this->opcionesPresentacionFiltro([
-            'mercado' => $mercado,
-            'cliente' => $cliente,
-            'programa_general' => $programaGeneral,
-            'programa' => $programa,
-        ])->contains('idPresentacion', $presentacion)) {
-            $presentacion = null;
-        }
-
-        if ($familia && ! $this->opcionesFamiliaFiltro([
-            'mercado' => $mercado,
-            'cliente' => $cliente,
-            'programa_general' => $programaGeneral,
-            'programa' => $programa,
-            'presentacion' => $presentacion,
-        ])->contains('idFamilia', $familia)) {
-            $familia = null;
-        }
-
-        return [
-            'mercado' => $mercado,
-            'cliente' => $cliente,
-            'programa_general' => $programaGeneral,
-            'familia' => $familia,
-            'programa' => $programa,
-            'presentacion' => $presentacion,
-            'q' => trim((string) ($filtros['q'] ?? '')),
-        ];
+        return $parsed;
     }
 
     public function materialPorCodigo(string $codigo): ?MaterialProgramaPL
@@ -222,6 +231,7 @@ class ProgramaGridService
                 'idPresentacion' => $datos['id_presentacion'],
                 'idMaterialPL' => $material->idMaterialPL,
                 'idCantidadCaja' => $cantidad->idCantidadCaja,
+                'idCantidadCajaRefExcel' => $cantidad->idCantidadCaja,
                 'idUso' => $datos['id_uso'],
                 'idSituado' => $datos['id_situado'],
                 'idFamilia' => $datos['id_familia'],
@@ -325,17 +335,17 @@ class ProgramaGridService
     private function queryFilas(array $filtros): Builder
     {
         $query = ProgramaFila::query()->with([
-            'mercado',
-            'cliente',
-            'variedad',
-            'programa.programaGeneral',
-            'programaGeneral',
-            'presentacion',
-            'material',
-            'cantidadCaja',
-            'uso',
-            'situado',
-            'familia',
+            'mercado:idMercado,nomMercado',
+            'cliente:idCliente,nomCliente',
+            'variedad:idVariedad,nomVariedad',
+            'programa:idPrograma,nomPrograma,idProgramaGeneral',
+            'programa.programaGeneral:idProgramaGeneral,nombre,CodigoProGeneral',
+            'programaGeneral:idProgramaGeneral,nombre,CodigoProGeneral',
+            'presentacion:idPresentacion,nomPresentacion',
+            'material:idMaterialPL,CodigoPL,nomMaterial',
+            'cantidadCaja:idCantidadCaja,cantidad',
+            'uso:idUso,nomUso',
+            'familia:idFamilia,nomFamilia',
         ]);
 
         if (! empty($filtros['mercado'])) {
@@ -361,11 +371,7 @@ class ProgramaGridService
         }
 
         if (! empty($filtros['q'])) {
-            $termino = trim($filtros['q']);
-            $query->whereHas('material', function (Builder $material) use ($termino) {
-                $material->where('CodigoPL', 'like', '%'.$termino.'%')
-                    ->orWhere('nomMaterial', 'like', '%'.$termino.'%');
-            });
+            $this->aplicarFiltroBuscarMaterial($query, trim((string) $filtros['q']));
         }
 
         return $query;
@@ -397,7 +403,112 @@ class ProgramaGridService
             $this->aplicarFiltroFamilia($query, (int) $filtros['familia']);
         }
 
+        if (! empty($filtros['q'])) {
+            $this->aplicarFiltroBuscarMaterial($query, trim((string) $filtros['q']));
+        }
+
         return $query;
+    }
+
+    /**
+     * @param  Builder<ProgramaFila>  $query
+     */
+    private function aplicarFiltroBuscarMaterial(Builder $query, string $termino): void
+    {
+        if ($termino === '') {
+            return;
+        }
+
+        $like = '%'.$termino.'%';
+        $query->leftJoin('MaterialProgramaPL as mpl_buscar', 'ProgramaFila.idMaterialPL', '=', 'mpl_buscar.idMaterialPL')
+            ->where(function (Builder $consulta) use ($like) {
+                $consulta->where('mpl_buscar.CodigoPL', 'like', $like)
+                    ->orWhere('mpl_buscar.nomMaterial', 'like', $like);
+            })
+            ->select('ProgramaFila.*');
+    }
+
+    /**
+     * @param  array<string, mixed>  $filtros
+     * @return array{mercado: ?int, cliente: ?int, programa_general: ?int, familia: ?int, programa: ?int, presentacion: ?int, q: string}
+     */
+    private function parseFiltrosEntrada(array $filtros): array
+    {
+        return [
+            'mercado' => filled($filtros['mercado'] ?? null) ? (int) $filtros['mercado'] : null,
+            'cliente' => filled($filtros['cliente'] ?? null) ? (int) $filtros['cliente'] : null,
+            'programa_general' => filled($filtros['programa_general'] ?? null) ? (int) $filtros['programa_general'] : null,
+            'programa' => filled($filtros['programa'] ?? null) ? (int) $filtros['programa'] : null,
+            'presentacion' => filled($filtros['presentacion'] ?? null) ? (int) $filtros['presentacion'] : null,
+            'familia' => filled($filtros['familia'] ?? null) ? (int) $filtros['familia'] : null,
+            'q' => trim((string) ($filtros['q'] ?? '')),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @param  array<string, Collection>  $opciones
+     * @return array<string, mixed>
+     */
+    private function ajustarFiltrosConOpciones(array $parsed, array $opciones): array
+    {
+        $out = $parsed;
+
+        if ($out['mercado'] && ! $opciones['mercados']->contains('idMercado', $out['mercado'])) {
+            $out['mercado'] = null;
+        }
+
+        if ($out['cliente'] && ! $opciones['clientes']->contains('idCliente', $out['cliente'])) {
+            $out['cliente'] = null;
+        }
+
+        if ($out['programa_general'] && ! $opciones['programasGenerales']->contains('idProgramaGeneral', $out['programa_general'])) {
+            $out['programa_general'] = null;
+        }
+
+        if ($out['programa'] && ! $opciones['programas']->contains('idPrograma', $out['programa'])) {
+            $out['programa'] = null;
+        }
+
+        if (! $out['programa']) {
+            $out['presentacion'] = null;
+        } elseif ($out['presentacion'] && ! $opciones['presentaciones']->contains('idPresentacion', $out['presentacion'])) {
+            $out['presentacion'] = null;
+        }
+
+        if ($out['familia'] && ! $opciones['familias']->contains('idFamilia', $out['familia'])) {
+            $out['familia'] = null;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @param  array{programasGenerales: Collection, programas: Collection, familias: Collection}  $opciones
+     * @return array<string, mixed>
+     */
+    private function ajustarFiltrosRecetaConOpciones(array $parsed, array $opciones): array
+    {
+        $out = $parsed;
+
+        if ($out['programa_general'] && ! $opciones['programasGenerales']->contains('idProgramaGeneral', $out['programa_general'])) {
+            $out['programa_general'] = null;
+        }
+
+        if ($out['programa'] && ! $opciones['programas']->contains('idPrograma', $out['programa'])) {
+            $out['programa'] = null;
+        }
+
+        if (! $out['programa']) {
+            $out['presentacion'] = null;
+        }
+
+        if ($out['familia'] && ! $opciones['familias']->contains('idFamilia', $out['familia'])) {
+            $out['familia'] = null;
+        }
+
+        return $out;
     }
 
     /**
@@ -562,7 +673,9 @@ class ProgramaGridService
     public function olvidarCaches(): void
     {
         Cache::forget('programa.catalogos.v1');
+        Cache::forget('programa.catalogos.v2');
         Cache::forget('catalogo.programas_consumo');
+        Cache::forget('catalogo.programas_por_general_consumo');
         $version = (int) Cache::get('programa.cache_version', 0);
         Cache::forever('programa.cache_version', $version + 1);
     }
@@ -602,7 +715,7 @@ class ProgramaGridService
     }
 
     /**
-     * Vacía la grilla Receta (filas + pallets/conformación). No toca catálogos ni proveedores.
+     * VacÃ­a la grilla Receta (filas + pallets/conformaciÃ³n). No toca catÃ¡logos ni proveedores.
      *
      * @return array{filas: int, params: int}
      */
@@ -628,3 +741,5 @@ class ProgramaGridService
         ];
     }
 }
+
+

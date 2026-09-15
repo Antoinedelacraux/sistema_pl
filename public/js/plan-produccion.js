@@ -24,17 +24,12 @@
         return formatearCelda(redondear(valor, nomFamilia, decimalesApi));
     }
 
-    function parseMatsData() {
-        var el = document.getElementById('plan-prod-mats-data');
-        if (!el) {
-            return {};
+    function materialesUrlTemplate() {
+        if (!section) {
+            return '';
         }
 
-        try {
-            return JSON.parse(el.textContent || '{}') || {};
-        } catch (e) {
-            return {};
-        }
+        return section.getAttribute('data-materiales-url') || '';
     }
 
     function weekIds() {
@@ -53,9 +48,10 @@
         }).filter(Boolean);
     }
 
-    var matsByPg = parseMatsData();
-    var semIds = weekIds();
     var section = document.getElementById('plan-prod-section-plan');
+    var matsByPg = {};
+    var matsLoading = {};
+    var semIds = weekIds();
     var editBtn = document.getElementById('plan-prod-edit');
     var saveBtn = document.getElementById('plan-prod-save');
     var cancelBtn = document.getElementById('plan-prod-cancel');
@@ -223,13 +219,64 @@
         };
     }
 
+    function ensureMateriales(pgId) {
+        var key = String(pgId || '');
+        if (!key) {
+            return Promise.resolve([]);
+        }
+
+        if (Object.prototype.hasOwnProperty.call(matsByPg, key)) {
+            return Promise.resolve(matsByPg[key]);
+        }
+
+        if (matsLoading[key]) {
+            return matsLoading[key];
+        }
+
+        var tpl = materialesUrlTemplate();
+        if (!tpl) {
+            matsByPg[key] = [];
+            return Promise.resolve([]);
+        }
+
+        var url = tpl.replace('__PG__', encodeURIComponent(key));
+        matsLoading[key] = fetch(url, { headers: { Accept: 'application/json' } })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('fetch');
+                }
+
+                return response.json();
+            })
+            .then(function (data) {
+                var items = Array.isArray(data.materiales) ? data.materiales : [];
+                matsByPg[key] = items;
+                delete matsLoading[key];
+
+                return items;
+            })
+            .catch(function () {
+                delete matsLoading[key];
+                matsByPg[key] = [];
+
+                return [];
+            });
+
+        return matsLoading[key];
+    }
+
     function buildMatRows(pgId) {
         var row = pgRow(pgId);
         if (!row || row.getAttribute('data-mats-built') === '1') {
             return;
         }
 
-        var mats = matsByPg[String(pgId)] || [];
+        var key = String(pgId);
+        if (!Object.prototype.hasOwnProperty.call(matsByPg, key)) {
+            return;
+        }
+
+        var mats = matsByPg[key] || [];
         if (!mats.length) {
             row.setAttribute('data-mats-built', '1');
             return;
@@ -324,7 +371,15 @@
     }
 
     function recalcularSemana(pgId, semId, origen) {
-        buildMatRows(pgId);
+        ensureMateriales(pgId).then(function () {
+            buildMatRows(pgId);
+            recalcularSemanaCore(pgId, semId, origen);
+        });
+
+        return;
+    }
+
+    function recalcularSemanaCore(pgId, semId, origen) {
 
         var cajas = getCajas(pgId, semId);
         var filas = matRows(pgId);
@@ -394,20 +449,22 @@
                 return;
             }
 
-            buildMatRows(pgId);
+            ensureMateriales(pgId).then(function () {
+                buildMatRows(pgId);
 
-            var filas = document.querySelectorAll('[data-plan-prod-mat="' + pgId + '"]');
-            if (!filas.length) {
-                return;
-            }
+                var filas = document.querySelectorAll('[data-plan-prod-mat="' + pgId + '"]');
+                if (!filas.length) {
+                    return;
+                }
 
-            var expanded = btn.getAttribute('aria-expanded') === 'true';
-            expanded = !expanded;
-            btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-            btn.classList.toggle('is-expanded', expanded);
+                var expanded = btn.getAttribute('aria-expanded') === 'true';
+                expanded = !expanded;
+                btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                btn.classList.toggle('is-expanded', expanded);
 
-            filas.forEach(function (tr) {
-                tr.hidden = !expanded;
+                filas.forEach(function (tr) {
+                    tr.hidden = !expanded;
+                });
             });
         });
     });

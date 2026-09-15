@@ -100,7 +100,7 @@
                             action="{{ route('programas.vaciar') }}"
                             class="receta-vaciar-form"
                             id="receta-vaciar-form"
-                            data-confirm="Se eliminarán todas las filas de la receta y los parámetros de pallets/conformación. Los catálogos no se borran. Después deberá importar el Excel nuevamente."
+                            data-confirm="Se eliminarán todas las filas de la receta y los parámetros de pallets/conformación. Los catálogos no se borran. Use esto solo si quiere reemplazar todo; para actualizar sin perder cantidades editadas en pantalla, importe Excel directamente (sin vaciar)."
                             data-confirm-title="Vaciar receta"
                             data-confirm-ok="Sí, vaciar receta"
                             data-confirm-variant="danger"

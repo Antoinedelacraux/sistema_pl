@@ -21,11 +21,12 @@ class StockResumenController extends Controller
     public function index(Request $request): View
     {
         $filtros = $this->filtrosDesdeRequest($request);
+        $filasCompletas = $this->resumenService->filasResumen($filtros);
 
         return view('resumen.index', array_merge($this->resumenService->catalogos($filtros), [
-            'filas' => $this->resumenService->filasResumenPaginadas($filtros, $request),
+            'filas' => \App\Support\GridPagination::paginateCollection($filasCompletas, $request),
             'filtros' => $filtros,
-            'contadores' => $this->resumenService->contadores(),
+            'contadores' => $this->resumenService->contadoresDesdeFilas($filasCompletas),
             'activeNav' => 'inicio',
         ]));
     }
@@ -91,3 +92,4 @@ class StockResumenController extends Controller
         return $valor > 0 ? $valor : null;
     }
 }
+

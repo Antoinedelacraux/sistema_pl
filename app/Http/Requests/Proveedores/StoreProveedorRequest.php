@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Proveedores;
 
+use App\Models\Estado;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -15,7 +16,12 @@ class StoreProveedorRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nom_proveedor' => ['required', 'string', 'max:50'],
+            'nom_proveedor' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::exists('ProveedorCatalogo', 'nomProveedor')->where('Estado', Estado::ACTIVO),
+            ],
             'codigo' => ['required', 'string', 'max:30'],
             'nom_material' => ['required', 'string', 'max:255'],
             'id_material_pl' => ['required', 'integer', Rule::exists('MaterialProgramaPL', 'idMaterialPL')],

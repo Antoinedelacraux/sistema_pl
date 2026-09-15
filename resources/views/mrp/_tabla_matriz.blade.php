@@ -2,7 +2,15 @@
     use App\Support\CantidadCajaSupport;
 
     $formatearCantidad = static function ($valor, ?string $nomFamilia = null) use (&$layoutPlan): string {
+        if (is_string($valor)) {
+            return $valor;
+        }
+
         if (is_array($valor)) {
+            if (isset($valor['texto'])) {
+                return (string) $valor['texto'];
+            }
+
             $valor = $valor['valor'] ?? 0;
         }
 
@@ -21,22 +29,35 @@
     $editablePlan = ! empty($editablePlan);
     $layoutPlan = ! empty($layoutPlan) || $editablePlan;
 
-    $celdaSemana = static function (array $fila, string $clave) use ($layoutPlan): array {
+    $celdaSemana = static function (array $fila, string $clave) use ($layoutPlan, $editablePlan): array {
         $dato = $fila[$clave] ?? 0;
         $nomFamilia = (string) ($fila['nom_familia'] ?? '');
 
         if (is_array($dato)) {
             $num = (float) ($dato['valor'] ?? 0);
-
-            return [
-                'texto' => $num == 0.0 ? '—' : (
+            $texto = $dato['texto'] ?? null;
+            if ($texto === null) {
+                $texto = $num == 0.0 ? '—' : (
                     $layoutPlan
                         ? CantidadCajaSupport::formatearVisualizacionCelda($num, $nomFamilia)
                         : number_format($num, 2, '.', '')
-                ),
+                );
+            }
+
+            return [
+                'texto' => $texto,
                 'alerta' => (bool) ($dato['alerta'] ?? false),
                 'negativo' => (bool) ($dato['negativo'] ?? false) || $num < 0 || (bool) ($dato['alerta'] ?? false),
                 'num' => $num,
+            ];
+        }
+
+        if (is_string($dato)) {
+            return [
+                'texto' => $dato,
+                'alerta' => false,
+                'negativo' => false,
+                'num' => $editablePlan ? (float) str_replace(',', '', $dato) : 0.0,
             ];
         }
 
@@ -92,6 +113,11 @@
 @foreach ($semanas as $sem)
 @php
     $clave = 'sem_'.$sem->idSemConsumo;
+@endphp
+@if (! $editablePlan && ! $resaltarNegativos && is_string($fila[$clave] ?? null))
+<td class="programas-grid__qty" data-mat="{{ $fila['idMaterialPL'] }}" data-sem="{{ $sem->idSemConsumo }}">{{ $fila[$clave] }}</td>
+@else
+@php
     $celda = $celdaSemana($fila, $clave);
     $totalFila += $celda['num'];
 @endphp
@@ -99,6 +125,7 @@
 <td class="programas-grid__qty mrp-grid__qty--editable" data-mat="{{ $fila['idMaterialPL'] }}" data-sem="{{ $sem->idSemConsumo }}" data-val="{{ $celda['num'] == 0.0 ? '' : number_format($celda['num'], 2, '.', '') }}"><span class="mrp-grid__valor">{{ $celda['texto'] }}</span></td>
 @else
 <td @class(['programas-grid__qty', 'mrp-grid__qty--alerta' => $resaltarNegativos && $celda['negativo']]) data-mat="{{ $fila['idMaterialPL'] }}" data-sem="{{ $sem->idSemConsumo }}">{{ $celda['texto'] }}</td>
+@endif
 @endif
 @endforeach
 @if ($mostrarTotal)

@@ -6,7 +6,7 @@
 @section('crumbs', 'Stock · ingresos, consumos y traslados')
 
 @push('head')
-<link rel="stylesheet" href="{{ asset('css/registro.css') }}?v=1">
+<link rel="stylesheet" href="{{ asset('css/registro.css') }}?v=4">
 @endpush
 
 @section('page')
@@ -330,6 +330,7 @@
     });
 @endphp
 <script>
+    window.registroIndexUrl = @json(route('registro.index'));
     window.registroMaterialUrl = @json(route('registro.material-por-codigo'));
     window.registroMaterialesBuscarUrl = @json(route('registro.materiales.buscar'));
     window.registroStockUrl = @json(route('registro.stock-disponible'));
@@ -354,5 +355,5 @@
 <script src="{{ asset('js/offline-queue.js') }}" defer></script>
 <script src="{{ asset('js/offline-sync-registro.js') }}?v=3" defer></script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script src="{{ asset('js/registro.js') }}?v=15" defer></script>
+<script src="{{ asset('js/registro.js') }}?v=18" defer></script>
 @endpush

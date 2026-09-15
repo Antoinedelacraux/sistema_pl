@@ -101,8 +101,8 @@
         <div
             class="mrp-section"
             id="mrp-section-consumo"
-            data-mrp-lazy="consumo"
-            data-mrp-lazy-url="{{ route('mrp.seccion', ['tipo' => 'consumo'] + array_filter($filtros ?? [])) }}"
+            data-mrp-lazy-extra
+            data-mrp-lazy-url="{{ route('mrp.secciones-extra', array_filter($filtros ?? [])) }}"
         >
             <div class="mrp-section__head">
                 <h2 class="mrp-section__title">Consumo real</h2>
@@ -111,12 +111,7 @@
             <div class="mrp-section__lazy" aria-live="polite">Cargando consumo real…</div>
         </div>
 
-        <div
-            class="mrp-section"
-            id="mrp-section-ingresos"
-            data-mrp-lazy="ingresos"
-            data-mrp-lazy-url="{{ route('mrp.seccion', ['tipo' => 'ingresos'] + array_filter($filtros ?? [])) }}"
-        >
+        <div class="mrp-section" id="mrp-section-ingresos">
             <div class="mrp-section__head">
                 <h2 class="mrp-section__title">Ingresos</h2>
             </div>
@@ -130,5 +125,5 @@
 
 @push('scripts')
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script src="{{ asset('js/mrp.js') }}?v=3" defer></script>
+<script src="{{ asset('js/mrp.js') }}?v=4" defer></script>
 @endpush

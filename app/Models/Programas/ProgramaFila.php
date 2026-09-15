@@ -26,6 +26,7 @@ class ProgramaFila extends Model
         'idPresentacion',
         'idMaterialPL',
         'idCantidadCaja',
+        'idCantidadCajaRefExcel',
         'idUso',
         'idSituado',
         'idFamilia',

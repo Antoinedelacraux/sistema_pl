@@ -10,6 +10,7 @@ use App\Services\PlanProduccion\PlanProduccionGridService;
 use App\Services\PlanProduccion\PlanProduccionImportService;
 use App\Services\PlanProduccion\PlanProduccionUpdateService;
 use App\Support\AuditoriaAccion;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -25,6 +26,15 @@ class PlanProduccionController extends Controller
         private readonly PlanProduccionExportService $exportService,
         private readonly AuditoriaService $auditoria
     ) {}
+
+    public function materiales(Request $request, int $idProgramaGeneral): JsonResponse
+    {
+        abort_unless($request->user()?->puede('plan_produccion', 'ver') ?? false, 403);
+
+        return response()->json([
+            'materiales' => $this->gridService->materialesPayload($idProgramaGeneral),
+        ]);
+    }
 
     public function index(Request $request): View
     {

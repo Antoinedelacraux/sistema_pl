@@ -51,10 +51,14 @@ class MaestroCatalogoService
             ->withQueryString();
     }
 
-    public function olvidarCaches(): void
+    public function olvidarCaches(?string $tab = null): void
     {
         $version = (int) Cache::get('maestros.cache_version', 0);
         Cache::forever('maestros.cache_version', $version + 1);
+
+        if ($tab === 'proveedor') {
+            Cache::forget('proveedor.catalogos.v2');
+        }
     }
 
     /**
@@ -78,7 +82,7 @@ class MaestroCatalogoService
                     $extras
                 ));
 
-                $this->olvidarCaches();
+                $this->olvidarCaches($tab);
 
                 return $existente->fresh();
             }
@@ -92,7 +96,7 @@ class MaestroCatalogoService
             [$columnaNombre => $nombre, 'Estado' => Estado::ACTIVO],
             $extras
         ));
-        $this->olvidarCaches();
+        $this->olvidarCaches($tab);
 
         return $registro;
     }
@@ -111,7 +115,7 @@ class MaestroCatalogoService
             [$columnaNombre => trim($nombre), 'Estado' => $estado],
             $extras
         ));
-        $this->olvidarCaches();
+        $this->olvidarCaches($tab);
 
         return $registro->fresh();
     }
@@ -127,7 +131,7 @@ class MaestroCatalogoService
         $modelClass = $definicion['model'];
 
         $modelClass::query()->findOrFail($id)->update(['Estado' => Estado::INACTIVO]);
-        $this->olvidarCaches();
+        $this->olvidarCaches($tab);
     }
 
     public function activar(string $tab, int $id): Model
@@ -137,7 +141,7 @@ class MaestroCatalogoService
 
         $registro = $modelClass::query()->findOrFail($id);
         $registro->update(['Estado' => Estado::ACTIVO]);
-        $this->olvidarCaches();
+        $this->olvidarCaches($tab);
 
         return $registro->fresh();
     }

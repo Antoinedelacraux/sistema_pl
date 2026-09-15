@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Proveedores\ImportProveedorConfirmRequest;
+use App\Http\Requests\Proveedores\ImportProveedorPreviewRequest;
 use App\Http\Requests\Proveedores\StoreProveedorRequest;
 use App\Http\Requests\Proveedores\UpdateProveedorRequest;
 use App\Services\Auditoria\AuditoriaService;
 use App\Services\Proveedores\ProveedorExportService;
 use App\Services\Proveedores\ProveedorGridService;
+use App\Services\Proveedores\ProveedorImportService;
 use App\Support\AuditoriaAccion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -20,6 +23,7 @@ class ProveedorController extends Controller
     public function __construct(
         private readonly ProveedorGridService $gridService,
         private readonly ProveedorExportService $exportService,
+        private readonly ProveedorImportService $importService,
         private readonly AuditoriaService $auditoria
     ) {}
 
@@ -28,14 +32,15 @@ class ProveedorController extends Controller
         $catalogos = $this->gridService->catalogos();
         $filtros = $this->filtrosDesdeRequest($request);
         $filas = $this->gridService->filasGrillaPaginadas($filtros, $request);
+        $columnas = $this->gridService->metadatosColumnas();
         $user = $request->user();
 
         return view('proveedores.index', array_merge($catalogos, [
             'filas' => $filas,
             'filtros' => $filtros,
             'totalFilas' => $filas->total(),
-            'columnasProveedor' => $this->gridService->columnasProveedor(),
-            'columnasConfig' => $this->gridService->columnasConfig(),
+            'columnasProveedor' => $columnas['columnasProveedor'],
+            'columnasConfig' => $columnas['columnasConfig'],
             'puedeCrear' => $user?->puede('proveedor', 'crear') ?? false,
             'puedeEditar' => $user?->puede('proveedor', 'editar') ?? false,
             'puedeEliminar' => $user?->puede('proveedor', 'eliminar') ?? false,
@@ -57,6 +62,47 @@ class ProveedorController extends Controller
             $this->filtrosDesdeRequest($request),
             $request->user()
         );
+    }
+
+    public function importPreview(ImportProveedorPreviewRequest $request): JsonResponse
+    {
+        try {
+            $resultado = $this->importService->preview($request->file('archivo_excel'));
+        } catch (\InvalidArgumentException $exception) {
+            return response()->json(['error' => $exception->getMessage()], 422);
+        }
+
+        return response()->json($resultado);
+    }
+
+    public function importConfirm(ImportProveedorConfirmRequest $request): RedirectResponse
+    {
+        $validado = $request->validated();
+        $resultado = $this->importService->confirmar(
+            $validado['nom_proveedor'],
+            $validado['filas'],
+            $this->gridService
+        );
+
+        $this->auditoria->registrar(
+            accion: AuditoriaAccion::PROVEEDOR_CREAR,
+            entidad: 'Proveedor',
+            idEntidad: null,
+            descripcion: 'Importación masiva de códigos proveedor',
+            datosNuevos: array_merge($resultado, ['nom_proveedor' => $validado['nom_proveedor']]),
+            request: $request,
+        );
+
+        return redirect()
+            ->route('proveedor.index')
+            ->with(
+                'status',
+                sprintf(
+                    'Importación: %d guardada(s), %d omitida(s).',
+                    $resultado['guardadas'],
+                    $resultado['omitidas']
+                )
+            );
     }
 
     public function store(StoreProveedorRequest $request): RedirectResponse

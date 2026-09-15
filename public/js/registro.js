@@ -14,6 +14,8 @@
     var consumoOverrides = {};
     var consumoTotalOverrides = {};
     var consumoPresentacionesCache = {};
+    var registroIndexUrl = window.registroIndexUrl || '';
+    var INGRESO_OBS_AJUSTE = 'AJUSTE TEMPORAL — revertir o anular este ingreso al corregir consumo/traslado erróneo.';
 
     var modales = {
         ingreso: document.getElementById('registro-ingreso-modal'),
@@ -390,18 +392,21 @@
     }
 
     function pintarCeldaStockConsumo(tdStock, stock) {
+        var tr = tdStock.closest('tr');
         tdStock.innerHTML = '';
         tdStock.removeAttribute('title');
 
         if (stock == null) {
             tdStock.textContent = '—';
+            if (tr) {
+                tr.removeAttribute('data-stock');
+            }
             if (!almacenConsumoSeleccionado()) {
                 tdStock.title = 'Seleccione un almacén para ver el stock';
             }
             return;
         }
 
-        var tr = tdStock.closest('tr');
         var stockBadge = document.createElement('span');
         stockBadge.className = 'registro-consumo-tabla__stock-valor';
         stockBadge.textContent = formatearNumero(
@@ -413,6 +418,117 @@
             stockBadge.classList.add('is-critico');
         }
         tdStock.appendChild(stockBadge);
+
+        if (tr) {
+            tr.setAttribute('data-stock', String(stock));
+        }
+    }
+
+    function totalConsumoFila(tr) {
+        var totalInput = tr.querySelector('[data-consumo-total]');
+        if (!totalInput) {
+            return 0;
+        }
+
+        return parseFloat(String(totalInput.value || '').replace(',', '.')) || 0;
+    }
+
+    function urlRegistroMovimientos(codigoPl, idAlmacen, tab) {
+        if (!registroIndexUrl) {
+            return '#';
+        }
+
+        var params = new URLSearchParams();
+        params.set('tab', tab || 'consumos');
+        if (idAlmacen) {
+            params.set('almacen', String(idAlmacen));
+        }
+        if (codigoPl) {
+            params.set('buscar', String(codigoPl));
+        }
+
+        var sep = registroIndexUrl.indexOf('?') >= 0 ? '&' : '?';
+
+        return registroIndexUrl + sep + params.toString();
+    }
+
+    function actualizarAlertaStockConsumo() {
+        var alertBox = document.getElementById('egreso-stock-alert');
+        var body = document.getElementById('egreso-materiales-body');
+        if (!alertBox || !body) {
+            return;
+        }
+
+        if (!almacenConsumoSeleccionado()) {
+            alertBox.hidden = true;
+            alertBox.innerHTML = '';
+            return;
+        }
+
+        var idAlmacen = document.getElementById('egreso-id-almacen').value;
+        var faltantes = [];
+
+        body.querySelectorAll('tr[data-consumo-row]').forEach(function (tr) {
+            tr.classList.remove('is-stock-insuficiente');
+            var stockRaw = tr.getAttribute('data-stock');
+            if (stockRaw === null || stockRaw === '') {
+                return;
+            }
+
+            var stock = parseFloat(stockRaw);
+            var total = totalConsumoFila(tr);
+            if (total <= 0 || total <= stock + 0.0001) {
+                return;
+            }
+
+            tr.classList.add('is-stock-insuficiente');
+            var inputMat = tr.querySelector('input[name*="[id_material_pl]"]');
+            faltantes.push({
+                idMaterial: inputMat ? inputMat.value : '',
+                codigoPl: tr.getAttribute('data-codigo-pl') || '',
+                nom: (tr.querySelector('.registro-consumo-tabla__material') || {}).textContent || 'Material',
+                total: total,
+                stock: stock,
+                falta: total - stock,
+            });
+        });
+
+        if (faltantes.length === 0) {
+            alertBox.hidden = true;
+            alertBox.innerHTML = '';
+            return;
+        }
+
+        var html = '<p class="registro-consumo-stock-alert__lead"><strong>Stock insuficiente</strong> en '
+            + faltantes.length
+            + ' material(es). Ingreso temporal → corregir consumo/traslado en Registro → revertir ese ingreso.</p><ul class="registro-consumo-stock-alert__list">';
+
+        faltantes.forEach(function (fila, index) {
+            var faltaTxt = fila.falta.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            var verUrl = urlRegistroMovimientos(fila.codigoPl, idAlmacen);
+            html += '<li><span class="registro-consumo-stock-alert__item">'
+                + escapeHtml(fila.nom) + ' · PL ' + escapeHtml(fila.codigoPl)
+                + ' · faltan ' + faltaTxt
+                + '</span> '
+                + '<a class="registro-consumo-stock-alert__link" href="' + escapeHtml(verUrl) + '" target="_blank" rel="noopener">Ver consumos</a> '
+                + '<a class="registro-consumo-stock-alert__link" href="' + escapeHtml(urlRegistroMovimientos(fila.codigoPl, idAlmacen, 'traslados')) + '" target="_blank" rel="noopener">Traslados</a> '
+                + '<button type="button" class="btn btn--outline btn--sm registro-consumo-stock-alert__btn" data-ingreso-emergencia="' + index + '">Ingreso temporal</button>'
+                + '</li>';
+        });
+
+        html += '</ul>';
+        alertBox.hidden = false;
+        alertBox.innerHTML = html;
+
+        alertBox.querySelectorAll('[data-ingreso-emergencia]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var idx = parseInt(btn.getAttribute('data-ingreso-emergencia'), 10);
+                var fila = faltantes[idx];
+                if (fila) {
+                    abrirIngresoEmergenciaDesdeConsumo(fila);
+                }
+            });
+        });
     }
 
     function actualizarHintStockConsumo() {
@@ -466,6 +582,7 @@
         });
 
         actualizarHintStockConsumo();
+        actualizarAlertaStockConsumo();
     }
 
     function sincronizarStockMaterialesConsumo() {
@@ -509,6 +626,8 @@
                 ? redondearConsumo(total, nomFamilia, decimales).toFixed(decimalesFamiliaConsumo(nomFamilia, decimales))
                 : '';
         });
+
+        actualizarAlertaStockConsumo();
     }
 
     function renderTablaMaterialesConsumo(items) {
@@ -549,6 +668,7 @@
             tr.setAttribute('data-usa-pallets', usaPallets ? '1' : '0');
             tr.setAttribute('data-es-caja', esFilaCaja ? '1' : '0');
             tr.setAttribute('data-uso', claveUso);
+            tr.setAttribute('data-codigo-pl', item.codigo_pl || '');
             if (consumoEditLineas[idMaterial]) {
                 tr.classList.add('is-edit-row');
             }
@@ -653,6 +773,7 @@
                 consumoTotalOverrides[idMaterial] = totalInput.value;
                 tr.setAttribute('data-total-manual', '1');
                 totalInput.setAttribute('data-total-manual', '1');
+                actualizarAlertaStockConsumo();
             });
             tdTotal.appendChild(totalInput);
 
@@ -722,6 +843,16 @@
 
     window.registroPrepararEgresoSubmit = prepararEnvioConsumo;
 
+    function programaEnLista(items, idProgramaSeleccionado) {
+        if (!idProgramaSeleccionado) {
+            return true;
+        }
+
+        return items.some(function (item) {
+            return String(item.id_programa) === String(idProgramaSeleccionado);
+        });
+    }
+
     function cargarProgramasConsumo(idProgramaGeneral, idProgramaSeleccionado) {
         var programa = document.getElementById('egreso-id-programa');
 
@@ -736,6 +867,11 @@
         }
 
         var offlineItems = programasOfflinePorGeneral(idProgramaGeneral);
+
+        if (offlineItems.length > 0 && (!idProgramaSeleccionado || programaEnLista(offlineItems, idProgramaSeleccionado))) {
+            pintarProgramasConsumo(programa, offlineItems, idProgramaSeleccionado);
+            return Promise.resolve();
+        }
 
         if (!consumoProgramasUrl || !navigator.onLine) {
             pintarProgramasConsumo(programa, offlineItems, idProgramaSeleccionado);
@@ -1303,7 +1439,13 @@
                 '<td>' + escapeHtml(linea.almacenCodigo) + '</td>' +
                 '<td class="registro-ingreso-preview__material">' + escapeHtml(linea.nomMaterial) + '</td>' +
                 '<td class="registro-ingreso-preview__code">' + escapeHtml(linea.codigoPl) + '</td>' +
-                '<td class="registro-ingreso-preview__qty">' + escapeHtml(linea.cantidadTexto) + '</td>' +
+                '<td class="registro-ingreso-preview__qty">' +
+                    '<input type="number" class="field__input registro-ingreso-preview__qty-input" ' +
+                    'name="lineas[' + index + '][cantidad]" ' +
+                    'value="' + escapeHtml(linea.cantidad) + '" ' +
+                    'min="0.01" step="0.01" inputmode="decimal" ' +
+                    'data-ingreso-cantidad-index="' + index + '">' +
+                '</td>' +
                 '<td class="registro-ingreso-preview__actions">' +
                     '<button type="button" class="icon-action icon-action--delete" data-quitar-ingreso-linea="' + index + '" title="Quitar">&times;</button>' +
                 '</td>' +
@@ -1311,8 +1453,7 @@
         }).join('');
 
         hidden.innerHTML = ingresoLineas.map(function (linea, index) {
-            var hiddenLinea = '<input type="hidden" name="lineas[' + index + '][id_material_pl]" value="' + linea.idMaterialPL + '">' +
-                '<input type="hidden" name="lineas[' + index + '][cantidad]" value="' + linea.cantidad + '">';
+            var hiddenLinea = '<input type="hidden" name="lineas[' + index + '][id_material_pl]" value="' + linea.idMaterialPL + '">';
 
             if (linea.idMovimiento) {
                 hiddenLinea += '<input type="hidden" name="lineas[' + index + '][id_movimiento]" value="' + linea.idMovimiento + '">';
@@ -1320,6 +1461,30 @@
 
             return hiddenLinea;
         }).join('');
+
+        body.querySelectorAll('[data-ingreso-cantidad-index]').forEach(function (input) {
+            input.addEventListener('change', function () {
+                var idx = parseInt(input.getAttribute('data-ingreso-cantidad-index'), 10);
+                if (!ingresoLineas[idx]) {
+                    return;
+                }
+
+                var val = parseFloat(String(input.value).replace(',', '.'));
+                if (!val || val <= 0) {
+                    input.value = ingresoLineas[idx].cantidad;
+                    mostrarHintIngreso('La cantidad debe ser mayor a cero.', true);
+                    return;
+                }
+
+                var cantidad = val.toFixed(2);
+                ingresoLineas[idx].cantidad = cantidad;
+                ingresoLineas[idx].cantidadTexto = val.toLocaleString('es-PE', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                });
+                input.value = cantidad;
+            });
+        });
 
         body.querySelectorAll('[data-quitar-ingreso-linea]').forEach(function (btn) {
             btn.addEventListener('click', function () {
@@ -1336,6 +1501,41 @@
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
+    }
+
+    function abrirIngresoEmergenciaDesdeConsumo(fila) {
+        var egresoAlmacen = document.getElementById('egreso-id-almacen');
+        var ingresoAlmacen = document.getElementById('ingreso-id-almacen');
+        var checkAjuste = document.getElementById('ingreso-ajuste-temporal');
+        var obs = document.getElementById('ingreso-observacion');
+
+        resetIngresoModalState();
+
+        if (egresoAlmacen && ingresoAlmacen && egresoAlmacen.value) {
+            ingresoAlmacen.value = egresoAlmacen.value;
+        }
+
+        if (checkAjuste) {
+            checkAjuste.checked = true;
+        }
+        if (obs) {
+            obs.value = INGRESO_OBS_AJUSTE;
+        }
+
+        var cantidad = Math.max(0.01, Math.round(fila.falta * 100) / 100);
+        var material = materialesMap[String(fila.idMaterial)] || {};
+
+        ingresoLineas.push({
+            idMaterialPL: String(fila.idMaterial),
+            cantidad: cantidad.toFixed(2),
+            cantidadTexto: cantidad.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            codigoPl: fila.codigoPl || material.codigo || '',
+            nomMaterial: fila.nom || material.nombre || '',
+            almacenCodigo: almacenCodigoIngreso(),
+        });
+
+        renderIngresoPreview();
+        abrirModal('ingreso');
     }
 
     function anadirLineaIngreso() {
@@ -1467,10 +1667,27 @@
         renderIngresoPreview();
         limpiarLineaIngreso();
         ocultarEstadoXmlIngreso();
+        var checkAjuste = document.getElementById('ingreso-ajuste-temporal');
+        if (checkAjuste) {
+            checkAjuste.checked = false;
+        }
         ['ingreso-archivo-pdf', 'ingreso-archivo-xml', 'ingreso-archivo-excel'].forEach(function (id) {
             var input = document.getElementById(id);
             if (input) {
                 input.value = '';
+            }
+        });
+    }
+
+    var checkAjusteIngreso = document.getElementById('ingreso-ajuste-temporal');
+    if (checkAjusteIngreso) {
+        checkAjusteIngreso.addEventListener('change', function () {
+            var obs = document.getElementById('ingreso-observacion');
+            if (!obs) {
+                return;
+            }
+            if (checkAjusteIngreso.checked && obs.value.trim() === '') {
+                obs.value = INGRESO_OBS_AJUSTE;
             }
         });
     }
@@ -1947,6 +2164,10 @@
             ? detalleTrasladoUrl.replace('__ID__', String(id))
             : detalleMovimientoUrl.replace('__ID__', String(id));
 
+        if (tipo !== 'traslado') {
+            url += (url.indexOf('?') >= 0 ? '&' : '?') + 'contexto=edicion';
+        }
+
         fetch(url, { headers: { Accept: 'application/json' } })
             .then(function (response) {
                 if (!response.ok) {
@@ -2066,18 +2287,36 @@
                         programaGeneralSelect.value = String(edit.id_programa_general);
                     }
 
+                    abrirModal('egreso');
+
+                    var ctx = data.contexto_edicion || {};
+                    var presentacionSelect = document.getElementById('egreso-id-presentacion');
+
                     cargarProgramasConsumo(edit.id_programa_general || '', edit.id_programa || '')
                         .then(function () {
+                            if (Array.isArray(ctx.presentaciones) && ctx.presentaciones.length && presentacionSelect) {
+                                consumoPresentacionesCache[String(edit.id_programa || '')] = ctx.presentaciones;
+                                pintarPresentacionesConsumo(
+                                    presentacionSelect,
+                                    ctx.presentaciones,
+                                    edit.id_presentacion || ''
+                                );
+                                return;
+                            }
+
                             return cargarPresentacionesConsumo(edit.id_programa || '', edit.id_presentacion || '');
                         })
                         .then(function () {
+                            if (Array.isArray(ctx.materiales)) {
+                                actualizarParametrosPresentacionConsumo(ctx.presentacion || null);
+                                renderTablaMaterialesConsumo(ctx.materiales);
+                                return;
+                            }
+
                             return cargarMaterialesConsumo(
                                 edit.id_programa || '',
                                 edit.id_presentacion || ''
                             );
-                        })
-                        .then(function () {
-                            abrirModal('egreso');
                         });
                     return;
                 }

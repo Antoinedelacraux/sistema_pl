@@ -31,7 +31,7 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
     Route::get('/inicio/export/pdf', [StockResumenController::class, 'exportPdf'])
         ->middleware('permiso:inicio,ver')
         ->name('inicio.export.pdf');
-    Route::redirect('/resumen', '/inicio');
+    Route::get('/resumen', [StockResumenController::class, 'index'])->middleware('permiso:inicio,ver')->name('resumen');
     Route::redirect('/resumen/export/excel', '/inicio/export/excel');
     Route::redirect('/resumen/export/pdf', '/inicio/export/pdf');
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
@@ -57,6 +57,10 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         ->whereIn('tipo', ['consumo', 'ingresos'])
         ->name('mrp.seccion');
 
+    Route::get('/mrp/secciones-extra', [MrpController::class, 'seccionesExtra'])
+        ->middleware('permiso:mrp,ver')
+        ->name('mrp.secciones-extra');
+
     Route::post('/mrp/import', [MrpController::class, 'importExcel'])
         ->middleware('permiso:mrp,crear')
         ->name('mrp.import');
@@ -72,6 +76,11 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
     Route::get('/plan-produccion', [PlanProduccionController::class, 'index'])
         ->middleware('permiso:plan_produccion,ver')
         ->name('plan-produccion.index');
+
+    Route::get('/plan-produccion/materiales/{idProgramaGeneral}', [PlanProduccionController::class, 'materiales'])
+        ->middleware('permiso:plan_produccion,ver')
+        ->whereNumber('idProgramaGeneral')
+        ->name('plan-produccion.materiales');
 
     Route::get('/plan-produccion/export/excel/{seccion}', [PlanProduccionController::class, 'exportExcel'])
         ->middleware('permiso:plan_produccion,ver')
@@ -167,6 +176,14 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
     Route::post('/proveedor', [ProveedorController::class, 'store'])
         ->middleware('permiso:proveedor,crear')
         ->name('proveedor.store');
+
+    Route::post('/proveedor/import/preview', [ProveedorController::class, 'importPreview'])
+        ->middleware('permiso:proveedor,crear')
+        ->name('proveedor.import.preview');
+
+    Route::post('/proveedor/import', [ProveedorController::class, 'importConfirm'])
+        ->middleware('permiso:proveedor,crear')
+        ->name('proveedor.import');
 
     Route::get('/proveedor/material-por-codigo', [ProveedorController::class, 'materialPorCodigo'])
         ->middleware('permiso:proveedor,ver')
@@ -313,3 +330,4 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         Route::get('/auditoria', [AuditoriaController::class, 'index'])->name('auditoria.index');
     });
 });
+

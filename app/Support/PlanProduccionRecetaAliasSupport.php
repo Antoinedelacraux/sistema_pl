@@ -4,13 +4,10 @@ namespace App\Support;
 
 final class PlanProduccionRecetaAliasSupport
 {
-    /**
-     * Plan de ventas (PG) → programas cliente en receta (col. Program del Excel).
-     *
-     * @var array<string, list<string>>
-     */
-    private const PROGRAMAS_CLIENTE_POR_PLAN = [
-        'pouch sweet globe 8.2 kg ff' => ['WELLCOME (3J)', 'WELLCOME (4J, 5J)'],
+    /** Programas cliente en receta (col. Program) que se fusionan en plan de ventas. */
+    public const PROGRAMAS_WELLCOME_CALIBRE = [
+        'WELLCOME (3J)',
+        'WELLCOME (4J, 5J)',
     ];
 
     /**
@@ -18,8 +15,28 @@ final class PlanProduccionRecetaAliasSupport
      */
     public static function programasClienteParaPlan(string $nombrePlan): array
     {
-        $clave = mb_strtolower(trim($nombrePlan));
+        if (self::planUsaFusionWellcomeCalibre($nombrePlan)) {
+            return self::PROGRAMAS_WELLCOME_CALIBRE;
+        }
 
-        return self::PROGRAMAS_CLIENTE_POR_PLAN[$clave] ?? [];
+        return [];
+    }
+
+    public static function planUsaFusionWellcomeCalibre(string $nombrePlan): bool
+    {
+        $clave = mb_strtolower(trim($nombrePlan));
+        if ($clave === '') {
+            return false;
+        }
+
+        if (str_contains($clave, 'pouch sweet globe') || str_contains($clave, 'sweet globe 8.2')) {
+            return true;
+        }
+
+        if (str_contains($clave, 'wellcome') && (str_contains($clave, '3j') || str_contains($clave, '4j') || str_contains($clave, '5j'))) {
+            return true;
+        }
+
+        return false;
     }
 }

@@ -187,11 +187,6 @@
     @include('proveedores._modal_agregar')
 @endif
 
-<datalist id="proveedor-nombres-list">
-    @foreach ($nombresProveedor as $nombre)
-        <option value="{{ $nombre }}"></option>
-    @endforeach
-</datalist>
 @endsection
 
 @push('scripts')
@@ -199,8 +194,9 @@
     window.proveedorUpdateUrlTemplate = @json(route('proveedor.update', ['nroFila' => 0]));
     window.proveedorMaterialCodigoUrl = @json(route('proveedor.material-por-codigo'));
     window.proveedorMaterialNombreUrl = @json(route('proveedor.material-por-nombre'));
+    window.proveedorImportPreviewUrl = @json(route('proveedor.import.preview'));
     window.proveedorColumnasKeys = @json(collect($columnasProveedor)->pluck('key', 'nombre'));
 </script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script src="{{ asset('js/proveedor.js') }}?v=2" defer></script>
+<script src="{{ asset('js/proveedor.js') }}?v=3" defer></script>
 @endpush

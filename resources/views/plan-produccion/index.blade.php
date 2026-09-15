@@ -46,29 +46,8 @@
     @else
         @php
             $semIds = $semanas->pluck('idSemProduccion')->map(fn ($id) => (int) $id)->values()->all();
-            $matsPayload = [];
-            foreach ($filas as $fila) {
-                $pgKey = (string) $fila['idProgramaGeneral'];
-                $matsPayload[$pgKey] = [];
-                foreach ($fila['materiales'] as $mat) {
-                    $item = [
-                        'id' => (int) $mat['id_material_pl'],
-                        'c' => $mat['codigo_pl'],
-                        'n' => $mat['descripcion'],
-                        'f' => $mat['nom_familia'] ?? '',
-                        'x' => (float) $mat['cantidad_por_caja_num'],
-                        'xf' => $mat['cantidad_por_caja'],
-                        'caja' => ! empty($mat['es_caja']) ? 1 : 0,
-                        'dec' => (int) ($mat['decimales_cantidad'] ?? 2),
-                    ];
-                    if (! empty($mat['overrides'])) {
-                        $item['o'] = $mat['overrides'];
-                    }
-                    $matsPayload[$pgKey][] = $item;
-                }
-            }
         @endphp
-        <div class="plan-prod-section plan-prod-section--plan" id="plan-prod-section-plan">
+        <div class="plan-prod-section plan-prod-section--plan" id="plan-prod-section-plan" data-materiales-url="{{ route('plan-produccion.materiales', ['idProgramaGeneral' => '__PG__']) }}">
             <div class="plan-prod-section__head">
                 <div class="plan-prod-section__head-left">
                     <h2 class="plan-prod-section__title">Plan de ventas</h2>
@@ -165,7 +144,6 @@
                     </script>
                 </div>
             </form>
-            <script type="application/json" id="plan-prod-mats-data">@json($matsPayload)</script>
         </div>
 
         @if (session()->has('plan_prod_cells_highlight'))
@@ -202,7 +180,7 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/plan-produccion.js') }}?v=7"></script>
+<script src="{{ asset('js/plan-produccion.js') }}?v=9"></script>
 <script>
 (function () {
     var importBtn = document.getElementById('plan-prod-importar-excel');

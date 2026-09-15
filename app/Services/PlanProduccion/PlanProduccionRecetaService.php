@@ -24,14 +24,10 @@ class PlanProduccionRecetaService
         }
 
         $ids = $this->idsPorNombreProgramaGeneral($nombre);
-        $programasCliente = PlanProduccionRecetaAliasSupport::programasClienteParaPlan($nombre);
-
-        if ($programasCliente !== []) {
-            $ids = array_values(array_unique(array_merge(
-                $ids,
-                $this->idsPorProgramasCliente($programasCliente)
-            )));
-        }
+        $ids = array_values(array_unique(array_merge(
+            $ids,
+            $this->idsPorFusionCalibre($nombre)
+        )));
 
         return $ids;
     }
@@ -63,6 +59,25 @@ class PlanProduccionRecetaService
             ->pluck('idProgramaGeneral')
             ->map(fn ($id) => (int) $id)
             ->all();
+    }
+
+    /**
+     * 3J + 4J/5J: siempre une recetas WELLCOME para planes Sweet Globe / Wellcome calibre.
+     *
+     * @return list<int>
+     */
+    private function idsPorFusionCalibre(string $nombrePlan): array
+    {
+        if (! PlanProduccionRecetaAliasSupport::planUsaFusionWellcomeCalibre($nombrePlan)) {
+            return [];
+        }
+
+        $programas = PlanProduccionRecetaAliasSupport::programasClienteParaPlan($nombrePlan);
+        if ($programas === []) {
+            return [];
+        }
+
+        return $this->idsPorProgramasCliente($programas);
     }
 
     /**
@@ -242,14 +257,10 @@ class PlanProduccionRecetaService
         $resultado = [];
         foreach ($nombresPorIdPg as $idPg => $nombre) {
             $ids = $this->idsPorNombreProgramaGeneral($nombre);
-            $programasCliente = PlanProduccionRecetaAliasSupport::programasClienteParaPlan($nombre);
-
-            if ($programasCliente !== []) {
-                $ids = array_values(array_unique(array_merge(
-                    $ids,
-                    $this->idsPorProgramasCliente($programasCliente)
-                )));
-            }
+            $ids = array_values(array_unique(array_merge(
+                $ids,
+                $this->idsPorFusionCalibre($nombre)
+            )));
 
             $resultado[$idPg] = $ids;
         }

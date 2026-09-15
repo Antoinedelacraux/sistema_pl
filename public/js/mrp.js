@@ -142,60 +142,91 @@
         }
     }
 
-    function cargarSeccionLazy(section) {
-        var url = section.getAttribute('data-mrp-lazy-url');
-        if (!url || section.dataset.mrpLazyLoaded === '1') {
+    function quitarPlaceholder(section) {
+        var placeholder = section && section.querySelector('.mrp-section__lazy');
+        if (placeholder) {
+            placeholder.remove();
+        }
+    }
+
+    function marcarErrorLazy(section) {
+        var placeholder = section && section.querySelector('.mrp-section__lazy');
+        if (placeholder) {
+            placeholder.textContent = 'No se pudo cargar esta sección.';
+        }
+    }
+
+    function cargarSeccionesExtra(triggerSection) {
+        var url = triggerSection.getAttribute('data-mrp-lazy-url');
+        if (!url || triggerSection.dataset.mrpLazyLoaded === '1') {
             return Promise.resolve();
         }
 
+        var sectionConsumo = document.getElementById('mrp-section-consumo');
+        var sectionIngresos = document.getElementById('mrp-section-ingresos');
+
         return fetch(url, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'text/html' },
+            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
             credentials: 'same-origin',
         })
             .then(function (res) {
                 if (!res.ok) {
                     throw new Error('HTTP ' + res.status);
                 }
-                return res.text();
+                return res.json();
             })
-            .then(function (html) {
-                var placeholder = section.querySelector('.mrp-section__lazy');
-                if (placeholder) {
-                    placeholder.remove();
+            .then(function (data) {
+                quitarPlaceholder(sectionConsumo);
+                quitarPlaceholder(sectionIngresos);
+
+                if (sectionConsumo && data.consumo) {
+                    sectionConsumo.insertAdjacentHTML('beforeend', data.consumo);
                 }
-                section.insertAdjacentHTML('beforeend', html);
-                section.dataset.mrpLazyLoaded = '1';
+                if (sectionIngresos && data.ingresos) {
+                    sectionIngresos.insertAdjacentHTML('beforeend', data.ingresos);
+                }
+
+                triggerSection.dataset.mrpLazyLoaded = '1';
+                if (sectionIngresos) {
+                    sectionIngresos.dataset.mrpLazyLoaded = '1';
+                }
                 bindScrollSync();
             })
             .catch(function () {
-                var placeholder = section.querySelector('.mrp-section__lazy');
-                if (placeholder) {
-                    placeholder.textContent = 'No se pudo cargar esta sección.';
-                }
+                marcarErrorLazy(sectionConsumo);
+                marcarErrorLazy(sectionIngresos);
             });
     }
 
-    function cargarSeccionesLazy() {
-        var secciones = Array.prototype.slice.call(document.querySelectorAll('[data-mrp-lazy-url]'));
-        if (!secciones.length) {
+    function observarSeccionesExtra() {
+        var trigger = document.querySelector('[data-mrp-lazy-extra]');
+        if (!trigger || trigger.dataset.mrpLazyLoaded === '1') {
             return;
         }
 
-        var indice = 0;
-        function cargarSiguiente() {
-            if (indice >= secciones.length) {
+        function iniciarCarga() {
+            if (trigger.dataset.mrpLazyLoaded === '1') {
                 return;
             }
-            var section = secciones[indice];
-            indice += 1;
-            cargarSeccionLazy(section).finally(function () {
-                whenIdle(cargarSiguiente);
-            });
+            cargarSeccionesExtra(trigger);
         }
 
-        whenIdle(cargarSiguiente);
+        if (typeof IntersectionObserver === 'function') {
+            var io = new IntersectionObserver(function (entries) {
+                if (!entries.length || !entries[0].isIntersecting) {
+                    return;
+                }
+                io.disconnect();
+                whenIdle(iniciarCarga);
+            }, { rootMargin: '240px 0px' });
+            io.observe(trigger);
+
+            return;
+        }
+
+        whenIdle(iniciarCarga);
     }
 
     bindScrollSync();
-    cargarSeccionesLazy();
+    observarSeccionesExtra();
 })();

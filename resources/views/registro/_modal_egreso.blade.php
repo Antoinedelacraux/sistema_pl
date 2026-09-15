@@ -85,6 +85,7 @@
                         </div>
                     </div>
                     <p class="field__hint" id="egreso-materiales-hint">Seleccione un producto para cargar los materiales desde Receta.</p>
+                    <div class="registro-consumo-stock-alert" id="egreso-stock-alert" hidden role="alert"></div>
                     <div class="registro-consumo-tabla-wrap" id="egreso-materiales-tabla-wrap" hidden>
                         <table class="registro-consumo-tabla" id="egreso-materiales-tabla">
                             <colgroup>
@@ -117,7 +118,13 @@
                 </label>
             </div>
             @if ($errors->any() && in_array(($tab ?? ''), ['consumos', 'egresos'], true))
-                <div class="alert alert--error modal__errors">{{ $errors->first() }}</div>
+                <div class="alert alert--error modal__errors">
+                    <ul class="registro-modal-errors-list">
+                        @foreach ($errors->all() as $mensaje)
+                            <li>{{ $mensaje }}</li>
+                        @endforeach
+                    </ul>
+                </div>
             @endif
             <footer class="modal__actions">
                 <button type="button" class="btn btn--outline" data-cerrar-modal-registro="egreso">Cancelar</button>

@@ -9,6 +9,7 @@ use App\Services\Mrp\MrpGridService;
 use App\Services\Mrp\MrpImportService;
 use App\Services\Mrp\MrpPlanUpdateService;
 use App\Support\AuditoriaAccion;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\View\View;
@@ -73,6 +74,42 @@ class MrpController extends Controller
         }
 
         return view('mrp._tabla_matriz', $viewData);
+    }
+
+    public function seccionesExtra(Request $request): JsonResponse|Response
+    {
+        $filtros = $this->filtrosDesdeRequest($request);
+        $datos = $this->gridService->datos($filtros, ['consumo_real', 'ingresos']);
+
+        $consumoHtml = view('mrp._tabla_matriz', [
+            'semanas' => $datos['semanas'],
+            'filas' => $datos['consumo_real'],
+            'scrollId' => 'mrp-scroll-consumo',
+            'resaltarNegativos' => true,
+            'columnasExtra' => [
+                ['key' => 'stock_actual', 'label' => 'Stock actual'],
+            ],
+            'mensajeVacio' => 'Sin materiales en el plan.',
+        ])->render();
+
+        $ingresosHtml = view('mrp._tabla_matriz', [
+            'semanas' => $datos['semanas'],
+            'filas' => $datos['ingresos'],
+            'scrollId' => 'mrp-scroll-ingresos',
+            'columnasExtra' => [
+                ['key' => 'ingreso_total', 'label' => 'Ingreso total'],
+            ],
+            'mensajeVacio' => 'Sin materiales en el plan.',
+        ])->render();
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'consumo' => $consumoHtml,
+                'ingresos' => $ingresosHtml,
+            ]);
+        }
+
+        return response($consumoHtml.$ingresosHtml);
     }
 
     public function importExcel(ImportMrpExcelRequest $request): \Illuminate\Http\RedirectResponse

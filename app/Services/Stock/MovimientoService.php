@@ -22,16 +22,6 @@ use InvalidArgumentException;
 
 class MovimientoService
 {
-    private const SQL_STOCK_SUM = "
-        COALESCE(SUM(
-            CASE
-                WHEN tipo = 'ingreso' THEN cantidad
-                WHEN tipo = 'egreso' THEN -cantidad
-                ELSE 0
-            END
-        ), 0) AS stock
-    ";
-
     /** @var list<string> */
     private const COLUMNAS_LOTE_INGRESO = [
         'idAlmacen',
@@ -93,38 +83,68 @@ class MovimientoService
     private const CACHE_TOTAL_LOTES_TTL = 45;
 
     public function __construct(
-        private readonly PowerAutomateService $powerAutomateService
+        private readonly PowerAutomateService $powerAutomateService,
+        private readonly StockAlmacenService $stockAlmacenService,
     ) {}
     public function catalogos(bool $conMateriales = true): array
     {
-        // $conMateriales se mantiene por compatibilidad; la lista completa ya no se embebe en HTML.
-        unset($conMateriales);
+        return $this->catalogosRegistro('consumos');
+    }
 
-        return [
+    /**
+     * Catálogos para Registro. En ingresos/traslados evita programas/receta pesados (AJAX en consumo).
+     *
+     * @return array<string, mixed>
+     */
+    public function catalogosRegistro(string $tab, bool $conModalConsumo = false): array
+    {
+        $data = [
             'almacenes' => Cache::remember('catalogo.almacenes.v3', 600, function () {
                 return Almacen::query()
                     ->activo()
                     ->orderBy('codigo')
                     ->get(['idAlmacen', 'codigo', 'nomAlmacen', 'Estado']);
             }),
-            'tiposConsumo' => Cache::remember('catalogo.tipos_consumo', 600, function () {
-                return TipoConsumo::query()
-                    ->activo()
-                    ->orderBy('nomTipoConsumo')
-                    ->get(['idTipoConsumo', 'nomTipoConsumo']);
-            }),
-            'programasGenerales' => Cache::remember('catalogo.programas_generales_consumo', 600, function () {
-                return app(ConsumoRecetaService::class)->programasGeneralesDisponibles();
-            }),
-            'programas' => Cache::remember('catalogo.programas_consumo', 600, function () {
-                return app(ConsumoRecetaService::class)->programasDisponibles();
-            }),
-            'programasPorGeneral' => Cache::remember('catalogo.programas_por_general_consumo', 600, function () {
-                return app(ConsumoRecetaService::class)->programasAgrupadosPorGeneral();
-            }),
-            // Autocomplete vÃ­a registro.material-por-codigo; evita ~500KB en el HTML.
             'materiales' => collect(),
         ];
+
+        $cargarConsumoCompleto = $tab === 'consumos';
+        $cargarConsumoModal = $cargarConsumoCompleto || $conModalConsumo;
+
+        if (! $cargarConsumoModal) {
+            $data['tiposConsumo'] = collect();
+            $data['programasGenerales'] = collect();
+            $data['programas'] = collect();
+            $data['programasPorGeneral'] = [];
+
+            return $data;
+        }
+
+        $data['tiposConsumo'] = Cache::remember('catalogo.tipos_consumo', 600, function () {
+            return TipoConsumo::query()
+                ->activo()
+                ->orderBy('nomTipoConsumo')
+                ->get(['idTipoConsumo', 'nomTipoConsumo']);
+        });
+        $data['programasGenerales'] = Cache::remember('catalogo.programas_generales_consumo', 600, function () {
+            return app(ConsumoRecetaService::class)->programasGeneralesDisponibles();
+        });
+
+        if (! $cargarConsumoCompleto) {
+            $data['programas'] = collect();
+            $data['programasPorGeneral'] = [];
+
+            return $data;
+        }
+
+        $data['programas'] = Cache::remember('catalogo.programas_consumo', 600, function () {
+            return app(ConsumoRecetaService::class)->programasDisponibles();
+        });
+        $data['programasPorGeneral'] = Cache::remember('catalogo.programas_por_general_consumo', 600, function () {
+            return app(ConsumoRecetaService::class)->programasAgrupadosPorGeneral();
+        });
+
+        return $data;
     }
 
     /**
@@ -286,16 +306,10 @@ class MovimientoService
 
     public function stockDisponible(int $idMaterialPL, int $idAlmacen): float
     {
-        $idsMaterial = $this->idsMaterialEquivalentes($idMaterialPL);
-
-        $stock = MovimientoStock::query()
-            ->where('estado', 1)
-            ->where('idAlmacen', $idAlmacen)
-            ->whereIn('idMaterialPL', $idsMaterial)
-            ->selectRaw(self::SQL_STOCK_SUM)
-            ->value('stock');
-
-        return (float) $stock;
+        return $this->stockAlmacenService->sumaStockEnAlmacen(
+            $this->idsMaterialEquivalentes($idMaterialPL),
+            $idAlmacen
+        );
     }
 
     /**
@@ -333,13 +347,7 @@ class MovimientoService
 
         $todosLosIds = $idsPorCodigo->flatten()->merge($idsMaterial)->unique()->values()->all();
 
-        $stocksPorId = MovimientoStock::query()
-            ->where('estado', 1)
-            ->where('idAlmacen', $idAlmacen)
-            ->whereIn('idMaterialPL', $todosLosIds)
-            ->selectRaw('idMaterialPL, '.self::SQL_STOCK_SUM)
-            ->groupBy('idMaterialPL')
-            ->pluck('stock', 'idMaterialPL');
+        $stocksPorId = $this->stockAlmacenService->mapaStockEnAlmacen($todosLosIds, $idAlmacen);
 
         $stockPorCodigo = $idsPorCodigo->map(function (array $ids) use ($stocksPorId) {
             return collect($ids)->sum(fn (int $id) => (float) ($stocksPorId[$id] ?? 0));
@@ -436,14 +444,7 @@ class MovimientoService
 
     private function stockPorIdMaterial(int $idMaterialPL, int $idAlmacen): float
     {
-        $stock = MovimientoStock::query()
-            ->where('estado', 1)
-            ->where('idAlmacen', $idAlmacen)
-            ->where('idMaterialPL', $idMaterialPL)
-            ->selectRaw(self::SQL_STOCK_SUM)
-            ->value('stock');
-
-        return (float) $stock;
+        return $this->stockAlmacenService->sumaStockEnAlmacen([$idMaterialPL], $idAlmacen);
     }
 
     public function materialPorCodigo(string $codigo): ?MaterialProgramaPL
@@ -1017,7 +1018,7 @@ class MovimientoService
     /**
      * @return array<string, mixed>
      */
-    public function detalleMovimiento(int $idMovimiento): array
+    public function detalleMovimiento(int $idMovimiento, bool $contextoEdicion = false): array
     {
         $movimiento = MovimientoStock::query()
             ->with(['almacen', 'materialPl', 'tipoConsumo', 'programa', 'presentacion', 'usuario.persona'])
@@ -1029,7 +1030,7 @@ class MovimientoService
             ? $this->lineasIngresoRelacionadas($movimiento)
             : $this->lineasEgresoRelacionadas($movimiento);
 
-        return $this->formatearDetalleMovimiento($movimiento, $lineas);
+        return $this->formatearDetalleMovimiento($movimiento, $lineas, $contextoEdicion);
     }
 
     /**
@@ -1354,13 +1355,14 @@ class MovimientoService
      * @param  Collection<int, MovimientoStock>  $lineas
      * @return array<string, mixed>
      */
-    private function formatearDetalleMovimiento(MovimientoStock $movimiento, Collection $lineas): array
+    private function formatearDetalleMovimiento(MovimientoStock $movimiento, Collection $lineas, bool $contextoEdicion = false): array
     {
         $usuario = $movimiento->usuario;
         $persona = $usuario?->persona;
         $esIngreso = $movimiento->tipo === MovimientoStock::TIPO_INGRESO;
+        $consumoReceta = app(ConsumoRecetaService::class);
 
-        return [
+        $payload = [
             'tipo' => $movimiento->tipo,
             'titulo' => $esIngreso ? 'Detalle de ingreso' : 'Detalle de consumo',
             'id' => $movimiento->idMovimiento,
@@ -1413,13 +1415,50 @@ class MovimientoService
                 'factura' => $movimiento->factura,
                 'guia' => $movimiento->guia,
                 'observacion' => $movimiento->observacion,
-                'lineas' => app(ConsumoRecetaService::class)->lineasEdicionDesdeMovimientos(
+                'lineas' => $consumoReceta->lineasEdicionDesdeMovimientos(
                     (int) $movimiento->idPrograma,
                     (int) $movimiento->idPresentacion,
                     $lineas
                 ),
+                'programa_nombre' => $movimiento->programa?->nomPrograma,
+                'presentacion_nombre' => $movimiento->presentacion?->nomPresentacion,
+                'excluir_ids_movimiento' => $lineas
+                    ->pluck('idMovimiento')
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all(),
             ],
         ];
+
+        if ($contextoEdicion && ! $esIngreso) {
+            $idPrograma = (int) $movimiento->idPrograma;
+            $idPresentacion = (int) $movimiento->idPresentacion;
+            $excluirIds = $lineas
+                ->pluck('idMovimiento')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+
+            $payload['contexto_edicion'] = [
+                'presentaciones' => $consumoReceta
+                    ->presentacionesDePrograma($idPrograma)
+                    ->map(fn ($item) => [
+                        'id_presentacion' => $item->idPresentacion,
+                        'nom_presentacion' => $item->nomPresentacion,
+                    ])
+                    ->values()
+                    ->all(),
+                'materiales' => $consumoReceta->materialesDePresentacion(
+                    $idPrograma,
+                    $idPresentacion,
+                    $excluirIds !== [] ? $excluirIds : null,
+                    (int) $movimiento->idAlmacen
+                ),
+                'presentacion' => $consumoReceta->parametrosPresentacion($idPrograma, $idPresentacion),
+            ];
+        }
+
+        return $payload;
     }
 
     private function formatearCantidad(float|string|null $cantidad): string

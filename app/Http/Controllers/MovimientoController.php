@@ -14,14 +14,15 @@ use App\Models\Stock\MovimientoStock;
 use App\Services\Auditoria\AuditoriaService;
 use App\Services\Stock\ConsumoRecetaService;
 use App\Services\Stock\GuiaXmlParserService;
+use App\Services\Stock\IngresoNotificacionService;
 use App\Services\Stock\IngresoStockExcelParserService;
 use App\Services\Stock\MovimientoService;
 use App\Services\Stock\RegistroExportService;
 use App\Support\AuditoriaAccion;
+use App\Support\DocumentoExportSupport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\Response;
@@ -35,6 +36,7 @@ class MovimientoController extends Controller
         private readonly GuiaXmlParserService $guiaXmlParserService,
         private readonly IngresoStockExcelParserService $ingresoStockExcelParserService,
         private readonly RegistroExportService $exportService,
+        private readonly IngresoNotificacionService $ingresoNotificacionService,
         private readonly AuditoriaService $auditoria
     ) {}
 
@@ -55,7 +57,12 @@ class MovimientoController extends Controller
             'buscar' => trim((string) $request->query('buscar', '')),
         ];
 
-        $viewData = array_merge($this->movimientoService->catalogos($tab !== 'consumos'), [
+        $puedeCrear = $user?->puede('registro', 'crear') ?? false;
+        $puedeEditar = $user?->puede('registro', 'editar') ?? false;
+
+        $viewData = array_merge(
+            $this->movimientoService->catalogosRegistro($tab, $puedeCrear || $puedeEditar),
+            [
             'tab' => $tab,
             'filtros' => $filtros,
             'ingresos' => $tab === 'ingresos'
@@ -67,8 +74,8 @@ class MovimientoController extends Controller
             'traslados' => $tab === 'traslados'
                 ? $this->movimientoService->listarTrasladosPaginados($filtros, $request)
                 : collect(),
-            'puedeCrear' => $user?->puede('registro', 'crear') ?? false,
-            'puedeEditar' => $user?->puede('registro', 'editar') ?? false,
+            'puedeCrear' => $puedeCrear,
+            'puedeEditar' => $puedeEditar,
             'puedeEliminar' => $user?->puede('registro', 'eliminar') ?? false,
             'activeNav' => 'registro',
         ]);
@@ -204,6 +211,12 @@ class MovimientoController extends Controller
             descripcion: 'Ingreso registrado ('.$cantidad.' '.($cantidad === 1 ? 'línea' : 'líneas').')',
             datosNuevos: $request->validated(),
             request: $request,
+        );
+
+        $usuario = $request->user();
+        $this->ingresoNotificacionService->encolarSiCorresponde(
+            $request->validated(),
+            $usuario ? DocumentoExportSupport::nombreExportador($usuario) : null
         );
 
         $mensaje = $cantidad === 1 ? 'Ingreso registrado.' : "Se registraron {$cantidad} ingresos.";
@@ -494,12 +507,6 @@ class MovimientoController extends Controller
     {
         $idProgramaGeneral = (int) $request->query('id_programa_general', 0);
 
-        Cache::forget('catalogo.programas_consumo');
-        Cache::forget('catalogo.programas_por_general_consumo');
-        if ($idProgramaGeneral > 0) {
-            Cache::forget('catalogo.programas_consumo.pg.'.$idProgramaGeneral);
-        }
-
         return response()->json([
             'programas' => $this->consumoRecetaService
                 ->programasDisponibles($idProgramaGeneral > 0 ? $idProgramaGeneral : null)
@@ -591,10 +598,12 @@ class MovimientoController extends Controller
         );
     }
 
-    public function detalleMovimiento(int $idMovimiento): JsonResponse
+    public function detalleMovimiento(Request $request, int $idMovimiento): JsonResponse
     {
+        $contextoEdicion = $request->query('contexto') === 'edicion';
+
         return response()->json(
-            $this->movimientoService->detalleMovimiento($idMovimiento)
+            $this->movimientoService->detalleMovimiento($idMovimiento, $contextoEdicion)
         );
     }
 

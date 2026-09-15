@@ -48,9 +48,15 @@
                     </label>
                 </div>
                 <p class="field__hint registro-xml-lectura registro-ingreso-archivos__status" id="ingreso-xml-lectura-status" hidden></p>
+                <label class="field field--full registro-ingreso-ajuste">
+                    <span class="field__check">
+                        <input type="checkbox" id="ingreso-ajuste-temporal" value="1">
+                        <span>Ingreso temporal (emergencia) — marcar para cuadrar después en Registro</span>
+                    </span>
+                </label>
                 <label class="field field--full">
                     <span class="field__label">Observación</span>
-                    <input type="text" class="field__input @error('observacion') is-invalid @enderror" name="observacion" value="{{ old('observacion') }}" maxlength="500">
+                    <input type="text" class="field__input @error('observacion') is-invalid @enderror" name="observacion" id="ingreso-observacion" value="{{ old('observacion') }}" maxlength="500" placeholder="Ej. ajuste temporal hasta corregir consumo erróneo">
                 </label>
             </div>
 

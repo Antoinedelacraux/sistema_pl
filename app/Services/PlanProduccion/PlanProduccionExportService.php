@@ -85,8 +85,9 @@ class PlanProduccionExportService
             $filasNegrita[] = count($filas);
             $filas[] = $this->filaVentasPrograma($fila, $datos['semanas']);
 
-            if ($desglose && ! empty($fila['materiales'])) {
-                foreach ($fila['materiales'] as $material) {
+            if ($desglose) {
+                $materiales = $this->gridService->materialesDetalle((int) $fila['idProgramaGeneral']);
+                foreach ($materiales as $material) {
                     $filas[] = $this->filaVentasMaterial($fila, $material, $datos['semanas']);
                 }
             }

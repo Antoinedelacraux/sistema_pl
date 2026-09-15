@@ -70,12 +70,12 @@ class StoreEgresoRequest extends FormRequest
                 $disponible = $movimiento->stockDisponible((int) $linea['id_material_pl'], $idAlmacen);
                 if ($linea['cantidad'] > $disponible) {
                     $nombre = $linea['nom_material'] ?: 'material';
+                    $faltante = max(0, round((float) $linea['cantidad'] - $disponible, 2));
                     $validator->errors()->add(
                         'lineas',
                         'Stock insuficiente de '.$nombre.'. Disponible: '.number_format($disponible, 2, '.', '')
+                        .($faltante > 0 ? ' · Faltan: '.number_format($faltante, 2, '.', '') : '')
                     );
-
-                    return;
                 }
             }
         });

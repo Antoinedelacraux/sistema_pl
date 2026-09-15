@@ -102,10 +102,17 @@ class StockResumenService
         return $this->aplicarFiltros($filas, $filtros);
     }
 
-    public function contadores(): array
+    public function contadores(array $filtros = []): array
     {
-        $filas = $this->filasResumen();
+        return $this->contadoresDesdeFilas($this->filasResumen($filtros));
+    }
 
+    /**
+     * @param  \Illuminate\Support\Collection<int, object>  $filas
+     * @return array{total: int, critico: int, alerta: int, saludable: int}
+     */
+    public function contadoresDesdeFilas(Collection $filas): array
+    {
         return [
             'total' => $filas->count(),
             'critico' => $filas->where('estadoStock', 'critico')->count(),
@@ -231,3 +238,4 @@ class StockResumenService
         return 'saludable';
     }
 }
+

@@ -7,6 +7,8 @@ use App\Models\Programas\MaterialProgramaPL;
 use App\Models\Stock\MovimientoStock;
 use App\Models\Stock\PlanConsumo;
 use App\Models\Stock\SemConsumo;
+use App\Support\CantidadCajaSupport;
+use App\Services\Stock\StockAlmacenService;
 use App\Support\MaterialFamiliaSupport;
 use App\Support\PlanConsumoOrdenSupport;
 use Illuminate\Support\Collection;
@@ -120,14 +122,16 @@ class MrpGridService
                 $filaPlan = $base;
                 foreach ($semanas as $sem) {
                     $clave = $id.'|'.(int) $sem->idSemConsumo;
-                    $filaPlan['sem_'.$sem->idSemConsumo] = (float) ($planPorMaterial[$clave] ?? 0);
+                    $filaPlan['sem_'.$sem->idSemConsumo] = $this->textoCeldaPlan(
+                        (float) ($planPorMaterial[$clave] ?? 0)
+                    );
                 }
                 $plan[] = $filaPlan;
             }
 
             if ($necesitaConsumo) {
                 $filaConsumo = array_merge($base, [
-                    'stock_actual' => (float) ($stockPorMaterial[$id] ?? 0),
+                    'stock_actual' => $this->textoCeldaDecimal((float) ($stockPorMaterial[$id] ?? 0)),
                 ]);
                 $saldoProyectado = (float) ($stockPorMaterial[$id] ?? 0);
 
@@ -148,27 +152,23 @@ class MrpGridService
                             ? $saldoProyectado
                             : ($saldoProyectado - $pendiente);
 
-                        $filaConsumo['sem_'.$idSem] = [
-                            'valor' => $valorProyectado,
-                            'alerta' => true,
-                            'negativo' => true,
-                        ];
+                        $filaConsumo['sem_'.$idSem] = $this->celdaConsumoReal(
+                            $valorProyectado,
+                            true,
+                            true
+                        );
                     } elseif ($consumoSem > 0.0) {
                         $stockParaDias = $saldoProyectado + $consumoSem;
                         $consumoDiario = $consumoSem / 7.0;
                         $diasStock = $consumoDiario > 0.0 ? round($stockParaDias / $consumoDiario, 2) : 0.0;
 
-                        $filaConsumo['sem_'.$idSem] = [
-                            'valor' => $diasStock,
-                            'alerta' => $diasStock < 7.0,
-                            'negativo' => false,
-                        ];
+                        $filaConsumo['sem_'.$idSem] = $this->celdaConsumoReal(
+                            $diasStock,
+                            $diasStock < 7.0,
+                            false
+                        );
                     } else {
-                        $filaConsumo['sem_'.$idSem] = [
-                            'valor' => 0.0,
-                            'alerta' => false,
-                            'negativo' => false,
-                        ];
+                        $filaConsumo['sem_'.$idSem] = $this->celdaConsumoReal(0.0, false, false);
                     }
 
                     $saldoProyectado -= $pendiente;
@@ -184,11 +184,11 @@ class MrpGridService
                 foreach ($semanas as $sem) {
                     $clave = $id.'|'.(int) $sem->idSemConsumo;
                     $ingSem = (float) ($ingresoPorMaterial[$clave] ?? 0);
-                    $filaIngreso['sem_'.$sem->idSemConsumo] = $ingSem;
+                    $filaIngreso['sem_'.$sem->idSemConsumo] = $this->textoCeldaDecimal($ingSem);
                     $totalIngreso += $ingSem;
                 }
 
-                $filaIngreso['ingreso_total'] = $totalIngreso;
+                $filaIngreso['ingreso_total'] = $this->textoCeldaDecimal($totalIngreso);
                 $ingresos[] = $filaIngreso;
             }
         }
@@ -309,22 +309,7 @@ class MrpGridService
      */
     private function stockPorMaterial(array $idsMaterial): array
     {
-        if ($idsMaterial === []) {
-            return [];
-        }
-
-        $mapa = [];
-        DB::table('vw_StockAlmacenDetalle')
-            ->selectRaw('idMaterialPL, COALESCE(SUM(stock), 0) AS stock_total')
-            ->whereIn('idMaterialPL', $idsMaterial)
-            ->groupBy('idMaterialPL')
-            ->orderBy('idMaterialPL')
-            ->lazy(500)
-            ->each(function ($fila) use (&$mapa) {
-                $mapa[(int) $fila->idMaterialPL] = (float) $fila->stock_total;
-            });
-
-        return $mapa;
+        return app(StockAlmacenService::class)->mapaStockTotalPorMaterial($idsMaterial);
     }
 
     /**
@@ -372,5 +357,32 @@ class MrpGridService
             });
 
         return $mapa;
+    }
+
+    private function textoCeldaPlan(float $num): string
+    {
+        return CantidadCajaSupport::formatearVisualizacionCelda($num, null);
+    }
+
+    private function textoCeldaDecimal(float $num): string
+    {
+        if ($num == 0.0) {
+            return '—';
+        }
+
+        return number_format($num, 2, '.', '');
+    }
+
+    /**
+     * @return array{valor: float, alerta: bool, negativo: bool, texto: string}
+     */
+    private function celdaConsumoReal(float $valor, bool $alerta, bool $negativo): array
+    {
+        return [
+            'valor' => $valor,
+            'alerta' => $alerta,
+            'negativo' => $negativo,
+            'texto' => $this->textoCeldaDecimal($valor),
+        ];
     }
 }
