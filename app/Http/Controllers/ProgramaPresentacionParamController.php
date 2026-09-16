@@ -21,12 +21,13 @@ class ProgramaPresentacionParamController extends Controller
 
     public function index(Request $request): View
     {
-        $filtros = $this->gridService->normalizarFiltros([
+        $resuelto = $this->gridService->resolverFiltrosReceta([
             'programa_general' => $request->query('programa_general'),
             'programa' => $request->query('programa'),
             'presentacion' => $request->query('presentacion'),
             'q' => trim((string) $request->query('buscar', '')),
         ]);
+        $filtros = $resuelto['filtros'];
 
         $combinaciones = $this->paramService->listarPaginado([
             'programa_general' => $filtros['programa_general'],
@@ -35,8 +36,8 @@ class ProgramaPresentacionParamController extends Controller
             'buscar' => $filtros['q'],
         ], $request);
 
-        return view('programas.presentacion_params', array_merge($this->gridService->catalogos(), [
-            'catalogosFiltro' => $this->gridService->catalogosFiltro($filtros),
+        return view('programas.presentacion_params', [
+            'catalogosFiltro' => $resuelto['catalogos_filtro'],
             'combinaciones' => $combinaciones,
             'filtros' => [
                 'programa_general' => $filtros['programa_general'],
@@ -47,7 +48,7 @@ class ProgramaPresentacionParamController extends Controller
             'puedeEditar' => $request->user()?->puede('programas', 'editar') ?? false,
             'activeNav' => 'programas',
             'recetaTab' => 'params',
-        ]));
+        ]);
     }
 
     public function store(StoreProgramaPresentacionParamRequest $request): RedirectResponse

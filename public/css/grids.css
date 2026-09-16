@@ -1,0 +1,303 @@
+/* Grillas compartidas: programas-grid, grid-table, export */
+
+.export-icon{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--app-line);
+    text-decoration: none;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.export-icon__svg{
+    width: 18px;
+    height: 18px;
+}
+
+.export-icon--pdf{
+    color: #dc2626;
+    background: #fef2f2;
+}
+
+.export-icon--pdf:hover{
+    background: #fee2e2;
+    border-color: rgba(220, 38, 38, 0.35);
+}
+
+.export-icon--excel{
+    color: #059669;
+    background: #ecfdf5;
+}
+
+.export-icon--excel:hover{
+    background: #d1fae5;
+    border-color: rgba(5, 150, 105, 0.35);
+}
+
+.export-icon:active{
+    transform: scale(0.96);
+}
+/* ── Tabla unificada (estilo inventario) ───────────────────── */
+
+.grid-table-section,
+.inventario-table-section{
+    background: var(--app-surface);
+}
+
+.grid-table-head,
+.inventario-table-head{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px 10px;
+}
+
+.grid-table-count,
+.inventario-table-count{
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--purple-700);
+}
+
+.grid-table-section .programas-grid-wrap,
+.inventario-table-section .programas-grid-wrap{
+    border-top: none;
+    padding: 0 14px;
+}
+.programas-grid-wrap{
+    overflow: auto;
+    max-height: calc(100vh - 210px);
+    border-top: 1px solid var(--app-line);
+    width: 100%;
+    background: var(--app-surface);
+}
+
+.programas-grid{
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 11px;
+}
+
+.programas-grid thead{
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.programas-grid__th{
+    padding: 8px 7px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #fff;
+    background: var(--purple-700);
+    border-right: 1px solid rgba(255, 255, 255, 0.12);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    white-space: normal;
+    vertical-align: middle;
+    line-height: 1.25;
+    hyphens: auto;
+}
+
+.programas-grid__th--img,
+.programas-grid__cell--img{
+    width: 88px;
+    min-width: 88px;
+    text-align: center;
+}
+
+.field--checkbox{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.field--checkbox input{
+    width: auto;
+    margin: 0;
+}
+
+.field__input--file{
+    padding: 6px 8px;
+    height: auto;
+}
+
+.field__hint{
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--ink-muted);
+}
+
+.field__hint[hidden]{
+    display: none !important;
+}
+
+/* ── Tabla unificada (estilo inventario) ───────────────────── */
+
+.grid-table-section,
+.inventario-table-section{
+    background: var(--app-surface);
+}
+
+.grid-table-head,
+.inventario-table-head{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px 10px;
+}
+
+.grid-table-count,
+.inventario-table-count{
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--purple-700);
+}
+
+.grid-table-section .programas-grid-wrap,
+.inventario-table-section .programas-grid-wrap{
+    border-top: none;
+    padding: 0 14px;
+}
+
+.programas-grid__th--stack{
+    min-width: 0;
+    hyphens: none;
+    word-break: keep-all;
+    overflow-wrap: normal;
+}
+
+.programas-grid__th--num{
+    width: 48px;
+    min-width: 48px;
+    padding-left: 6px;
+    padding-right: 6px;
+}
+
+.programas-grid td{
+    padding: 6px 7px;
+    border-right: 1px solid var(--app-line);
+    border-bottom: 1px solid var(--app-line);
+    vertical-align: top;
+    background: var(--app-surface);
+    color: var(--ink);
+    line-height: 1.35;
+}
+
+.programas-grid__cell{
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.programas-grid__cell--short{
+    white-space: nowrap;
+}
+
+.programas-grid tbody tr:nth-child(even) td{
+    background: var(--muted-surface);
+}
+
+.programas-grid tbody tr:hover td{
+    background: var(--purple-soft);
+}
+
+.programas-grid__num{
+    text-align: center;
+    color: var(--ink-muted);
+    font-weight: 600;
+    width: 48px;
+    min-width: 48px;
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--app-surface);
+    box-shadow: 1px 0 0 var(--app-line);
+}
+
+.programas-grid tbody tr:nth-child(even) .programas-grid__num{
+    background: var(--muted-surface);
+}
+
+.programas-grid tbody tr:hover .programas-grid__num{
+    background: var(--purple-soft);
+}
+
+.programas-grid__code{
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    font-size: 10.5px;
+    white-space: nowrap;
+    letter-spacing: -0.01em;
+    vertical-align: top;
+}
+
+.programas-grid__material{
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    font-size: 10.5px;
+    line-height: 1.4;
+    vertical-align: top;
+}
+
+.programas-grid__qty{
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    font-weight: 600;
+}
+body.page-app[data-theme="dark"] .programas-grid td{
+    background: var(--app-surface);
+}
+
+body.page-app[data-theme="dark"] .programas-grid tbody tr:nth-child(even) td{
+    background: var(--muted-surface);
+}
+
+body.page-app[data-theme="dark"] .programas-grid__num{
+    background: var(--app-surface);
+}
+
+body.page-app[data-theme="dark"] .programas-grid tbody tr:nth-child(even) .programas-grid__num{
+    background: var(--muted-surface);
+}
+body.page-app[data-theme="dark"] .grid-table-count,
+body.page-app[data-theme="dark"] .inventario-table-count{
+    color: var(--ink-soft);
+}
+
+body.page-app[data-theme="dark"] .export-icon--pdf{
+    background: rgba(220, 38, 38, 0.12);
+}
+
+body.page-app[data-theme="dark"] .export-icon--excel{
+    background: rgba(5, 150, 105, 0.12);
+}
+
+/* OBSR badge base en grillas */
+.programas-grid__obsr-valor{
+    display: inline-block;
+    max-width: 100%;
+    min-width: 0;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 10px;
+    line-height: 1.25;
+    white-space: nowrap;
+    vertical-align: middle;
+}

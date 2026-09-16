@@ -6,7 +6,8 @@
 @section('crumbs', 'Planeamiento · materiales por receta')
 
 @push('head')
-<link rel="stylesheet" href="{{ asset('css/receta.css') }}?v=1">
+<link rel="stylesheet" href="{{ asset('css/receta.css') }}?v=2">
+<link rel="stylesheet" href="{{ asset('css/receta-layout.css') }}?v=1">
 @endpush
 
 @section('page')
@@ -30,9 +31,11 @@
                 action="{{ route('programas.index') }}"
                 class="receta-filters"
                 data-grid-filters
+                data-grid-filters-ajax="1"
+                data-grid-filters-region="programas-grid-region"
                 data-clear-url="{{ route('programas.index') }}"
             >
-                <div class="receta-filters__main">
+                <div class="receta-filters__main" data-grid-sync-id="programas-filtros-opciones">
                     <label class="receta-cmd-field receta-filters__field">
                         <span class="receta-cmd-label">Prog. General</span>
                         <select id="receta-filtro-programa-general" name="programa_general" class="receta-cmd-input">
@@ -120,7 +123,8 @@
         </div>
     </div>
 
-    <div class="grid-table-section">
+    <div class="grid-table-section" id="programas-grid-region">
+        <span hidden data-grid-sync-stat=".receta-toolbar__stat-value">{{ number_format($totalProgramas) }}</span>
         <div class="programas-grid-wrap">
             <table class="programas-grid">
             <thead>
@@ -270,7 +274,7 @@
 </script>
 <script src="{{ asset('js/receta-filters.js') }}?v=2" defer></script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script src="{{ asset('js/receta.js') }}?v=6" defer></script>
+<script src="{{ asset('js/receta.js') }}?v=7" defer></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         var importBtn = document.getElementById('receta-importar-excel');

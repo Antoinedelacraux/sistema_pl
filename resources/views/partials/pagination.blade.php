@@ -17,11 +17,11 @@
             @if ($paginator->onFirstPage())
                 <span class="grid-pagination__nav is-disabled" aria-disabled="true" aria-label="Página anterior">‹</span>
             @else
-                <a href="{{ $paginator->previousPageUrl() }}" class="grid-pagination__nav" aria-label="Página anterior">‹</a>
+                <a href="{{ $paginator->previousPageUrl() }}" class="grid-pagination__nav" aria-label="Página anterior"@if (!empty($gridAjaxRegion)) data-grid-ajax-page data-grid-region="{{ $gridAjaxRegion }}"@endif>‹</a>
             @endif
 
             @if ($inicio > 1)
-                <a href="{{ $paginator->url(1) }}" class="grid-pagination__page">1</a>
+                <a href="{{ $paginator->url(1) }}" class="grid-pagination__page"@if (!empty($gridAjaxRegion)) data-grid-ajax-page data-grid-region="{{ $gridAjaxRegion }}"@endif>1</a>
                 @if ($inicio > 2)
                     <span class="grid-pagination__ellipsis">…</span>
                 @endif
@@ -31,7 +31,7 @@
                 @if ($page === $paginaActual)
                     <span class="grid-pagination__page is-active" aria-current="page">{{ $page }}</span>
                 @else
-                    <a href="{{ $paginator->url($page) }}" class="grid-pagination__page">{{ $page }}</a>
+                    <a href="{{ $paginator->url($page) }}" class="grid-pagination__page"@if (!empty($gridAjaxRegion)) data-grid-ajax-page data-grid-region="{{ $gridAjaxRegion }}"@endif>{{ $page }}</a>
                 @endif
             @endfor
 
@@ -39,11 +39,11 @@
                 @if ($fin < $totalPaginas - 1)
                     <span class="grid-pagination__ellipsis">…</span>
                 @endif
-                <a href="{{ $paginator->url($totalPaginas) }}" class="grid-pagination__page">{{ $totalPaginas }}</a>
+                <a href="{{ $paginator->url($totalPaginas) }}" class="grid-pagination__page"@if (!empty($gridAjaxRegion)) data-grid-ajax-page data-grid-region="{{ $gridAjaxRegion }}"@endif>{{ $totalPaginas }}</a>
             @endif
 
             @if ($paginator->hasMorePages())
-                <a href="{{ $paginator->nextPageUrl() }}" class="grid-pagination__nav" aria-label="Página siguiente">›</a>
+                <a href="{{ $paginator->nextPageUrl() }}" class="grid-pagination__nav" aria-label="Página siguiente"@if (!empty($gridAjaxRegion)) data-grid-ajax-page data-grid-region="{{ $gridAjaxRegion }}"@endif>›</a>
             @else
                 <span class="grid-pagination__nav is-disabled" aria-disabled="true" aria-label="Página siguiente">›</span>
             @endif

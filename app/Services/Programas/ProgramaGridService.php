@@ -53,11 +53,6 @@ class ProgramaGridService
             ->withQueryString();
     }
 
-    public function totalFilas(array $filtros = []): int
-    {
-        return $this->queryFilas($filtros)->count();
-    }
-
     /** Programas distintos presentes en la grilla de receta (no el catÃ¡logo CRUD). */
     public function totalProgramasDistintos(array $filtros = []): int
     {
@@ -98,38 +93,10 @@ class ProgramaGridService
     }
 
     /**
-     * Opciones de filtros segÃºn selecciÃ³n previa (datos reales en receta).
-     *
-     * @param  array{mercado?: mixed, cliente?: mixed, programa_general?: mixed, programa?: mixed, presentacion?: mixed, familia?: mixed}  $filtros
-     * @return array{mercados: Collection, clientes: Collection, programasGenerales: Collection, programas: Collection, presentaciones: Collection, familias: Collection}
-     */
-    public function catalogosFiltro(array $filtros = []): array
-    {
-        $version = (int) Cache::get('programa.cache_version', 0);
-        $cacheKey = 'programa.catalogos_filtro.v'.$version.'.'.md5(json_encode([
-            'mercado' => $filtros['mercado'] ?? null,
-            'cliente' => $filtros['cliente'] ?? null,
-            'programa_general' => $filtros['programa_general'] ?? null,
-            'programa' => $filtros['programa'] ?? null,
-            'presentacion' => $filtros['presentacion'] ?? null,
-            'familia' => $filtros['familia'] ?? null,
-        ]));
-
-        return Cache::remember($cacheKey, self::CACHE_TTL, fn () => [
-            'mercados' => $this->opcionesMercadoFiltro(),
-            'clientes' => $this->opcionesClienteFiltro($filtros),
-            'programasGenerales' => $this->opcionesProgramaGeneralFiltro(),
-            'programas' => $this->opcionesProgramaFiltro($filtros),
-            'presentaciones' => $this->opcionesPresentacionFiltro($filtros),
-            'familias' => $this->opcionesFamiliaFiltro($filtros),
-        ]);
-    }
-
-    /**
-     * Solo opciones usadas en la grilla Receta (menos consultas que catalogosFiltro completo).
+     * Opciones de filtros según selección previa (datos reales en receta).
      *
      * @param  array<string, mixed>  $filtros
-     * @return array{programasGenerales: Collection, programas: Collection, familias: Collection}
+     * @return array{programasGenerales: Collection, programas: Collection, presentaciones: Collection, familias: Collection}
      */
     public function catalogosFiltroReceta(array $filtros = []): array
     {
@@ -144,6 +111,7 @@ class ProgramaGridService
         return Cache::remember($cacheKey, self::CACHE_TTL, fn () => [
             'programasGenerales' => $this->opcionesProgramaGeneralFiltro(),
             'programas' => $this->opcionesProgramaFiltro($filtros),
+            'presentaciones' => $this->opcionesPresentacionFiltro($filtros),
             'familias' => $this->opcionesFamiliaFiltro($filtros),
         ]);
     }
@@ -172,26 +140,6 @@ class ProgramaGridService
             'filtros' => $parsed,
             'catalogos_filtro' => $this->catalogosFiltroReceta($parsed),
         ];
-    }
-
-    /**
-     * @param  array{mercado?: mixed, cliente?: mixed, programa_general?: mixed, programa?: mixed, presentacion?: mixed, familia?: mixed, q?: string}  $filtros
-     * @return array{mercado: mixed, cliente: mixed, programa_general: mixed, familia: mixed, programa: mixed, presentacion: mixed, q: string}
-     */
-    public function normalizarFiltros(array $filtros): array
-    {
-        $parsed = $this->parseFiltrosEntrada($filtros);
-
-        for ($i = 0; $i < 5; $i++) {
-            $opciones = $this->catalogosFiltro($parsed);
-            $ajustado = $this->ajustarFiltrosConOpciones($parsed, $opciones);
-            if ($ajustado === $parsed) {
-                return $parsed;
-            }
-            $parsed = $ajustado;
-        }
-
-        return $parsed;
     }
 
     public function materialPorCodigo(string $codigo): ?MaterialProgramaPL
@@ -447,45 +395,7 @@ class ProgramaGridService
 
     /**
      * @param  array<string, mixed>  $parsed
-     * @param  array<string, Collection>  $opciones
-     * @return array<string, mixed>
-     */
-    private function ajustarFiltrosConOpciones(array $parsed, array $opciones): array
-    {
-        $out = $parsed;
-
-        if ($out['mercado'] && ! $opciones['mercados']->contains('idMercado', $out['mercado'])) {
-            $out['mercado'] = null;
-        }
-
-        if ($out['cliente'] && ! $opciones['clientes']->contains('idCliente', $out['cliente'])) {
-            $out['cliente'] = null;
-        }
-
-        if ($out['programa_general'] && ! $opciones['programasGenerales']->contains('idProgramaGeneral', $out['programa_general'])) {
-            $out['programa_general'] = null;
-        }
-
-        if ($out['programa'] && ! $opciones['programas']->contains('idPrograma', $out['programa'])) {
-            $out['programa'] = null;
-        }
-
-        if (! $out['programa']) {
-            $out['presentacion'] = null;
-        } elseif ($out['presentacion'] && ! $opciones['presentaciones']->contains('idPresentacion', $out['presentacion'])) {
-            $out['presentacion'] = null;
-        }
-
-        if ($out['familia'] && ! $opciones['familias']->contains('idFamilia', $out['familia'])) {
-            $out['familia'] = null;
-        }
-
-        return $out;
-    }
-
-    /**
-     * @param  array<string, mixed>  $parsed
-     * @param  array{programasGenerales: Collection, programas: Collection, familias: Collection}  $opciones
+     * @param  array{programasGenerales: Collection, programas: Collection, presentaciones: Collection, familias: Collection}  $opciones
      * @return array<string, mixed>
      */
     private function ajustarFiltrosRecetaConOpciones(array $parsed, array $opciones): array
@@ -501,6 +411,8 @@ class ProgramaGridService
         }
 
         if (! $out['programa']) {
+            $out['presentacion'] = null;
+        } elseif ($out['presentacion'] && ! $opciones['presentaciones']->contains('idPresentacion', $out['presentacion'])) {
             $out['presentacion'] = null;
         }
 
@@ -527,39 +439,6 @@ class ProgramaGridService
         }
 
         return $resultado;
-    }
-
-    private function opcionesMercadoFiltro(): Collection
-    {
-        return $this->memoOpcionesFiltro('mercado', function (): Collection {
-            $ids = ProgramaFila::query()->distinct()->pluck('idMercado');
-
-            return Mercado::query()
-                ->activo()
-                ->whereIn('idMercado', $ids)
-                ->orderBy('nomMercado')
-                ->get();
-        });
-    }
-
-    /**
-     * @param  array<string, mixed>  $filtros
-     */
-    private function opcionesClienteFiltro(array $filtros): Collection
-    {
-        $mercado = $filtros['mercado'] ?? null;
-
-        return $this->memoOpcionesFiltro('cliente:'.(string) $mercado, function () use ($filtros): Collection {
-            $ids = $this->queryIdsReceta($this->soloFiltros($filtros, ['mercado']))
-                ->distinct()
-                ->pluck('idCliente');
-
-            return Cliente::query()
-                ->activo()
-                ->whereIn('idCliente', $ids)
-                ->orderBy('nomCliente')
-                ->get();
-        });
     }
 
     private function opcionesProgramaGeneralFiltro(): Collection
@@ -592,10 +471,10 @@ class ProgramaGridService
      */
     private function opcionesProgramaFiltro(array $filtros): Collection
     {
-        $cacheKey = 'programa:'.md5(json_encode($this->soloFiltros($filtros, ['mercado', 'cliente', 'programa_general'])));
+        $cacheKey = 'programa:'.md5(json_encode($this->soloFiltros($filtros, ['programa_general'])));
 
         return $this->memoOpcionesFiltro($cacheKey, function () use ($filtros): Collection {
-            $ids = $this->queryIdsReceta($this->soloFiltros($filtros, ['mercado', 'cliente', 'programa_general']))
+            $ids = $this->queryIdsReceta($this->soloFiltros($filtros, ['programa_general']))
                 ->distinct()
                 ->pluck('idPrograma');
 
@@ -616,10 +495,10 @@ class ProgramaGridService
             return collect();
         }
 
-        $cacheKey = 'presentacion:'.md5(json_encode($this->soloFiltros($filtros, ['mercado', 'cliente', 'programa'])));
+        $cacheKey = 'presentacion:'.md5(json_encode($this->soloFiltros($filtros, ['programa_general', 'programa'])));
 
         return $this->memoOpcionesFiltro($cacheKey, function () use ($filtros): Collection {
-            $ids = $this->queryIdsReceta($this->soloFiltros($filtros, ['mercado', 'cliente', 'programa']))
+            $ids = $this->queryIdsReceta($this->soloFiltros($filtros, ['programa_general', 'programa']))
                 ->distinct()
                 ->pluck('idPresentacion');
 
@@ -637,12 +516,12 @@ class ProgramaGridService
     private function opcionesFamiliaFiltro(array $filtros): Collection
     {
         $cacheKey = 'familia:'.md5(json_encode($this->soloFiltros($filtros, [
-            'mercado', 'cliente', 'programa', 'presentacion',
+            'programa_general', 'programa', 'presentacion',
         ])));
 
         return $this->memoOpcionesFiltro($cacheKey, function () use ($filtros): Collection {
             $idsMaterial = $this->queryIdsReceta($this->soloFiltros($filtros, [
-                'mercado', 'cliente', 'programa', 'presentacion',
+                'programa_general', 'programa', 'presentacion',
             ]))
                 ->distinct()
                 ->pluck('idMaterialPL');
@@ -672,12 +551,13 @@ class ProgramaGridService
 
     public function olvidarCaches(): void
     {
-        Cache::forget('programa.catalogos.v1');
         Cache::forget('programa.catalogos.v2');
         Cache::forget('catalogo.programas_consumo');
         Cache::forget('catalogo.programas_por_general_consumo');
         $version = (int) Cache::get('programa.cache_version', 0);
         Cache::forever('programa.cache_version', $version + 1);
+        $paramsVersion = (int) Cache::get('programa.presentacion_params.cache_version', 0);
+        Cache::forever('programa.presentacion_params.cache_version', $paramsVersion + 1);
     }
 
     /**

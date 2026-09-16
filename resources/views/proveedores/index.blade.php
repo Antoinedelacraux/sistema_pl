@@ -5,6 +5,10 @@
 @section('heading', 'Proveedor')
 @section('crumbs', 'Planeamiento · códigos TGF y SAFCO')
 
+@push('head')
+<link rel="stylesheet" href="{{ asset('css/proveedor.css') }}?v=1">
+@endpush
+
 @section('page')
 @php
     $totalColumnas = count($columnasConfig);
@@ -24,6 +28,8 @@
                 action="{{ route('proveedor.index') }}"
                 class="proveedor-filters"
                 data-grid-filters
+                data-grid-filters-ajax="1"
+                data-grid-filters-region="proveedor-grid-region"
                 data-clear-url="{{ route('proveedor.index') }}"
             >
                 <div class="proveedor-filters__main">
@@ -77,7 +83,8 @@
         </div>
     </div>
 
-    <div class="grid-table-section">
+    <div class="grid-table-section" id="proveedor-grid-region">
+        <span hidden data-grid-sync-stat=".proveedor-toolbar__stat-value">{{ number_format($totalFilas) }}</span>
         <div class="programas-grid-wrap proveedor-grid-wrap">
         <table class="programas-grid proveedor-grid" id="proveedor-grid">
             <colgroup>
@@ -198,5 +205,5 @@
     window.proveedorColumnasKeys = @json(collect($columnasProveedor)->pluck('key', 'nombre'));
 </script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script src="{{ asset('js/proveedor.js') }}?v=3" defer></script>
+<script src="{{ asset('js/proveedor.js') }}?v=4" defer></script>
 @endpush

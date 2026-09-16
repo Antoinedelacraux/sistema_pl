@@ -14,7 +14,6 @@ class PlanProduccionGridService
 {
     public function __construct(
         private readonly PlanProduccionRecetaService $recetaService,
-        private readonly PlanProduccionCantidadService $cantidadService,
         private readonly PlanProduccionMrpSyncService $syncService,
     ) {}
 
@@ -32,7 +31,7 @@ class PlanProduccionGridService
         $version = (int) Cache::get('plan_produccion.cache_version', 0);
         $cacheKey = 'plan_produccion.datos.v'.$version;
 
-        return Cache::remember($cacheKey, 120, fn () => $this->buildDatos(incluirMaterialesEnFilas: false));
+        return Cache::remember($cacheKey, 600, fn () => $this->buildDatos());
     }
 
     /**
@@ -59,7 +58,7 @@ class PlanProduccionGridService
         $version = (int) Cache::get('plan_produccion.cache_version', 0);
         $cacheKey = 'plan_produccion.mats.v'.$version.'.pg.'.$idProgramaGeneral;
 
-        return Cache::remember($cacheKey, 120, fn () => $this->buildMaterialesPayload($idProgramaGeneral));
+        return Cache::remember($cacheKey, 600, fn () => $this->buildMaterialesPayload($idProgramaGeneral));
     }
 
     /**
@@ -82,7 +81,7 @@ class PlanProduccionGridService
      *   total_programas: int
      * }
      */
-    private function buildDatos(bool $incluirMaterialesEnFilas = false): array
+    private function buildDatos(): array
     {
         $semanas = SemProduccion::query()
             ->activo()
@@ -103,12 +102,14 @@ class PlanProduccionGridService
         $cantidades = PlanProduccion::query()
             ->activo()
             ->whereIn('idSemProduccion', $idsSem)
+            ->select(['idProgramaGeneral', 'idSemProduccion', 'cantidad', 'calificacion'])
             ->get()
             ->groupBy('idProgramaGeneral');
 
         $overrides = PlanProduccionMaterial::query()
             ->activo()
             ->whereIn('idSemProduccion', $idsSem)
+            ->select(['idProgramaGeneral', 'idMaterialPL', 'idSemProduccion', 'cantidad'])
             ->get()
             ->groupBy('idProgramaGeneral');
 
@@ -116,6 +117,7 @@ class PlanProduccionGridService
         $programas = ProgramaGeneral::query()
             ->activo()
             ->whereIn('idProgramaGeneral', $idsPgTodos)
+            ->select(['idProgramaGeneral', 'nombre'])
             ->get()
             ->keyBy('idProgramaGeneral');
 
@@ -154,15 +156,12 @@ class PlanProduccionGridService
             }
 
             $matsCrudos = $materialesPorPg[$idPg] ?? [];
-            $materiales = $incluirMaterialesEnFilas
-                ? $this->mapMaterialesDetalle($idPg, $matsCrudos, $overrides->get($idPg))
-                : [];
 
             $filas[] = [
                 'idProgramaGeneral' => $idPg,
                 'nombre' => $pg->nombre,
                 'calificacion' => $calificacion,
-                'materiales' => $materiales,
+                'materiales' => [],
                 'tiene_materiales' => $matsCrudos !== [],
             ] + $porSem;
         }
@@ -223,16 +222,17 @@ class PlanProduccionGridService
      */
     private function materialesCrudos(int $idProgramaGeneral): array
     {
-        $pg = ProgramaGeneral::query()->activo()->find($idProgramaGeneral);
+        $pg = ProgramaGeneral::query()
+            ->activo()
+            ->find($idProgramaGeneral, ['idProgramaGeneral', 'nombre']);
         if ($pg === null) {
             return [];
         }
 
-        $materialesPorPg = $this->recetaService->materialesUnificadosPorProgramas([
-            $idProgramaGeneral => $pg->nombre,
-        ]);
-
-        return $materialesPorPg[$idProgramaGeneral] ?? [];
+        return $this->recetaService->materialesUnificadosParaDesglose(
+            $idProgramaGeneral,
+            (string) $pg->nombre
+        );
     }
 
     /**

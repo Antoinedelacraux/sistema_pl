@@ -1845,20 +1845,17 @@ body.page-app[data-theme="dark"] select.field__input{
 }
 
 @media (max-width: 1100px){
-    .receta-toolbar__shell,
-    .proveedor-toolbar__shell {
+    .receta-toolbar__shell {
         align-items: stretch;
     }
 
-    .receta-toolbar__aside,
-    .proveedor-toolbar__aside {
+    .receta-toolbar__aside {
         flex: 1 1 100%;
         margin-left: 0;
         justify-content: space-between;
     }
 
-    .receta-filters__field--search,
-    .proveedor-filters__field--search {
+    .receta-filters__field--search {
         flex: 1 1 200px;
         max-width: none;
     }

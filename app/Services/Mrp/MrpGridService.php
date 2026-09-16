@@ -98,12 +98,13 @@ class MrpGridService
         $necesitaIngresos = in_array('ingresos', $secciones, true);
 
         $planPorMaterial = $necesitaPlan ? $this->planPorMaterialSemana($idsMaterial) : [];
-        $consumoPorMaterial = $necesitaConsumo
-            ? $this->movimientosPorMaterialSemana(MovimientoStock::TIPO_EGRESO, $semanas, $idsMaterial)
-            : [];
-        $ingresoPorMaterial = ($necesitaConsumo || $necesitaIngresos)
-            ? $this->movimientosPorMaterialSemana(MovimientoStock::TIPO_INGRESO, $semanas, $idsMaterial)
-            : [];
+
+        // Combina egreso + ingreso en una sola query cuando se necesitan ambos.
+        $necesitaMovimientos = $necesitaConsumo || $necesitaIngresos;
+        [$consumoPorMaterial, $ingresoPorMaterial] = $necesitaMovimientos
+            ? $this->movimientosPorMaterialSemanaAmbos($necesitaConsumo, $necesitaIngresos, $semanas, $idsMaterial)
+            : [[], []];
+
         $stockPorMaterial = $necesitaConsumo ? $this->stockPorMaterial($idsMaterial) : [];
 
         $plan = [];
@@ -313,14 +314,21 @@ class MrpGridService
     }
 
     /**
+     * Obtiene consumos e ingresos en una sola query cuando se necesitan ambos tipos,
+     * o solo el tipo solicitado si el otro no se necesita.
+     *
      * @param  Collection<int, SemConsumo>  $semanas
      * @param  list<int>  $idsMaterial
-     * @return array<string, float>
+     * @return array{0: array<string, float>, 1: array<string, float>} [consumo, ingreso]
      */
-    private function movimientosPorMaterialSemana(string $tipo, Collection $semanas, array $idsMaterial): array
-    {
+    private function movimientosPorMaterialSemanaAmbos(
+        bool $necesitaConsumo,
+        bool $necesitaIngresos,
+        Collection $semanas,
+        array $idsMaterial
+    ): array {
         if ($semanas->isEmpty() || $idsMaterial === []) {
-            return [];
+            return [[], []];
         }
 
         $fechaMin = $semanas->min('fechaInicio')->format('Y-m-d');
@@ -333,30 +341,42 @@ class MrpGridService
             $fin = $sem->fechaInicio->copy()->addDays(6)->format('Y-m-d');
             $caseParts[] = "WHEN fecha BETWEEN '{$ini}' AND '{$fin}' THEN {$idSem}";
         }
-
         $caseExpr = 'CASE '.implode(' ', $caseParts).' END';
 
-        $mapa = [];
+        // Filtra solo los tipos que se necesitan.
+        $tipos = array_values(array_filter([
+            $necesitaConsumo ? MovimientoStock::TIPO_EGRESO : null,
+            $necesitaIngresos ? MovimientoStock::TIPO_INGRESO : null,
+        ]));
+
+        $consumo = [];
+        $ingreso = [];
+
         DB::query()
-            ->fromSub(function ($query) use ($tipo, $idsMaterial, $fechaMin, $fechaMax, $caseExpr) {
+            ->fromSub(function ($query) use ($tipos, $idsMaterial, $fechaMin, $fechaMax, $caseExpr) {
                 $query->from('MovimientoStock')
-                    ->selectRaw("idMaterialPL, cantidad, ({$caseExpr}) AS idSemConsumo")
+                    ->selectRaw("tipo, idMaterialPL, cantidad, ({$caseExpr}) AS idSemConsumo")
                     ->where('estado', 1)
-                    ->where('tipo', $tipo)
+                    ->whereIn('tipo', $tipos)
                     ->whereNull('idTraslado')
                     ->whereIn('idMaterialPL', $idsMaterial)
                     ->whereBetween('fecha', [$fechaMin, $fechaMax]);
             }, 'mov')
-            ->selectRaw('idMaterialPL, idSemConsumo, SUM(cantidad) AS total')
+            ->selectRaw('tipo, idMaterialPL, idSemConsumo, SUM(cantidad) AS total')
             ->whereNotNull('idSemConsumo')
-            ->groupBy('idMaterialPL', 'idSemConsumo')
+            ->groupBy('tipo', 'idMaterialPL', 'idSemConsumo')
             ->orderBy('idMaterialPL')
             ->lazy(500)
-            ->each(function ($fila) use (&$mapa) {
-                $mapa[((int) $fila->idMaterialPL).'|'.((int) $fila->idSemConsumo)] = (float) $fila->total;
+            ->each(function ($fila) use (&$consumo, &$ingreso) {
+                $key = ((int) $fila->idMaterialPL).'|'.((int) $fila->idSemConsumo);
+                if ($fila->tipo === MovimientoStock::TIPO_EGRESO) {
+                    $consumo[$key] = (float) $fila->total;
+                } else {
+                    $ingreso[$key] = (float) $fila->total;
+                }
             });
 
-        return $mapa;
+        return [$consumo, $ingreso];
     }
 
     private function textoCeldaPlan(float $num): string

@@ -1,0 +1,101 @@
+/* Receta: responsive toolbar */
+
+@media (max-width: 1100px) {
+    .receta-toolbar__shell {
+        align-items: stretch;
+    }
+
+    .receta-toolbar__aside {
+        flex: 1 1 100%;
+        margin-left: 0;
+        justify-content: space-between;
+    }
+
+    .receta-filters__field--search {
+        flex: 1 1 200px;
+        max-width: none;
+    }
+}
+@media (max-width: 720px){
+    .receta-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .receta-tabs__link {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .receta-toolbar {
+        padding: 10px 10px 0;
+    }
+
+    .receta-toolbar__shell {
+        padding: 10px;
+        gap: 10px;
+    }
+
+    .receta-filters,
+    .receta-filters__main {
+        flex: 1 1 100%;
+        gap: 8px;
+    }
+
+    .receta-filters__field {
+        flex: 1 1 calc(50% - 8px);
+        width: auto;
+        min-width: 0;
+    }
+
+    .receta-filters__field--search {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+
+    .receta-filters__clear,
+    .receta-filters__export.inventario-export {
+        flex: 0 0 auto;
+    }
+
+    .receta-toolbar__aside {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .receta-toolbar__stat {
+        width: 100%;
+        flex-direction: row;
+        justify-content: center;
+        gap: 8px;
+        min-height: 0;
+        padding: 8px 10px;
+    }
+
+    .receta-toolbar__stat-label {
+        margin-top: 0;
+        font-size: 11px;
+    }
+
+    .receta-toolbar__actions {
+        width: 100%;
+        justify-content: stretch;
+        flex-wrap: wrap;
+    }
+
+    .receta-toolbar__actions .btn {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+body.page-app[data-theme="dark"] .receta-toolbar__shell {
+    box-shadow: none;
+}
+
+body.page-app[data-theme="dark"] .receta-toolbar__stat-value {
+    color: var(--sidebar-accent);
+}
+
+body.page-app[data-theme="dark"] .receta-toolbar__stat-label {
+    color: var(--ink-soft);
+}

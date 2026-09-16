@@ -658,10 +658,11 @@
         });
     }
 
-    document.querySelectorAll('[data-editar-proveedor]').forEach(function (boton) {
-        boton.addEventListener('click', function () {
+    document.addEventListener('click', function (event) {
+        var boton = event.target.closest('[data-editar-proveedor]');
+        if (boton) {
             abrirModalProveedor(boton.closest('.proveedor-fila'));
-        });
+        }
     });
 
     document.querySelectorAll('[data-cerrar-modal-proveedor]').forEach(function (node) {

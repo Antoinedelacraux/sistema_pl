@@ -318,8 +318,6 @@ class ProveedorGridService
     {
         Cache::forget('proveedor.catalogos.v2');
         Cache::forget('proveedor.metadatos_columnas.v2');
-        Cache::forget('proveedor.columnas_proveedor.v1');
-        Cache::forget('proveedor.columnas_config.v1');
     }
 
     /**

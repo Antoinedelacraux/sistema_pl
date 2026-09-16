@@ -6,7 +6,7 @@
 @section('crumbs', 'Stock · ingresos, consumos y traslados')
 
 @push('head')
-<link rel="stylesheet" href="{{ asset('css/registro.css') }}?v=4">
+<link rel="stylesheet" href="{{ asset('css/registro.css') }}?v=5">
 @endpush
 
 @section('page')

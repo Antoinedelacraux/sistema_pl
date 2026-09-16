@@ -8,6 +8,7 @@ use App\Models\Programas\ProgramaGeneral;
 use App\Support\CantidadCajaSupport;
 use App\Support\FamiliaMaterialSupport;
 use App\Support\PlanProduccionRecetaAliasSupport;
+use Illuminate\Support\Facades\Cache;
 
 class PlanProduccionRecetaService
 {
@@ -127,6 +128,58 @@ class PlanProduccionRecetaService
     }
 
     /**
+     * Desglose Plan producción (un solo PG): ids relacionados en caché + una pasada de materiales.
+     *
+     * @return list<array{
+     *   id_material_pl: int,
+     *   codigo_pl: string|null,
+     *   nom_material: string|null,
+     *   nom_familia: string|null,
+     *   cantidad_por_caja: float,
+     *   es_caja: bool,
+     *   decimales_cantidad: int
+     * }>
+     */
+    public function materialesUnificadosParaDesglose(int $idProgramaGeneral, string $nombrePlan): array
+    {
+        if ($idProgramaGeneral <= 0) {
+            return [];
+        }
+
+        $ids = $this->idsRecetaRelacionadosParaDesglose($idProgramaGeneral, $nombrePlan);
+        if ($ids === []) {
+            return [];
+        }
+
+        $porPgRaw = $this->materialesPorProgramaGeneral($ids);
+        $listas = [];
+        foreach ($ids as $idReceta) {
+            if (isset($porPgRaw[$idReceta])) {
+                $listas[] = $porPgRaw[$idReceta];
+            }
+        }
+
+        return $this->unificarListasMateriales($listas);
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function idsRecetaRelacionadosParaDesglose(int $idProgramaGeneral, string $nombrePlan): array
+    {
+        $version = (int) Cache::get('plan_produccion.cache_version', 0);
+        $cacheKey = 'plan_receta.ids_desglose.v'.$version.'.pg.'.$idProgramaGeneral;
+
+        return Cache::remember($cacheKey, 600, function () use ($idProgramaGeneral, $nombrePlan) {
+            return array_values(array_unique(array_merge(
+                [$idProgramaGeneral],
+                $this->idsPorNombreProgramaGeneral($nombrePlan),
+                $this->idsPorFusionCalibre($nombrePlan)
+            )));
+        });
+    }
+
+    /**
      * @param  array<int, string>  $nombresPorIdPg
      * @return array<int, list<array{
      *   id_material_pl: int,
@@ -193,7 +246,19 @@ class PlanProduccionRecetaService
         $filas = ProgramaFila::query()
             ->activo()
             ->whereIn('idProgramaGeneral', $idsProgramaGeneral)
-            ->with(['material', 'cantidadCaja', 'familia'])
+            ->select([
+                'idProgramaFila',
+                'idProgramaGeneral',
+                'idPrograma',
+                'idMaterialPL',
+                'idCantidadCaja',
+                'idFamilia',
+            ])
+            ->with([
+                'material:idMaterialPL,CodigoPL,nomMaterial',
+                'cantidadCaja:idCantidadCaja,cantidad',
+                'familia:idFamilia,nomFamilia',
+            ])
             ->get();
 
         if ($filas->isEmpty()) {
@@ -202,7 +267,13 @@ class PlanProduccionRecetaService
                 ->whereHas('programa', function ($q) use ($idsProgramaGeneral) {
                     $q->whereIn('idProgramaGeneral', $idsProgramaGeneral);
                 })
-                ->with(['material', 'cantidadCaja', 'familia', 'programa'])
+                ->select(['idProgramaFila', 'idProgramaGeneral', 'idPrograma', 'idMaterialPL', 'idCantidadCaja', 'idFamilia'])
+                ->with([
+                    'material:idMaterialPL,CodigoPL,nomMaterial',
+                    'cantidadCaja:idCantidadCaja,cantidad',
+                    'familia:idFamilia,nomFamilia',
+                    'programa:idPrograma,idProgramaGeneral',
+                ])
                 ->get();
         }
 

@@ -82,14 +82,12 @@ class MovimientoService
 
     private const CACHE_TOTAL_LOTES_TTL = 45;
 
+    private const CACHE_GRID_REGISTRO_TTL = 45;
+
     public function __construct(
         private readonly PowerAutomateService $powerAutomateService,
         private readonly StockAlmacenService $stockAlmacenService,
     ) {}
-    public function catalogos(bool $conMateriales = true): array
-    {
-        return $this->catalogosRegistro('consumos');
-    }
 
     /**
      * Catálogos para Registro. En ingresos/traslados evita programas/receta pesados (AJAX en consumo).
@@ -203,27 +201,32 @@ class MovimientoService
 
     public function listarIngresosPaginados(array $filtros, Request $request): LengthAwarePaginator
     {
-        return $this->listarMovimientosPaginadosPorLote(
+        return $this->listarGrillaRegistroCacheada('ingreso', $filtros, $request, fn () => $this->listarMovimientosPaginadosPorLote(
             MovimientoStock::TIPO_INGRESO,
             self::COLUMNAS_LOTE_INGRESO,
             self::WITH_GRID_INGRESO,
             $filtros,
             $request
-        );
+        ));
     }
 
     public function listarEgresosPaginados(array $filtros, Request $request): LengthAwarePaginator
     {
-        return $this->listarMovimientosPaginadosPorLote(
+        return $this->listarGrillaRegistroCacheada('egreso', $filtros, $request, fn () => $this->listarMovimientosPaginadosPorLote(
             MovimientoStock::TIPO_EGRESO,
             self::COLUMNAS_LOTE_EGRESO,
             self::WITH_GRID_EGRESO,
             $filtros,
             $request
-        );
+        ));
     }
 
     public function listarTrasladosPaginados(array $filtros, Request $request): LengthAwarePaginator
+    {
+        return $this->listarGrillaRegistroCacheada('traslado', $filtros, $request, fn () => $this->listarTrasladosPaginadosSinCache($filtros, $request));
+    }
+
+    private function listarTrasladosPaginadosSinCache(array $filtros, Request $request): LengthAwarePaginator
     {
         $query = Traslado::query()
             ->select([
@@ -497,7 +500,7 @@ class MovimientoService
         $referenciaPdf = $this->referenciaDocumento($datos);
         $archivoData = $this->procesarArchivoPdf($archivo, MovimientoStock::TIPO_INGRESO, $referenciaPdf);
 
-        return DB::transaction(function () use ($datos, $idUsuario, $lineas, $archivoData) {
+        $creados = DB::transaction(function () use ($datos, $idUsuario, $lineas, $archivoData) {
             $creados = 0;
 
             foreach ($lineas as $linea) {
@@ -524,6 +527,10 @@ class MovimientoService
 
             return $creados;
         });
+
+        $this->olvidarCacheGrillaRegistro();
+
+        return $creados;
     }
 
     public function crearEgreso(array $datos, ?int $idUsuario, ?UploadedFile $archivo = null): int
@@ -546,7 +553,7 @@ class MovimientoService
         $referenciaPdf = $this->referenciaDocumento($datos);
         $archivoData = $this->procesarArchivoPdf($archivo, MovimientoStock::TIPO_EGRESO, $referenciaPdf);
 
-        return DB::transaction(function () use ($datos, $idUsuario, $idAlmacen, $lineas, $archivoData) {
+        $creados = DB::transaction(function () use ($datos, $idUsuario, $idAlmacen, $lineas, $archivoData) {
             return $this->conBloqueoStockAlmacen($idAlmacen, function () use ($datos, $idUsuario, $idAlmacen, $lineas, $archivoData) {
                 $creados = 0;
                 $ahora = now();
@@ -594,6 +601,10 @@ class MovimientoService
                 return $creados;
             });
         });
+
+        $this->olvidarCacheGrillaRegistro();
+
+        return $creados;
     }
 
     public function crearTraslado(array $datos, ?int $idUsuario, ?UploadedFile $archivo = null): Traslado
@@ -610,7 +621,7 @@ class MovimientoService
         $referenciaPdf = $this->referenciaDocumento($datos);
         $archivoData = $this->procesarArchivoPdf($archivo, Traslado::TIPO_ARCHIVO, $referenciaPdf);
 
-        return DB::transaction(function () use ($datos, $idUsuario, $idMaterialPL, $idOrigen, $idDestino, $cantidad, $archivoData) {
+        $traslado = DB::transaction(function () use ($datos, $idUsuario, $idMaterialPL, $idOrigen, $idDestino, $cantidad, $archivoData) {
             return $this->conBloqueoStock($idOrigen, $idMaterialPL, function () use ($datos, $idUsuario, $idMaterialPL, $idOrigen, $idDestino, $cantidad, $archivoData) {
                 $disponible = $this->stockDisponible($idMaterialPL, $idOrigen);
                 if ($cantidad > $disponible) {
@@ -661,6 +672,10 @@ class MovimientoService
                 return $traslado->load(['materialPl', 'almacenOrigen', 'almacenDestino']);
             });
         });
+
+        $this->olvidarCacheGrillaRegistro();
+
+        return $traslado;
     }
 
     public function anularMovimiento(int $idMovimiento): void
@@ -674,6 +689,7 @@ class MovimientoService
             $this->lineasIngresoRelacionadas($movimiento)->each(function (MovimientoStock $linea) {
                 $linea->update(['estado' => 0]);
             });
+            $this->olvidarCacheGrillaRegistro();
 
             return;
         }
@@ -682,11 +698,13 @@ class MovimientoService
             $this->lineasEgresoRelacionadas($movimiento)->each(function (MovimientoStock $linea) {
                 $linea->update(['estado' => 0]);
             });
+            $this->olvidarCacheGrillaRegistro();
 
             return;
         }
 
         $movimiento->update(['estado' => 0]);
+        $this->olvidarCacheGrillaRegistro();
     }
 
     public function anularTraslado(int $idTraslado): void
@@ -700,6 +718,8 @@ class MovimientoService
                 ->where('estado', 1)
                 ->update(['estado' => 0]);
         });
+
+        $this->olvidarCacheGrillaRegistro();
     }
 
     public function actualizarEgreso(int $idMovimiento, array $datos, ?UploadedFile $archivo = null): MovimientoStock
@@ -726,7 +746,7 @@ class MovimientoService
         $archivoData = $this->resolverArchivoPdf($archivo, MovimientoStock::TIPO_EGRESO, $datos, $principal);
         $lineasInput = collect($datos['lineas'] ?? [])->keyBy(fn ($linea) => (int) ($linea['id_material_pl'] ?? 0));
 
-        return DB::transaction(function () use ($principal, $datos, $idAlmacen, $lineasResueltas, $lineasInput, $archivoData) {
+        $resultado = DB::transaction(function () use ($principal, $datos, $idAlmacen, $lineasResueltas, $lineasInput, $archivoData) {
             return $this->conBloqueoStockAlmacen($idAlmacen, function () use ($principal, $datos, $idAlmacen, $lineasResueltas, $lineasInput, $archivoData) {
                 $lineasActuales = $this->lineasEgresoRelacionadas($principal);
 
@@ -796,11 +816,15 @@ class MovimientoService
                 return $principal->fresh(['materialPl', 'almacen', 'tipoConsumo', 'programa', 'presentacion']);
             });
         });
+
+        $this->olvidarCacheGrillaRegistro();
+
+        return $resultado;
     }
 
     public function actualizarTraslado(int $idTraslado, array $datos, ?UploadedFile $archivo = null): Traslado
     {
-        return DB::transaction(function () use ($idTraslado, $datos, $archivo) {
+        $traslado = DB::transaction(function () use ($idTraslado, $datos, $archivo) {
             $traslado = Traslado::query()->where('estado', 1)->findOrFail($idTraslado);
 
             $idMaterialPL = (int) $datos['id_material_pl'];
@@ -855,6 +879,10 @@ class MovimientoService
 
             return $traslado->fresh(['materialPl', 'almacenOrigen', 'almacenDestino']);
         });
+
+        $this->olvidarCacheGrillaRegistro();
+
+        return $traslado;
     }
 
     /**
@@ -902,7 +930,7 @@ class MovimientoService
 
         $this->validarEdicionIngreso($principal, $datos);
 
-        return DB::transaction(function () use ($principal, $datos, $archivo) {
+        $actualizados = DB::transaction(function () use ($principal, $datos, $archivo) {
             $lineasActuales = $this->lineasIngresoRelacionadas($principal);
             $lineasNuevas = $datos['lineas'] ?? [];
             $archivoData = $this->resolverArchivoPdf($archivo, MovimientoStock::TIPO_INGRESO, $datos, $principal);
@@ -961,6 +989,10 @@ class MovimientoService
 
             return $actualizados;
         });
+
+        $this->olvidarCacheGrillaRegistro();
+
+        return $actualizados;
     }
 
     private function validarReduccionIngreso(MovimientoStock $linea, float $nuevaCantidad): void
@@ -1236,38 +1268,35 @@ class MovimientoService
         $page = max(1, (int) $request->query('page', 1));
         $offset = ($page - 1) * $perPage;
         $alias = $tipo === MovimientoStock::TIPO_EGRESO ? 'lotes_egreso' : 'lotes_ingreso';
+        $tabla = (new MovimientoStock)->getTable();
+        $columnasLoteCalificadas = array_map(
+            static fn (string $columna): string => $tabla.'.'.$columna,
+            $columnasLote
+        );
 
         $base = MovimientoStock::query()
-            ->where('estado', 1)
-            ->where('tipo', $tipo)
-            ->whereNull('idTraslado');
+            ->where($tabla.'.estado', 1)
+            ->where($tabla.'.tipo', $tipo)
+            ->whereNull($tabla.'.idTraslado');
 
         $this->aplicarFiltrosMovimiento($base, $filtros);
 
         $grouped = (clone $base)
-            ->select($columnasLote)
-            ->selectRaw('MAX(idMovimiento) AS id_principal')
-            ->selectRaw('SUM(cantidad) AS cantidad_total')
+            ->select($columnasLoteCalificadas)
+            ->selectRaw('MAX('.$tabla.'.idMovimiento) AS id_principal')
+            ->selectRaw('SUM('.$tabla.'.cantidad) AS cantidad_total')
             ->selectRaw('COUNT(*) AS total_lineas')
-            ->groupBy($columnasLote);
+            ->groupBy($columnasLoteCalificadas);
 
-        // Una sola pasada: pÃ¡gina + total de lotes (MySQL 8 window).
         $lotes = DB::query()
             ->fromSub($grouped, $alias)
-            ->select('*')
-            ->selectRaw('COUNT(*) OVER() AS total_lotes')
             ->orderByDesc('fecha')
             ->orderByDesc('id_principal')
             ->offset($offset)
             ->limit($perPage)
             ->get();
 
-        $total = (int) ($lotes->first()->total_lotes ?? 0);
-
-        // PÃ¡gina vacÃ­a fuera de rango: conservar total exacto vÃ­a cache breve.
-        if ($lotes->isEmpty() && $page > 1) {
-            $total = $this->contarLotesPaginados($base, $columnasLote, $tipo, $filtros, $alias);
-        }
+        $total = $this->contarLotesPaginados($base, $columnasLoteCalificadas, $tipo, $filtros, $alias);
 
         $idsPrincipales = $lotes->pluck('id_principal')->filter()->map(fn ($id) => (int) $id)->all();
 
@@ -1305,7 +1334,8 @@ class MovimientoService
      */
     private function contarLotesPaginados($base, array $columnasLote, string $tipo, array $filtros, string $alias): int
     {
-        $cacheKey = 'registro.lotes.total.'.$tipo.'.'.md5(json_encode([
+        $version = (int) Cache::get('registro.grid.cache_version', 0);
+        $cacheKey = 'registro.lotes.total.v'.$version.'.'.$tipo.'.'.md5(json_encode([
             'fecha' => $filtros['fecha'] ?? null,
             'id_almacen' => $filtros['id_almacen'] ?? null,
             'buscar' => $filtros['buscar'] ?? '',
@@ -1319,6 +1349,32 @@ class MovimientoService
                 )
                 ->count();
         });
+    }
+
+    /**
+     * @param  array<string, mixed>  $filtros
+     */
+    private function listarGrillaRegistroCacheada(
+        string $tipo,
+        array $filtros,
+        Request $request,
+        callable $resolver
+    ): LengthAwarePaginator {
+        $page = max(1, (int) $request->query('page', 1));
+        $version = (int) Cache::get('registro.grid.cache_version', 0);
+        $cacheKey = 'registro.grid.v'.$version.'.'.$tipo.'.'.md5(json_encode([
+            'fecha' => $filtros['fecha'] ?? null,
+            'id_almacen' => $filtros['id_almacen'] ?? null,
+            'buscar' => $filtros['buscar'] ?? '',
+        ])).'.p'.$page;
+
+        return Cache::remember($cacheKey, self::CACHE_GRID_REGISTRO_TTL, $resolver);
+    }
+
+    private function olvidarCacheGrillaRegistro(): void
+    {
+        $version = (int) Cache::get('registro.grid.cache_version', 0);
+        Cache::forever('registro.grid.cache_version', $version + 1);
     }
 
     private function mapearLotePaginado(object $lote, ?MovimientoStock $principal, string $tipo): object
@@ -1497,13 +1553,16 @@ class MovimientoService
         }
 
         if (! empty($filtros['buscar'])) {
-            $termino = '%'.$filtros['buscar'].'%';
-            $query->where(function ($consulta) use ($termino) {
-                $consulta->where('factura', 'like', $termino)
-                    ->orWhere('guia', 'like', $termino)
-                    ->orWhere('facturaGuia', 'like', $termino)
-                    ->orWhereHas('materialPl', fn ($material) => $material->where('CodigoPL', 'like', $termino));
-            });
+            $termino = '%'.addcslashes((string) $filtros['buscar'], '%_\\').'%';
+            $tabla = $query->getModel()->getTable();
+            $query->leftJoin('MaterialProgramaPL as mpl_buscar', $tabla.'.idMaterialPL', '=', 'mpl_buscar.idMaterialPL')
+                ->where(function ($consulta) use ($termino, $tabla) {
+                    $consulta->where($tabla.'.factura', 'like', $termino)
+                        ->orWhere($tabla.'.guia', 'like', $termino)
+                        ->orWhere($tabla.'.facturaGuia', 'like', $termino)
+                        ->orWhere('mpl_buscar.CodigoPL', 'like', $termino);
+                })
+                ->select($tabla.'.*');
         }
     }
 
@@ -1526,13 +1585,16 @@ class MovimientoService
         }
 
         if (! empty($filtros['buscar'])) {
-            $termino = '%'.$filtros['buscar'].'%';
-            $query->where(function ($consulta) use ($termino) {
-                $consulta->where('factura', 'like', $termino)
-                    ->orWhere('guia', 'like', $termino)
-                    ->orWhere('facturaGuia', 'like', $termino)
-                    ->orWhereHas('materialPl', fn ($material) => $material->where('CodigoPL', 'like', $termino));
-            });
+            $termino = '%'.addcslashes((string) $filtros['buscar'], '%_\\').'%';
+            $tabla = $query->getModel()->getTable();
+            $query->leftJoin('MaterialProgramaPL as mpl_buscar_traslado', $tabla.'.idMaterialPL', '=', 'mpl_buscar_traslado.idMaterialPL')
+                ->where(function ($consulta) use ($termino, $tabla) {
+                    $consulta->where($tabla.'.factura', 'like', $termino)
+                        ->orWhere($tabla.'.guia', 'like', $termino)
+                        ->orWhere($tabla.'.facturaGuia', 'like', $termino)
+                        ->orWhere('mpl_buscar_traslado.CodigoPL', 'like', $termino);
+                })
+                ->select($tabla.'.*');
         }
     }
 

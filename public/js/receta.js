@@ -341,10 +341,11 @@
         });
     }
 
-    document.querySelectorAll('[data-receta-editar]').forEach(function (node) {
-        node.addEventListener('click', function () {
-            abrirModalEditar(node);
-        });
+    document.addEventListener('click', function (event) {
+        var editarBtn = event.target.closest('[data-receta-editar]');
+        if (editarBtn) {
+            abrirModalEditar(editarBtn);
+        }
     });
 
     document.querySelectorAll('[data-cerrar-modal]').forEach(function (node) {
@@ -473,17 +474,17 @@
         });
     }
 
-    document.querySelectorAll('[data-receta-imagen]').forEach(function (node) {
-        node.addEventListener('click', function () {
-            abrirLightbox(node.getAttribute('data-receta-imagen'));
-        });
-    });
-
-    document.querySelectorAll('[data-editar-imagen]').forEach(function (node) {
-        node.addEventListener('click', function (event) {
+    document.addEventListener('click', function (event) {
+        var imagenEdit = event.target.closest('[data-editar-imagen]');
+        if (imagenEdit) {
             event.stopPropagation();
-            abrirImagenModal(node);
-        });
+            abrirImagenModal(imagenEdit);
+            return;
+        }
+        var imagenThumb = event.target.closest('[data-receta-imagen]');
+        if (imagenThumb) {
+            abrirLightbox(imagenThumb.getAttribute('data-receta-imagen'));
+        }
     });
 
     document.querySelectorAll('[data-receta-lightbox-close]').forEach(function (node) {

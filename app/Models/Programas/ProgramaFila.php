@@ -4,6 +4,7 @@ namespace App\Models\Programas;
 
 use App\Models\Concerns\HasEstado;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProgramaFila extends Model
@@ -40,7 +41,7 @@ class ProgramaFila extends Model
             return null;
         }
 
-        return app(\App\Services\Programas\ProgramaImagenService::class)->url($this->imagen);
+        return Storage::disk('public')->url($this->imagen);
     }
 
     public function mercado(): BelongsTo
