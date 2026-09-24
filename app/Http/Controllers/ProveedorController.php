@@ -201,7 +201,7 @@ class ProveedorController extends Controller
     {
         return [
             'familia' => $request->query('familia'),
-            'buscar' => trim((string) $request->query('buscar', '')),
+            'buscar'  => trim((string) $request->query('buscar', '')),
         ];
     }
 }

@@ -49,7 +49,7 @@ class ProgramaGridService
     {
         return $this->queryFilas($filtros)
             ->orderBy('nroFila')
-            ->paginate(GridPagination::PER_PAGE)
+            ->paginate(25)      // 25 en vez de 50: reduce el HTML de ~300KB a ~150KB
             ->withQueryString();
     }
 
@@ -554,6 +554,7 @@ class ProgramaGridService
         Cache::forget('programa.catalogos.v2');
         Cache::forget('catalogo.programas_consumo');
         Cache::forget('catalogo.programas_por_general_consumo');
+        Cache::forget('resumen.variedades_mapa.v1');
         $version = (int) Cache::get('programa.cache_version', 0);
         Cache::forever('programa.cache_version', $version + 1);
         $paramsVersion = (int) Cache::get('programa.presentacion_params.cache_version', 0);

@@ -10,6 +10,7 @@ use App\Support\GridPagination;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class StockResumenService
@@ -21,12 +22,17 @@ class StockResumenService
     /**
      * @param  array{programa?: int|null, producto?: int|null}  $filtros
      */
+    private function almacenes(): Collection
+    {
+        return Cache::remember('resumen.almacenes.v1', 600, fn () => Almacen::query()->activo()->orderBy('codigo')->get());
+    }
+
     public function catalogos(array $filtros = []): array
     {
         $idPrograma = (int) ($filtros['programa'] ?? 0);
 
         return [
-            'almacenes' => Almacen::query()->activo()->orderBy('codigo')->get(),
+            'almacenes' => $this->almacenes(),
             'programas' => $this->consumoRecetaService->programasDisponibles(),
             'productos' => $idPrograma > 0
                 ? $this->consumoRecetaService->presentacionesDePrograma($idPrograma)
@@ -44,7 +50,7 @@ class StockResumenService
 
     public function filasResumen(array $filtros = []): Collection
     {
-        $almacenes = Almacen::query()->activo()->orderBy('codigo')->get();
+        $almacenes = $this->almacenes();
         $materiales = MaterialProgramaPL::query()->activo()->orderBy('CodigoPL')->get();
 
         $stocksRaw = DB::table('vw_StockAlmacen')->get();
@@ -184,17 +190,29 @@ class StockResumenService
      */
     private function mapaVariedadesPorMaterial(array $filtros): array
     {
+        $idPrograma = (int) ($filtros['programa'] ?? 0);
+        $idProducto = (int) ($filtros['producto'] ?? 0);
+
+        // Solo cachear la versión sin filtros (la más común); filtros específicos van directo
+        if ($idPrograma === 0) {
+            return Cache::remember('resumen.variedades_mapa.v1', 600, fn () => $this->buildMapaVariedades(0, 0));
+        }
+
+        return $this->buildMapaVariedades($idPrograma, $idProducto);
+    }
+
+    /** @return array<int, string> */
+    private function buildMapaVariedades(int $idPrograma, int $idProducto): array
+    {
         $query = ProgramaFila::query()
             ->where('Estado', Estado::ACTIVO)
             ->whereNotNull('idMaterialPL')
             ->with('variedad:idVariedad,nomVariedad');
 
-        $idPrograma = (int) ($filtros['programa'] ?? 0);
         if ($idPrograma > 0) {
             $query->where('idPrograma', $idPrograma);
         }
 
-        $idProducto = (int) ($filtros['producto'] ?? 0);
         if ($idProducto > 0) {
             $query->where('idPresentacion', $idProducto);
         }
@@ -219,6 +237,13 @@ class StockResumenService
         }
 
         return $mapa;
+    }
+
+    /** Invalida cachés de resumen (llamar cuando cambie Receta o Almacenes). */
+    public function olvidarCaches(): void
+    {
+        Cache::forget('resumen.almacenes.v1');
+        Cache::forget('resumen.variedades_mapa.v1');
     }
 
     private function estadoStock(float $stock, float $stockMinimo): string

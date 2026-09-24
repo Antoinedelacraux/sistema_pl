@@ -285,9 +285,14 @@
 </div>
 
 @if ($puedeCrear || $puedeEditar)
-    @include('registro._modal_ingreso')
-    @include('registro._modal_egreso')
-    @include('registro._modal_traslado')
+    {{-- Solo se incluye el modal del tab activo → reduce ~2/3 del HTML de modales --}}
+    @if ($tab === 'ingresos')
+        @include('registro._modal_ingreso')
+    @elseif ($tab === 'consumos')
+        @include('registro._modal_egreso')
+    @elseif ($tab === 'traslados')
+        @include('registro._modal_traslado')
+    @endif
 @endif
 
 @include('registro._modal_detalle')

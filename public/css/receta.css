@@ -157,7 +157,9 @@
     margin-top: 10px;
 }
 
-.panel--programas .receta-cmd-field{
+.panel--programas .receta-cmd-field,
+.panel--proveedor .receta-cmd-field,
+.proveedor-toolbar .receta-cmd-field{
     display: flex;
     flex-direction: column;
     gap: 4px;

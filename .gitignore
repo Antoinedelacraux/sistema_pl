@@ -36,6 +36,10 @@ yarn-error.log
 /qa-report
 /storage/logs/performance-report*.json
 
+# Archivos de trabajo Excel (no versionar)
+/*.xlsx
+/*.xls
+
 # Leftovers locales (no versionar)
 /plantilla
 /scripts

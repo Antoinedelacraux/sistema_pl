@@ -10,7 +10,8 @@
         "dompdf/dompdf": "^3.1",
         "laravel/framework": "^11.31",
         "laravel/tinker": "^2.9",
-        "phpoffice/phpspreadsheet": "^5.9"
+        "phpoffice/phpspreadsheet": "^5.9",
+        "predis/predis": "^2.3"
     },
     "require-dev": {
         "laravel/pint": "^1.13",
@@ -32,7 +33,7 @@
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"npm run dev\" --names=server,queue,vite"
+            "php artisan serve"
         ]
     },
     "extra": {

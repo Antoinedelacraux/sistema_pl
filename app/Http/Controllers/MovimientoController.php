@@ -61,7 +61,8 @@ class MovimientoController extends Controller
         $puedeEditar = $user?->puede('registro', 'editar') ?? false;
 
         $viewData = array_merge(
-            $this->movimientoService->catalogosRegistro($tab, $puedeCrear || $puedeEditar),
+            // Solo cargamos catálogos de consumo cuando el tab activo los necesita
+            $this->movimientoService->catalogosRegistro($tab, $tab === 'consumos' && ($puedeCrear || $puedeEditar)),
             [
             'tab' => $tab,
             'filtros' => $filtros,

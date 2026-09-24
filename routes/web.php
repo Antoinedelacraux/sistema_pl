@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\TablaComercialController;
 use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\InventarioController;
 use App\Http\Controllers\MaestroController;
@@ -72,6 +73,24 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
     Route::put('/mrp/plan', [MrpController::class, 'updatePlan'])
         ->middleware('permiso:mrp,editar')
         ->name('mrp.plan.update');
+
+    Route::get('/tabla-comercial', [TablaComercialController::class, 'index'])
+        ->middleware('permiso:plan_produccion,ver')
+        ->name('tabla-comercial.index');
+
+    Route::get('/tabla-comercial/semana/{idSemProduccion}', [TablaComercialController::class, 'semana'])
+        ->middleware('permiso:plan_produccion,ver')
+        ->whereNumber('idSemProduccion')
+        ->name('tabla-comercial.semana');
+
+    Route::post('/tabla-comercial/asignar', [TablaComercialController::class, 'asignar'])
+        ->middleware('permiso:plan_produccion,editar')
+        ->name('tabla-comercial.asignar');
+
+    Route::post('/tabla-comercial/estado', [TablaComercialController::class, 'updateEstado'])
+        ->middleware('permiso:plan_produccion,editar')
+        ->name('tabla-comercial.estado');
+
 
     Route::get('/plan-produccion', [PlanProduccionController::class, 'index'])
         ->middleware('permiso:plan_produccion,ver')

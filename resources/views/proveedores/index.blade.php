@@ -7,6 +7,7 @@
 
 @push('head')
 <link rel="stylesheet" href="{{ asset('css/proveedor.css') }}?v=1">
+<link rel="stylesheet" href="{{ asset('css/receta.css') }}?v=3">
 @endpush
 
 @section('page')
@@ -21,19 +22,19 @@
 @include('partials.flash')
 
 <section class="panel panel--proveedor">
-    <div class="proveedor-toolbar">
-        <div class="proveedor-toolbar__shell">
+    <div class="receta-toolbar">
+        <div class="receta-toolbar__shell">
             <form
                 method="GET"
                 action="{{ route('proveedor.index') }}"
-                class="proveedor-filters"
+                class="receta-filters"
                 data-grid-filters
                 data-grid-filters-ajax="1"
                 data-grid-filters-region="proveedor-grid-region"
                 data-clear-url="{{ route('proveedor.index') }}"
             >
-                <div class="proveedor-filters__main">
-                    <label class="receta-cmd-field proveedor-filters__field proveedor-filters__field--material">
+                <div class="receta-filters__main">
+                    <label class="receta-cmd-field receta-filters__field">
                         <span class="receta-cmd-label">Material</span>
                         <select id="proveedor-filtro-familia" name="familia" class="receta-cmd-input">
                             <option value="">Todas</option>
@@ -43,7 +44,7 @@
                         </select>
                     </label>
 
-                    <label class="receta-cmd-field proveedor-filters__field proveedor-filters__field--search">
+                    <label class="receta-cmd-field receta-filters__field receta-filters__field--search">
                         <span class="receta-cmd-label">Buscar</span>
                         <input
                             type="search"
@@ -56,7 +57,7 @@
                         >
                     </label>
 
-                    <div class="proveedor-filters__clear">
+                    <div class="receta-filters__clear">
                         <button type="button" class="btn btn--outline btn--sm" id="proveedor-limpiar" data-grid-filters-clear>Limpiar</button>
                     </div>
                 </div>
@@ -64,16 +65,16 @@
                 @include('partials.export-actions', [
                     'pdfUrl' => route('proveedor.export.pdf', $exportParams),
                     'excelUrl' => route('proveedor.export.excel', $exportParams),
-                    'class' => 'receta-cmd-export-inner proveedor-filters__export',
+                    'class' => 'receta-cmd-export-inner receta-filters__export',
                 ])
             </form>
 
-            <div class="proveedor-toolbar__aside">
-                <div class="proveedor-toolbar__stat" aria-live="polite">
-                    <span class="proveedor-toolbar__stat-value">{{ number_format($totalFilas) }}</span>
-                    <span class="proveedor-toolbar__stat-label">registros</span>
+            <div class="receta-toolbar__aside">
+                <div class="receta-toolbar__stat" aria-live="polite">
+                    <span class="receta-toolbar__stat-value">{{ number_format($totalFilas) }}</span>
+                    <span class="receta-toolbar__stat-label">registros</span>
                 </div>
-                <div class="proveedor-toolbar__actions">
+                <div class="receta-toolbar__actions">
                     <button type="button" class="btn btn--outline btn--sm" id="proveedor-abrir-columnas">Columnas</button>
                     @if ($puedeCrear)
                         <button type="button" class="btn btn--purple btn--sm" id="proveedor-abrir-agregar">Agregar</button>
@@ -84,7 +85,7 @@
     </div>
 
     <div class="grid-table-section" id="proveedor-grid-region">
-        <span hidden data-grid-sync-stat=".proveedor-toolbar__stat-value">{{ number_format($totalFilas) }}</span>
+        <span hidden data-grid-sync-stat=".receta-toolbar__stat-value">{{ number_format($totalFilas) }}</span>
         <div class="programas-grid-wrap proveedor-grid-wrap">
         <table class="programas-grid proveedor-grid" id="proveedor-grid">
             <colgroup>
