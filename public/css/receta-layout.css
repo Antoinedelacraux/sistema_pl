@@ -2,17 +2,16 @@
 
 @media (max-width: 1100px) {
     .receta-toolbar__shell {
-        align-items: stretch;
+        align-items: flex-end;
     }
 
     .receta-toolbar__aside {
-        flex: 1 1 100%;
+        flex: 0 0 auto;
         margin-left: 0;
-        justify-content: space-between;
     }
 
     .receta-filters__field--search {
-        flex: 1 1 200px;
+        flex: 1 1 auto;
         max-width: none;
     }
 }
@@ -49,8 +48,13 @@
     }
 
     .receta-filters__field--search {
-        flex: 1 1 100%;
+        flex: 1 1 auto;
         min-width: 0;
+        max-width: none;
+    }
+
+    .receta-filters__search-row {
+        flex: 1 1 100%;
     }
 
     .receta-filters__clear,

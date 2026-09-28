@@ -3,6 +3,7 @@
     var programa = document.getElementById('inicio-filtro-programa');
     var producto = document.getElementById('inicio-filtro-producto');
     var cajas = document.getElementById('inicio-filtro-cajas');
+    var pallets = document.getElementById('inicio-filtro-pallets');
 
     if (!programa || !producto) {
         return;
@@ -20,25 +21,35 @@
         form.submit();
     }
 
-    programa.addEventListener('change', function () {
-        producto.value = '';
-        if (cajas) {
-            cajas.value = '';
+    function atarSimulacion(input) {
+        if (!input || !form) {
+            return;
         }
-    });
 
-    if (cajas && form) {
-        var timerCajas = null;
-        cajas.addEventListener('change', submitFiltros);
-        cajas.addEventListener('keydown', function (event) {
+        var timer = null;
+        input.addEventListener('change', submitFiltros);
+        input.addEventListener('keydown', function (event) {
             if (event.key === 'Enter') {
                 event.preventDefault();
                 submitFiltros();
             }
         });
-        cajas.addEventListener('input', function () {
-            clearTimeout(timerCajas);
-            timerCajas = setTimeout(submitFiltros, 600);
+        input.addEventListener('input', function () {
+            clearTimeout(timer);
+            timer = setTimeout(submitFiltros, 600);
         });
     }
+
+    programa.addEventListener('change', function () {
+        producto.value = '';
+        if (cajas) {
+            cajas.value = '';
+        }
+        if (pallets) {
+            pallets.value = '';
+        }
+    });
+
+    atarSimulacion(cajas);
+    atarSimulacion(pallets);
 })();

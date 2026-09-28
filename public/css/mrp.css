@@ -172,9 +172,9 @@
 }
 
 .panel--mrp .mrp-grid-wrap {
-    height: 220px;
-    max-height: 220px;
-    min-height: 220px;
+    height: 300px;
+    max-height: 300px;
+    min-height: 300px;
     overflow: auto;
     border: 1px solid var(--app-line);
     border-radius: var(--radius-sm);
@@ -211,22 +211,22 @@
     position: sticky;
     top: 0;
     z-index: 3;
-    height: 46px;
-    max-height: 46px;
+    height: 40px;
+    max-height: 40px;
     box-sizing: border-box;
     overflow: hidden;
     vertical-align: middle;
 }
 
 .mrp-grid tbody tr {
-    height: 36px;
+    height: 28px;
     content-visibility: auto;
-    contain-intrinsic-size: auto 36px;
+    contain-intrinsic-size: auto 28px;
 }
 
 .mrp-grid .programas-grid__th,
 .mrp-grid td {
-    padding: 8px 14px;
+    padding: 4px 12px;
     box-sizing: border-box;
 }
 

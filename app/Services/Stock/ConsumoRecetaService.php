@@ -355,35 +355,56 @@ class ConsumoRecetaService
     }
 
     /**
-     * Calcula cantidades necesarias por material para N cajas (misma lógica que consumo).
+     * Calcula cantidades necesarias por material para N cajas y/o pallets (misma lógica que consumo).
      *
      * @return array<int, float> idMaterialPL => cantidad
      */
-    public function proyectarNecesidadesPorCajas(int $idPrograma, int $idPresentacion, float $cajas): array
-    {
-        if ($idPrograma <= 0 || $idPresentacion <= 0 || $cajas <= 0) {
+    public function proyectarNecesidadesPorCajas(
+        int $idPrograma,
+        int $idPresentacion,
+        float $cajas,
+        ?float $pallets = null
+    ): array {
+        if ($idPrograma <= 0 || $idPresentacion <= 0 || ($cajas <= 0 && ($pallets === null || $pallets < 0))) {
             return [];
         }
 
         $receta = $this->materialesDePresentacion($idPrograma, $idPresentacion);
         $lineasInput = [];
 
-        foreach ($receta as $item) {
-            if (empty($item['es_caja_factor'])) {
+        if ($cajas > 0) {
+            foreach ($receta as $item) {
+                if (empty($item['es_caja_factor'])) {
+                    continue;
+                }
+
+                $lineasInput[] = [
+                    'id_material_pl' => (int) $item['id_material_pl'],
+                    'cantidad' => $cajas,
+                ];
+            }
+        }
+
+        $lineas = $this->resolverLineasConsumo($idPrograma, $idPresentacion, $lineasInput, $pallets);
+        $mapa = [];
+        $soloPallets = $cajas <= 0;
+        $idsPallets = [];
+
+        if ($soloPallets) {
+            foreach ($receta as $item) {
+                if (! empty($item['usa_pallets'])) {
+                    $idsPallets[(int) $item['id_material_pl']] = true;
+                }
+            }
+        }
+
+        foreach ($lineas as $linea) {
+            $idMaterial = (int) $linea['id_material_pl'];
+            if ($soloPallets && ! isset($idsPallets[$idMaterial])) {
                 continue;
             }
 
-            $lineasInput[] = [
-                'id_material_pl' => (int) $item['id_material_pl'],
-                'cantidad' => $cajas,
-            ];
-        }
-
-        $lineas = $this->resolverLineasConsumo($idPrograma, $idPresentacion, $lineasInput);
-        $mapa = [];
-
-        foreach ($lineas as $linea) {
-            $mapa[(int) $linea['id_material_pl']] = (float) $linea['cantidad'];
+            $mapa[$idMaterial] = (float) $linea['cantidad'];
         }
 
         return $mapa;

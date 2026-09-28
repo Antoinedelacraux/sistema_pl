@@ -31,15 +31,35 @@
                         @endforeach
                     </select>
                 </label>
-                <label class="field">
-                    <span class="field__label">Programa General</span>
-                    <select class="field__input" id="egreso-id-programa-general" required>
-                        <option value="">Seleccionar programa general</option>
-                        @foreach ($programasGenerales as $programaGeneral)
-                            <option value="{{ $programaGeneral->idProgramaGeneral }}">{{ $programaGeneral->nombre }}</option>
-                        @endforeach
-                    </select>
-                </label>
+                <div class="field field-mode" data-field-mode="egreso-pg">
+                    <div class="field-mode__head">
+                        <span class="field__label">Programa General</span>
+                        <div class="mode-switch" role="group" aria-label="Modo programa general">
+                            <button type="button" class="mode-switch__btn is-active" data-mode="select">Seleccionar</button>
+                            <button type="button" class="mode-switch__btn" data-mode="search">Buscador</button>
+                        </div>
+                    </div>
+                    <div class="field-mode__panel" data-panel="select">
+                        <select class="field__input" id="egreso-id-programa-general" required>
+                            <option value="">Seleccionar programa general</option>
+                            @foreach ($programasGenerales as $programaGeneral)
+                                <option value="{{ $programaGeneral->idProgramaGeneral }}">{{ $programaGeneral->nombre }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="field-mode__panel" data-panel="search" hidden>
+                        <div class="egreso-pg-combo" id="egreso-pg-combo">
+                            <input
+                                type="search"
+                                class="field__input"
+                                id="egreso-pg-buscar"
+                                placeholder="Escriba para buscar…"
+                                autocomplete="off"
+                            >
+                            <ul class="egreso-pg-combo__list" id="egreso-pg-list" hidden></ul>
+                        </div>
+                    </div>
+                </div>
                 <label class="field field--full">
                     <span class="field__label">Programa</span>
                     <select class="field__input @error('id_programa') is-invalid @enderror" name="id_programa" id="egreso-id-programa" required disabled>

@@ -13,10 +13,13 @@
         'estado' => request('estado', $filtros['estado'] ?? null),
         'buscar' => request('buscar', $filtros['buscar'] ?? null),
         'cajas' => request('cajas', $filtros['cajas'] ?? null),
+        'pallets' => request('pallets', $filtros['pallets'] ?? null),
     ], fn ($valor) => filled($valor));
     $programaSeleccionado = (int) ($filtros['programa'] ?? 0);
     $productoSeleccionado = (int) ($filtros['producto'] ?? 0);
-    $simulaCajas = $productoSeleccionado > 0 && ! empty($filtros['cajas']);
+    $tieneCajas = filled($filtros['cajas'] ?? null);
+    $tienePallets = ($filtros['pallets'] ?? null) !== null && ($filtros['pallets'] ?? '') !== '';
+    $simulaCajas = $productoSeleccionado > 0 && ($tieneCajas || $tienePallets);
 @endphp
 <div class="resumen-page">
 @include('partials.flash')
@@ -99,6 +102,20 @@
                             title="Simular consumo para N cajas (requiere programa y producto específico)"
                         >
                     </label>
+                    <label class="resumen-filters__field resumen-filters__field--cajas">
+                        <span class="resumen-filters__label">Pall.</span>
+                        <input
+                            type="number"
+                            id="inicio-filtro-pallets"
+                            name="pallets"
+                            class="resumen-filters__input resumen-filters__input--cajas"
+                            min="0"
+                            step="0.01"
+                            placeholder="—"
+                            value="{{ $filtros['pallets'] ?? '' }}"
+                            title="Simular pallets para Temperature Recorder, parihuelas, tapas y pallets (requiere programa y producto)"
+                        >
+                    </label>
                     <button type="button" class="btn btn--outline btn--sm" id="resumen-limpiar" data-grid-filters-clear>Limpiar</button>
                 </div>
             </div>
@@ -137,7 +154,7 @@
                     @forelse ($filas as $fila)
                         @php
                             $clasesFila = ['resumen-fila'];
-                            if ($fila->total <= 0) {
+                            if ($fila->estadoStock === 'critico') {
                                 $clasesFila[] = 'resumen-fila--stock-cero';
                             }
                         @endphp
@@ -153,16 +170,18 @@
                                         $claseStock .= $stockAlmacen >= $fila->necesario
                                             ? ' resumen-stock-cell--sim-ok'
                                             : ' resumen-stock-cell--sim-falta';
-                                    } else {
-                                        $claseStock .= ' resumen-stock-cell--'.($stockAlmacen <= 0 ? 'critico' : 'saludable');
+                                    } elseif ($stockAlmacen <= 0 && $fila->estadoStock === 'critico') {
+                                        $claseStock .= ' resumen-stock-cell--critico';
+                                    } elseif ($stockAlmacen > 0) {
+                                        $claseStock .= ' resumen-stock-cell--saludable';
                                     }
                                 @endphp
-                                <td class="{{ $claseStock }}">{{ number_format($stockAlmacen, 2, '.', '') }}</td>
+                                <td class="{{ $claseStock }}">{{ number_format($stockAlmacen, 2, '.', ',') }}</td>
                             @endforeach
-                            <td class="programas-grid__qty resumen-total-cell resumen-stock-cell resumen-stock-cell--{{ $fila->estadoStock }}">{{ number_format($fila->total, 2, '.', '') }}</td>
+                            <td class="programas-grid__qty resumen-total-cell resumen-stock-cell resumen-stock-cell--{{ $fila->estadoStock }}">{{ number_format($fila->total, 2, '.', ',') }}</td>
                             @if ($simulaCajas)
                                 <td class="programas-grid__qty resumen-necesario-cell">
-                                    {{ $fila->necesario > 0 ? number_format($fila->necesario, 2, '.', '') : '—' }}
+                                    {{ $fila->necesario > 0 ? number_format($fila->necesario, 2, '.', ',') : '—' }}
                                 </td>
                             @endif
                             <td class="programas-grid__qty">{{ number_format($fila->stockMinimo, 2, '.', '') }}</td>
@@ -194,6 +213,6 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/inicio-filters.js') }}?v=3" defer></script>
+<script src="{{ asset('js/inicio-filters.js') }}?v=4" defer></script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
 @endpush

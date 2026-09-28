@@ -6,7 +6,7 @@
 @section('crumbs', 'Planeamiento · consumo planificado y real')
 
 @push('head')
-<link rel="stylesheet" href="{{ asset('css/mrp.css') }}?v=2">
+<link rel="stylesheet" href="{{ asset('css/mrp.css') }}?v=10">
 @endpush
 
 @section('page')
@@ -125,5 +125,5 @@
 
 @push('scripts')
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script src="{{ asset('js/mrp.js') }}?v=4" defer></script>
+<script src="{{ asset('js/mrp.js') }}?v=7" defer></script>
 @endpush

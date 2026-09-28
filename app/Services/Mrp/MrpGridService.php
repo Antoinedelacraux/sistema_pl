@@ -390,7 +390,7 @@ class MrpGridService
             return '—';
         }
 
-        return number_format($num, 2, '.', '');
+        return number_format($num, 2, '.', ',');
     }
 
     /**

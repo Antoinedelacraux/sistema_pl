@@ -17,23 +17,39 @@
 @include('partials.flash')
 
 <section class="panel panel--maestros">
-    <div class="maestros-tabs" role="tablist" aria-label="Catálogos del sistema">
-        <div class="maestros-tabs__track">
-            @foreach ($definiciones as $clave => $item)
-                @if ($clave === 'area')
-                    <span class="maestros-tabs__sep" aria-hidden="true"></span>
-                @endif
-                <a
-                    href="{{ route('maestros.index', array_merge(request()->except(['tab', 'page']), ['tab' => $clave])) }}"
-                    class="maestros-tabs__btn {{ $tabActiva === $clave ? 'is-active' : '' }}"
-                    role="tab"
-                    aria-selected="{{ $tabActiva === $clave ? 'true' : 'false' }}"
-                >
-                    <span class="maestros-tabs__label">{{ $item['label'] }}</span>
-                </a>
-            @endforeach
-        </div>
-    </div>
+    <nav class="maestros-nav" aria-label="Catálogos">
+        @foreach ($grupos as $grupo)
+            <div class="maestros-nav__group">
+                <p class="maestros-nav__title">{{ $grupo['label'] }}</p>
+                @foreach ($grupo['tabs'] as $clave)
+                    @continue(! isset($definiciones[$clave]))
+                    <a
+                        href="{{ route('maestros.index', array_merge(request()->except(['tab', 'page']), ['tab' => $clave])) }}"
+                        class="maestros-nav__link {{ $tabActiva === $clave ? 'is-active' : '' }}"
+                        @if ($tabActiva === $clave) aria-current="page" @endif
+                    >{{ $definiciones[$clave]['label'] }}</a>
+                @endforeach
+            </div>
+        @endforeach
+    </nav>
+
+    <div class="maestros-main">
+        <label class="maestros-nav-mobile">
+            <span class="maestros-nav-mobile__label">Catálogo</span>
+            <select class="field__input maestros-nav-mobile__select" data-maestros-nav aria-label="Catálogo">
+                @foreach ($grupos as $grupo)
+                    <optgroup label="{{ $grupo['label'] }}">
+                        @foreach ($grupo['tabs'] as $clave)
+                            @continue(! isset($definiciones[$clave]))
+                            <option
+                                value="{{ route('maestros.index', array_merge(request()->except(['tab', 'page']), ['tab' => $clave])) }}"
+                                @selected($tabActiva === $clave)
+                            >{{ $definiciones[$clave]['label'] }}</option>
+                        @endforeach
+                    </optgroup>
+                @endforeach
+            </select>
+        </label>
 
     <div class="maestros-toolbar">
         <form
@@ -210,6 +226,7 @@
             'itemLabel' => strtolower($definicion['labelPlural']),
         ])
     </div>
+    </div>
 </section>
 
 @include('maestros._modal')
@@ -226,5 +243,5 @@
     };
 </script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script src="{{ asset('js/maestros.js') }}" defer></script>
+<script src="{{ asset('js/maestros.js') }}?v=2" defer></script>
 @endpush

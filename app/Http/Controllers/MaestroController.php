@@ -28,6 +28,7 @@ class MaestroController extends Controller
             'tab' => $tab,
             'definicion' => $definicion,
             'definiciones' => MaestrosCatalogo::definiciones(),
+            'grupos' => MaestrosCatalogo::grupos(),
             'registros' => $this->catalogoService->listar($tab, $buscar, $request),
             'buscar' => $buscar,
             'puedeCrear' => $user?->puede('maestros', 'crear') ?? false,

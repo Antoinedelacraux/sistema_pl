@@ -35,10 +35,10 @@
 
 .receta-toolbar__shell{
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: flex-end;
     justify-content: space-between;
-    gap: 12px;
+    gap: 10px;
     width: 100%;
     box-sizing: border-box;
     padding: 12px 14px;
@@ -46,38 +46,48 @@
     border: 1px solid var(--app-line);
     border-radius: var(--radius-md);
     box-shadow: 0 1px 3px rgba(50, 42, 68, 0.06);
+    overflow-x: auto;
 }
 
 .receta-filters{
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: flex-end;
-    gap: 12px;
-    flex: 1 1 480px;
+    gap: 8px;
+    flex: 1 1 auto;
     min-width: 0;
     margin: 0;
 }
 
 .receta-filters__main{
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: flex-end;
-    gap: 10px;
+    gap: 8px;
     flex: 1 1 auto;
     min-width: 0;
 }
 
 .receta-filters__field{
-    width: 140px;
-    flex: 0 1 140px;
-    min-width: 110px;
+    width: 118px;
+    flex: 0 0 118px;
+    min-width: 0;
 }
 
 .receta-filters__field--search{
-    flex: 1 1 180px;
-    min-width: 140px;
+    flex: 1 1 auto;
+    min-width: 120px;
     max-width: none;
     width: auto;
+}
+
+.receta-filters__search-row{
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 8px;
+    flex: 1 1 160px;
+    min-width: 160px;
 }
 
 .receta-filters__clear{
@@ -98,13 +108,13 @@
 
 .receta-toolbar__aside{
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    flex-wrap: nowrap;
+    align-items: flex-end;
     justify-content: flex-end;
-    gap: 10px;
-    flex: 1 1 280px;
+    gap: 8px;
+    flex: 0 0 auto;
     min-width: 0;
-    margin-left: auto;
+    margin-left: 0;
     padding-bottom: 1px;
 }
 
@@ -143,7 +153,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     flex-shrink: 0;
     justify-content: flex-end;
 }

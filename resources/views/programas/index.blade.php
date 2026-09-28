@@ -6,8 +6,8 @@
 @section('crumbs', 'Planeamiento · materiales por receta')
 
 @push('head')
-<link rel="stylesheet" href="{{ asset('css/receta.css') }}?v=2">
-<link rel="stylesheet" href="{{ asset('css/receta-layout.css') }}?v=1">
+<link rel="stylesheet" href="{{ asset('css/receta.css') }}?v=5">
+<link rel="stylesheet" href="{{ asset('css/receta-layout.css') }}?v=3">
 @endpush
 
 @section('page')
@@ -66,6 +66,7 @@
                         </select>
                     </label>
 
+                    <div class="receta-filters__search-row">
                     <label class="receta-cmd-field receta-filters__field receta-filters__field--search">
                         <span class="receta-cmd-label">Buscar</span>
                         <input
@@ -81,6 +82,7 @@
 
                     <div class="receta-filters__clear">
                         <button type="button" class="btn btn--outline btn--sm" id="receta-limpiar" data-grid-filters-clear>Limpiar</button>
+                    </div>
                     </div>
                 </div>
 
@@ -273,7 +275,7 @@
     window.recetaEditarFilaId = @json(session('receta_editar_fila'));
 </script>
 <script src="{{ asset('js/receta-filters.js') }}?v=2" defer></script>
-<script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
+<script src="{{ asset('js/grid-query-filters.js') }}?v=2" defer></script>
 <script src="{{ asset('js/receta.js') }}?v=7" defer></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {

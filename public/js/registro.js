@@ -151,6 +151,9 @@
         if (programaGeneral) {
             programaGeneral.value = '';
         }
+        syncEgresoPgBuscar();
+        ocultarListaPg();
+        actualizarRequiredPg();
 
         if (programa) {
             programa.innerHTML = '<option value="">Seleccione un programa general</option>';
@@ -1235,6 +1238,209 @@
     var egresoPrograma = document.getElementById('egreso-id-programa');
     var egresoPresentacion = document.getElementById('egreso-id-presentacion');
     var egresoAlmacen = document.getElementById('egreso-id-almacen');
+    var egresoPgBuscar = document.getElementById('egreso-pg-buscar');
+    var egresoPgList = document.getElementById('egreso-pg-list');
+    var egresoPgField = document.querySelector('[data-field-mode="egreso-pg"]');
+    var egresoPgHighlight = -1;
+
+    function actualizarRequiredPg() {
+        var isSearch = !!(egresoPgField && egresoPgField.querySelector('[data-panel="search"]') && !egresoPgField.querySelector('[data-panel="search"]').hidden);
+        if (egresoProgramaGeneral) {
+            egresoProgramaGeneral.required = !isSearch;
+        }
+        if (egresoPgBuscar) {
+            egresoPgBuscar.required = isSearch && !(egresoProgramaGeneral && egresoProgramaGeneral.value);
+        }
+    }
+
+    function activarModoEgresoPg(mode, opts) {
+        if (!egresoPgField) {
+            return;
+        }
+
+        egresoPgField.querySelectorAll('.mode-switch__btn').forEach(function (btn) {
+            btn.classList.toggle('is-active', btn.getAttribute('data-mode') === mode);
+        });
+        egresoPgField.querySelectorAll('.field-mode__panel').forEach(function (panel) {
+            panel.hidden = panel.getAttribute('data-panel') !== mode;
+        });
+        if (mode === 'search') {
+            syncEgresoPgBuscar();
+            if (egresoPgBuscar && !(opts && opts.silent)) {
+                egresoPgBuscar.focus();
+            }
+        } else {
+            ocultarListaPg();
+        }
+        actualizarRequiredPg();
+        try {
+            localStorage.setItem('registro-egreso-pg-mode', mode);
+        } catch (e) {}
+    }
+
+    function opcionesProgramaGeneral() {
+        if (!egresoProgramaGeneral) {
+            return [];
+        }
+
+        return Array.prototype.map.call(egresoProgramaGeneral.options, function (opt) {
+            return { id: String(opt.value || ''), nombre: String(opt.textContent || '').trim() };
+        }).filter(function (item) {
+            return item.id !== '';
+        });
+    }
+
+    function syncEgresoPgBuscar() {
+        if (!egresoPgBuscar || !egresoProgramaGeneral) {
+            return;
+        }
+        var opt = egresoProgramaGeneral.options[egresoProgramaGeneral.selectedIndex];
+        egresoPgBuscar.value = (opt && opt.value) ? String(opt.textContent || '').trim() : '';
+    }
+
+    function ocultarListaPg() {
+        if (!egresoPgList) {
+            return;
+        }
+        egresoPgList.hidden = true;
+        egresoPgList.innerHTML = '';
+        egresoPgHighlight = -1;
+    }
+
+    function normalizarBusquedaPg(texto) {
+        return String(texto || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function elegirProgramaGeneral(id) {
+        if (!egresoProgramaGeneral) {
+            return;
+        }
+        var prev = egresoProgramaGeneral.value;
+        egresoProgramaGeneral.value = id || '';
+        syncEgresoPgBuscar();
+        ocultarListaPg();
+        actualizarRequiredPg();
+        if (egresoProgramaGeneral.value !== prev) {
+            egresoProgramaGeneral.dispatchEvent(new Event('change'));
+        }
+    }
+
+    function renderListaPg(filtro) {
+        if (!egresoPgList) {
+            return;
+        }
+
+        var q = normalizarBusquedaPg(filtro);
+        var items = opcionesProgramaGeneral().filter(function (item) {
+            return q === '' || normalizarBusquedaPg(item.nombre).indexOf(q) !== -1;
+        }).slice(0, 40);
+
+        egresoPgList.innerHTML = '';
+        if (!items.length) {
+            var empty = document.createElement('li');
+            empty.className = 'egreso-pg-combo__empty';
+            empty.textContent = 'Sin coincidencias';
+            egresoPgList.appendChild(empty);
+            egresoPgList.hidden = false;
+            egresoPgHighlight = -1;
+            return;
+        }
+
+        items.forEach(function (item, idx) {
+            var li = document.createElement('li');
+            li.className = 'egreso-pg-combo__item';
+            li.setAttribute('data-id', item.id);
+            li.textContent = item.nombre;
+            if (idx === 0) {
+                li.classList.add('is-active');
+                egresoPgHighlight = 0;
+            }
+            egresoPgList.appendChild(li);
+        });
+        egresoPgList.hidden = false;
+    }
+
+    function moverHighlightPg(delta) {
+        if (!egresoPgList || egresoPgList.hidden) {
+            return;
+        }
+        var items = egresoPgList.querySelectorAll('.egreso-pg-combo__item');
+        if (!items.length) {
+            return;
+        }
+        egresoPgHighlight = Math.max(0, Math.min(items.length - 1, egresoPgHighlight + delta));
+        items.forEach(function (el, idx) {
+            el.classList.toggle('is-active', idx === egresoPgHighlight);
+        });
+        items[egresoPgHighlight].scrollIntoView({ block: 'nearest' });
+    }
+
+    if (egresoPgField) {
+        egresoPgField.querySelectorAll('.mode-switch__btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                activarModoEgresoPg(btn.getAttribute('data-mode'));
+            });
+        });
+        try {
+            var savedMode = localStorage.getItem('registro-egreso-pg-mode');
+            if (savedMode === 'search' || savedMode === 'select') {
+                activarModoEgresoPg(savedMode, { silent: true });
+            }
+        } catch (e) {}
+    }
+
+    if (egresoPgBuscar) {
+        egresoPgBuscar.addEventListener('input', function () {
+            renderListaPg(egresoPgBuscar.value);
+        });
+        egresoPgBuscar.addEventListener('focus', function () {
+            renderListaPg(egresoPgBuscar.value);
+        });
+        egresoPgBuscar.addEventListener('blur', function () {
+            setTimeout(function () {
+                ocultarListaPg();
+                syncEgresoPgBuscar();
+                actualizarRequiredPg();
+            }, 150);
+        });
+        egresoPgBuscar.addEventListener('keydown', function (event) {
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                moverHighlightPg(1);
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                moverHighlightPg(-1);
+            } else if (event.key === 'Enter') {
+                var activo = egresoPgList && egresoPgList.querySelector('.egreso-pg-combo__item.is-active');
+                if (activo) {
+                    event.preventDefault();
+                    elegirProgramaGeneral(activo.getAttribute('data-id'));
+                }
+            } else if (event.key === 'Escape') {
+                ocultarListaPg();
+            }
+        });
+    }
+
+    if (egresoPgList) {
+        egresoPgList.addEventListener('mousedown', function (event) {
+            var item = event.target.closest('.egreso-pg-combo__item');
+            if (!item) {
+                return;
+            }
+            event.preventDefault();
+            elegirProgramaGeneral(item.getAttribute('data-id'));
+        });
+    }
+
+    document.addEventListener('click', function (event) {
+        if (egresoPgList && !egresoPgList.hidden && !event.target.closest('#egreso-pg-combo')) {
+            ocultarListaPg();
+        }
+    });
 
     if (egresoProgramaGeneral) {
         egresoProgramaGeneral.addEventListener('change', function () {
@@ -1343,6 +1549,8 @@
         });
         if (programaGeneralSelectOld && consumoOld.id_programa_general) {
             programaGeneralSelectOld.value = String(consumoOld.id_programa_general);
+            syncEgresoPgBuscar();
+            actualizarRequiredPg();
         }
         if (programaSelectOld) {
             cargarProgramasConsumo(consumoOld.id_programa_general || '', consumoOld.id_programa || '')
@@ -2285,6 +2493,8 @@
 
                     if (programaGeneralSelect && edit.id_programa_general) {
                         programaGeneralSelect.value = String(edit.id_programa_general);
+                        syncEgresoPgBuscar();
+                        actualizarRequiredPg();
                     }
 
                     abrirModal('egreso');

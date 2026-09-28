@@ -23,7 +23,7 @@
             return CantidadCajaSupport::formatearVisualizacionCelda($num, $nomFamilia);
         }
 
-        return number_format($num, 2, '.', '');
+        return number_format($num, 2, '.', ',');
     };
 
     $editablePlan = ! empty($editablePlan);
@@ -40,7 +40,7 @@
                 $texto = $num == 0.0 ? '—' : (
                     $layoutPlan
                         ? CantidadCajaSupport::formatearVisualizacionCelda($num, $nomFamilia)
-                        : number_format($num, 2, '.', '')
+                        : number_format($num, 2, '.', ',')
                 );
             }
 
@@ -67,7 +67,7 @@
             'texto' => $num == 0.0 ? '—' : (
                 $layoutPlan
                     ? CantidadCajaSupport::formatearVisualizacionCelda($num, $nomFamilia)
-                    : number_format($num, 2, '.', '')
+                    : number_format($num, 2, '.', ',')
             ),
             'alerta' => false,
             'negativo' => $num < 0,
@@ -87,8 +87,8 @@
 <th class="programas-grid__th mrp-grid__th--sticky mrp-grid__th--code">Código PL</th>
 <th class="programas-grid__th mrp-grid__th--sticky mrp-grid__th--material">Material PL</th>
 @else
-<th class="programas-grid__th programas-grid__th--stack mrp-grid__th--sticky mrp-grid__th--code">Código<br>PL</th>
-<th class="programas-grid__th programas-grid__th--stack mrp-grid__th--sticky mrp-grid__th--material">Material<br>PL</th>
+<th class="programas-grid__th programas-grid__th--stack mrp-grid__th--sticky mrp-grid__th--code">Código PL</th>
+<th class="programas-grid__th programas-grid__th--stack mrp-grid__th--sticky mrp-grid__th--material">Material PL</th>
 @endif
 @foreach ($columnasExtra as $col)
 <th class="programas-grid__th programas-grid__th--num mrp-grid__th--sticky mrp-grid__th--extra">{{ $col['label'] }}</th>

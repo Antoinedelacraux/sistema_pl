@@ -215,6 +215,19 @@ class MaestrosCatalogo
         return self::tabValido($tab) ? $tab : self::TABS[0];
     }
 
+    /**
+     * @return list<array{label: string, tabs: list<string>}>
+     */
+    public static function grupos(): array
+    {
+        return [
+            ['label' => 'Comercial', 'tabs' => ['programa_general', 'mercado', 'cliente', 'programa']],
+            ['label' => 'Producto', 'tabs' => ['presentacion', 'familia', 'uso']],
+            ['label' => 'Operación', 'tabs' => ['situado', 'proveedor', 'tipo_consumo']],
+            ['label' => 'Organización', 'tabs' => self::TABS_CONFIGURACION],
+        ];
+    }
+
     public static function esTabConfiguracion(string $tab): bool
     {
         return in_array($tab, self::TABS_CONFIGURACION, true);

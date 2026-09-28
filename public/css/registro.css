@@ -407,6 +407,44 @@ body.page-app[data-theme="dark"] .registro-grid tbody tr:nth-child(even) .provee
     width: 150px;
 }
 
+.egreso-pg-combo{
+    position: relative;
+}
+
+.egreso-pg-combo__list{
+    position: absolute;
+    z-index: 30;
+    left: 0;
+    right: 0;
+    top: calc(100% + 2px);
+    margin: 0;
+    padding: 4px 0;
+    max-height: 220px;
+    overflow: auto;
+    list-style: none;
+    background: var(--app-surface, #fff);
+    border: 1px solid var(--app-line);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 8px 20px rgba(50, 42, 68, 0.12);
+}
+
+.egreso-pg-combo__item{
+    padding: 8px 10px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.egreso-pg-combo__item:hover,
+.egreso-pg-combo__item.is-active{
+    background: var(--purple-soft, #f3eefc);
+}
+
+.egreso-pg-combo__empty{
+    padding: 8px 10px;
+    font-size: 12px;
+    color: var(--ink-muted);
+}
+
 .registro-consumo-extra__field .field__label{
     font-size: 11px;
 }

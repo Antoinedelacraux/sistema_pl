@@ -130,4 +130,13 @@
             cerrarModal();
         }
     });
+
+    var navSelect = document.querySelector('[data-maestros-nav]');
+    if (navSelect) {
+        navSelect.addEventListener('change', function () {
+            if (navSelect.value) {
+                window.location.href = navSelect.value;
+            }
+        });
+    }
 })();

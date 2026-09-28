@@ -65,10 +65,20 @@ class StockResumenService
         $idPrograma = (int) ($filtros['programa'] ?? 0);
         $idProducto = (int) ($filtros['producto'] ?? 0);
         $cajasSimulacion = (float) ($filtros['cajas'] ?? 0);
-        $simulaCajas = $idPrograma > 0 && $idProducto > 0 && $cajasSimulacion > 0;
+        $palletsSimulacion = $filtros['pallets'] ?? null;
+        $palletsSimulacion = $palletsSimulacion === null || $palletsSimulacion === ''
+            ? null
+            : (float) $palletsSimulacion;
+        $simulaCajas = $idPrograma > 0 && $idProducto > 0
+            && ($cajasSimulacion > 0 || $palletsSimulacion !== null);
 
         $necesidades = $simulaCajas
-            ? $this->consumoRecetaService->proyectarNecesidadesPorCajas($idPrograma, $idProducto, $cajasSimulacion)
+            ? $this->consumoRecetaService->proyectarNecesidadesPorCajas(
+                $idPrograma,
+                $idProducto,
+                $cajasSimulacion,
+                $palletsSimulacion
+            )
             : [];
 
         $filas = $materiales->map(function (MaterialProgramaPL $material) use (
