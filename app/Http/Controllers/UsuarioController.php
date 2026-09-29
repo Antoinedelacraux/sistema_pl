@@ -199,8 +199,23 @@ class UsuarioController extends Controller
         ];
     }
 
-    public function tarjeta(Usuario $usuario): JsonResponse
+    /**
+     * Tarjeta de perfil (popover). Se usa en Usuarios, Auditoría y en el detalle de Registro,
+     * así que se permite: la propia tarjeta, administradores y quien vea usuarios/auditoría/registro.
+     */
+    public function tarjeta(Request $request, Usuario $usuario): JsonResponse
     {
+        $actual = $request->user();
+        $permitido = $actual !== null && (
+            (int) $actual->idUsuario === (int) $usuario->idUsuario
+            || $actual->esAdministrador()
+            || $actual->puede('usuarios', 'ver')
+            || $actual->puede('auditoria', 'ver')
+            || $actual->puede('registro', 'ver')
+        );
+
+        abort_unless($permitido, 403, 'No tienes permiso para ver este perfil.');
+
         $usuario->load(['persona.area', 'persona.cargo', 'rol']);
 
         $persona = $usuario->persona;

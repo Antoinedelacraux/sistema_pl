@@ -98,8 +98,9 @@
                     <span class="receta-toolbar__stat-value">{{ number_format($totalProgramas) }}</span>
                     <span class="receta-toolbar__stat-label">programas</span>
                 </div>
-                @if ($puedeCrear)
+                @if ($puedeCrear || ($puedeVaciar ?? false))
                     <div class="receta-toolbar__actions">
+                        @if ($puedeVaciar ?? false)
                         <form
                             method="POST"
                             action="{{ route('programas.vaciar') }}"
@@ -109,16 +110,21 @@
                             data-confirm-title="Vaciar receta"
                             data-confirm-ok="Sí, vaciar receta"
                             data-confirm-variant="danger"
+                            data-confirm-texto="VACIAR"
                         >
                             @csrf
+                            <input type="hidden" name="confirmacion" value="">
                             <button type="submit" class="btn btn--outline btn--sm" id="receta-vaciar">Vaciar</button>
                         </form>
+                        @endif
+                        @if ($puedeCrear)
                         <form method="POST" action="{{ route('programas.import') }}" enctype="multipart/form-data" class="receta-import-form" id="receta-import-form">
                             @csrf
                             <input type="file" name="archivo_excel" id="receta-archivo-excel" class="receta-import-form__file" accept=".xlsx,.xlsm,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
                             <button type="button" class="btn btn--outline btn--sm" id="receta-importar-excel">Importar Excel</button>
                         </form>
                         <button type="button" class="btn btn--purple btn--sm" id="receta-abrir-modal">Agregar</button>
+                        @endif
                     </div>
                 @endif
             </div>

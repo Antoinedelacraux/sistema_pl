@@ -37,7 +37,7 @@ class UpdateUsuarioRequest extends FormRequest
                 'max:150',
                 Rule::unique('Usuario', 'Usuario')->ignore($cuenta->idUsuario, 'idUsuario'),
             ],
-            'password' => ['nullable', 'string', 'min:6', 'max:255'],
+            'password' => ['nullable', 'string', 'min:8', 'max:255'],
             'estado' => ['required', 'integer', Rule::in([Estado::ACTIVO, Estado::INACTIVO])],
             'permisos' => ['nullable', 'array'],
             'permisos.*' => ['nullable', 'array'],
@@ -53,7 +53,7 @@ class UpdateUsuarioRequest extends FormRequest
         return [
             'correo.unique' => 'Ese correo ya está registrado.',
             'usuario.unique' => 'Ese usuario ya existe.',
-            'password.min' => 'La contraseña debe tener al menos 6 caracteres.',
+            'password.min' => 'La contraseña debe tener al menos 8 caracteres.',
         ];
     }
 

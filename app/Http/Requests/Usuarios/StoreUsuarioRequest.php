@@ -23,7 +23,7 @@ class StoreUsuarioRequest extends FormRequest
             'id_cargo' => ['required', 'integer', Rule::exists('Cargo', 'idCargo')],
             'id_rol' => ['required', 'integer', Rule::exists('Rol', 'idRol')],
             'usuario' => ['required', 'string', 'max:150', Rule::unique('Usuario', 'Usuario')],
-            'password' => ['required', 'string', 'min:6', 'max:255'],
+            'password' => ['required', 'string', 'min:8', 'max:255'],
             'estado' => ['required', 'integer', Rule::in([Estado::ACTIVO, Estado::INACTIVO])],
             'permisos' => ['nullable', 'array'],
             'permisos.*' => ['nullable', 'array'],
@@ -39,7 +39,7 @@ class StoreUsuarioRequest extends FormRequest
         return [
             'correo.unique' => 'Ese correo ya está registrado.',
             'usuario.unique' => 'Ese usuario ya existe.',
-            'password.min' => 'La contraseña debe tener al menos 6 caracteres.',
+            'password.min' => 'La contraseña debe tener al menos 8 caracteres.',
         ];
     }
 

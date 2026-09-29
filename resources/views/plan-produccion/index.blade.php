@@ -31,8 +31,11 @@
                     <input type="file" name="archivo_excel" id="plan-prod-archivo-excel" class="plan-prod-import-form__file" accept=".xlsx,.xlsm,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
                     <button type="button" class="btn btn--outline btn--sm" id="plan-prod-importar-excel">Importar Excel</button>
                 </form>
-                <form method="POST" action="{{ route('plan-produccion.vaciar') }}" data-confirm="¿Vaciar todo el plan de producción?" data-confirm-title="Vaciar plan" data-confirm-ok="Sí, vaciar" data-confirm-variant="danger">
+            @endif
+            @if ($puedeVaciar ?? false)
+                <form method="POST" action="{{ route('plan-produccion.vaciar') }}" data-confirm="Se eliminará todo el plan de producción. Esta acción no se puede deshacer." data-confirm-title="Vaciar plan" data-confirm-ok="Sí, vaciar" data-confirm-variant="danger" data-confirm-texto="VACIAR">
                     @csrf
+                    <input type="hidden" name="confirmacion" value="">
                     <button type="submit" class="btn btn--ghost btn--sm">Vaciar</button>
                 </form>
             @endif

@@ -7,6 +7,8 @@
     var consumoPresentacionesUrl = window.registroConsumoPresentacionesUrl || '';
     var consumoMaterialesUrl = window.registroConsumoMaterialesUrl || '';
     var consumoHintUrl = window.registroConsumoHintUrl || '';
+    var consumoLimitePlanUrl = window.registroConsumoLimitePlanUrl || '';
+    var consumoLimitePlan = null;
     var tabActiva = window.registroTabActiva || 'ingresos';
     var lookupTimer = null;
     var consumoEditId = null;
@@ -91,6 +93,8 @@
             consumoEditLineas = {};
             consumoOverrides = {};
             consumoTotalOverrides = {};
+            consumoLimitePlan = null;
+            ocultarHintLimitePlanConsumo();
             resetConsumoCascada();
         }
     }
@@ -586,6 +590,7 @@
 
         actualizarHintStockConsumo();
         actualizarAlertaStockConsumo();
+        pintarHintLimitePlanConsumo();
     }
 
     function sincronizarStockMaterialesConsumo() {
@@ -739,6 +744,7 @@
                     consumoOverrides[idMaterial] = inputCaja.value;
                     tr.removeAttribute('data-total-manual');
                     recalcularTotalesConsumo();
+                    pintarHintLimitePlanConsumo();
                 });
                 tdPersonalizado.appendChild(inputCaja);
             } else {
@@ -832,6 +838,130 @@
         if (idPresentacionSeleccionada) {
             presentacion.value = String(idPresentacionSeleccionada);
         }
+    }
+
+    function cajasSolicitadasDesdeTablaConsumo() {
+        var body = document.getElementById('egreso-materiales-body');
+        if (!body) {
+            return 0;
+        }
+        var factores = factoresCajasDesdeTabla(body);
+        var valores = Object.keys(factores).map(function (clave) {
+            return factores[clave];
+        }).filter(function (n) {
+            return n > 0;
+        });
+        if (!valores.length) {
+            return 0;
+        }
+        return Math.max.apply(null, valores);
+    }
+
+    function sincronizarBotonGuardarConsumo() {
+        var btn = document.getElementById('registro-egreso-guardar');
+        if (!btn) {
+            return;
+        }
+        var bloquear = consumoExcedePlanSemanal();
+        btn.disabled = bloquear;
+        btn.setAttribute('aria-disabled', bloquear ? 'true' : 'false');
+    }
+
+    function ocultarHintLimitePlanConsumo() {
+        var hint = document.getElementById('egreso-plan-limite-hint');
+        if (!hint) {
+            sincronizarBotonGuardarConsumo();
+            return;
+        }
+        hint.hidden = true;
+        hint.textContent = '';
+        hint.classList.remove('is-error');
+        sincronizarBotonGuardarConsumo();
+    }
+
+    function pintarHintLimitePlanConsumo() {
+        var hint = document.getElementById('egreso-plan-limite-hint');
+        if (!hint) {
+            sincronizarBotonGuardarConsumo();
+            return;
+        }
+
+        if (!consumoLimitePlan || !consumoLimitePlan.aplica) {
+            ocultarHintLimitePlanConsumo();
+            return;
+        }
+
+        var solicitado = cajasSolicitadasDesdeTablaConsumo();
+        var sem = consumoLimitePlan.semana || 'semana';
+        var texto = 'Plan ' + sem + ': '
+            + Number(consumoLimitePlan.plan).toLocaleString() + ' cajas · '
+            + 'Consumido: ' + Number(consumoLimitePlan.consumido).toLocaleString() + ' · '
+            + 'Disponible: ' + Number(consumoLimitePlan.disponible).toLocaleString();
+
+        if (solicitado > 0) {
+            texto += ' · Este consumo: ' + Number(solicitado).toLocaleString();
+        }
+
+        hint.textContent = texto;
+        hint.hidden = false;
+        hint.classList.toggle(
+            'is-error',
+            solicitado > 0 && (consumoLimitePlan.consumido + solicitado) > consumoLimitePlan.plan + 0.0001
+        );
+        sincronizarBotonGuardarConsumo();
+    }
+
+    function actualizarLimitePlanConsumo() {
+        if (!consumoLimitePlanUrl || !navigator.onLine) {
+            consumoLimitePlan = null;
+            ocultarHintLimitePlanConsumo();
+            return Promise.resolve();
+        }
+
+        var programa = document.getElementById('egreso-id-programa');
+        var fechaInput = document.querySelector('#registro-egreso-form [name="fecha"]');
+        var idPrograma = programa ? String(programa.value || '').trim() : '';
+        var fecha = fechaInput ? String(fechaInput.value || '').trim() : '';
+
+        if (!idPrograma || !fecha) {
+            consumoLimitePlan = null;
+            ocultarHintLimitePlanConsumo();
+            return Promise.resolve();
+        }
+
+        var params = new URLSearchParams({
+            id_programa: idPrograma,
+            fecha: fecha,
+        });
+        if (consumoEditId) {
+            params.set('excluir_id_movimiento', String(consumoEditId));
+        }
+
+        return fetch(consumoLimitePlanUrl + '?' + params.toString(), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        })
+            .then(function (response) {
+                return response.ok ? response.json() : null;
+            })
+            .then(function (data) {
+                consumoLimitePlan = data && data.aplica ? data : null;
+                pintarHintLimitePlanConsumo();
+            })
+            .catch(function () {
+                consumoLimitePlan = null;
+                ocultarHintLimitePlanConsumo();
+            });
+    }
+
+    function consumoExcedePlanSemanal() {
+        if (!consumoLimitePlan || !consumoLimitePlan.aplica) {
+            return false;
+        }
+        var solicitado = cajasSolicitadasDesdeTablaConsumo();
+        if (solicitado <= 0) {
+            return false;
+        }
+        return solicitado > consumoLimitePlan.disponible + 0.0001;
     }
 
     function prepararEnvioConsumo() {
@@ -991,6 +1121,7 @@
                 }
                 actualizarParametrosPresentacionConsumo(params);
                 renderTablaMaterialesConsumo(materiales);
+                actualizarLimitePlanConsumo();
             })
             .catch(function () {
                 vaciarTablaMaterialesConsumo('No se pudieron cargar los materiales.');
@@ -1452,7 +1583,13 @@
     if (egresoPrograma) {
         egresoPrograma.addEventListener('change', function () {
             cargarPresentacionesConsumo(egresoPrograma.value);
+            actualizarLimitePlanConsumo();
         });
+    }
+
+    var egresoFecha = document.querySelector('#registro-egreso-form [name="fecha"]');
+    if (egresoFecha) {
+        egresoFecha.addEventListener('change', actualizarLimitePlanConsumo);
     }
 
     if (egresoPresentacion) {
@@ -1850,8 +1987,16 @@
 
     var egresoForm = document.getElementById('registro-egreso-form');
     if (egresoForm) {
-        egresoForm.addEventListener('submit', function () {
+        egresoForm.addEventListener('submit', function (event) {
             prepararEnvioConsumo();
+            pintarHintLimitePlanConsumo();
+            if (consumoExcedePlanSemanal()) {
+                event.preventDefault();
+                var hintPlan = document.getElementById('egreso-plan-limite-hint');
+                if (hintPlan) {
+                    hintPlan.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }
+            }
         });
     }
 

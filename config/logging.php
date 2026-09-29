@@ -21,6 +21,12 @@ return [
     'default' => env('LOG_CHANNEL', 'stack'),
 
     /*
+    | Registrar cada consulta SQL en storage/logs/queries.log (solo local o con APP_DEBUG).
+    | Se lee con config('logging.log_queries') para que funcione con config:cache.
+    */
+    'log_queries' => filter_var(env('LOG_QUERIES', false), FILTER_VALIDATE_BOOL),
+
+    /*
     |--------------------------------------------------------------------------
     | Deprecations Log Channel
     |--------------------------------------------------------------------------

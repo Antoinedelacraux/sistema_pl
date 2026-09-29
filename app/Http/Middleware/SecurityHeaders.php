@@ -35,7 +35,7 @@ class SecurityHeaders
         @ini_set('expose_php', '0');
 
         // Optional CSP Report-Only (does not block). Enable with SECURITY_CSP_REPORT_ONLY=true
-        if (filter_var(env('SECURITY_CSP_REPORT_ONLY', false), FILTER_VALIDATE_BOOLEAN)) {
+        if (config('security.csp_report_only', false)) {
             $csp = implode('; ', [
                 "default-src 'self'",
                 "base-uri 'self'",

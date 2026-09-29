@@ -1,6 +1,6 @@
 <div class="modal" id="registro-ingreso-modal" aria-hidden="true">
     <div class="modal__backdrop" data-cerrar-modal-registro="ingreso"></div>
-    <div class="modal__panel modal__panel--wide" role="dialog" aria-modal="true">
+    <div class="modal__panel modal__panel--wide registro-modal-panel" role="dialog" aria-modal="true">
         <header class="modal__head">
             <h2 class="modal__title" id="registro-ingreso-title">Agregar ingreso</h2>
             <button type="button" class="modal__close" data-cerrar-modal-registro="ingreso">&times;</button>

@@ -4,7 +4,7 @@ namespace App\Services\TablaComercial;
 
 use App\Models\Programas\TablaComercialDia;
 use App\Models\Programas\TablaComercialEstado;
-use App\Models\Stock\MovimientoStock;
+use App\Services\Stock\ConsumoPlanLimiteService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -46,55 +46,24 @@ class TablaComercialService
             return [];
         }
 
-        $minFecha = $semanas->min('fechaInicio');
-        $maxFecha = $semanas->max('fechaInicio')?->addDays(6);
-
-        if (! $minFecha || ! $maxFecha) {
-            return [];
-        }
-
-        // Egresos por PG y fecha agrupados (un solo query)
-        $rows = DB::table('MovimientoStock as ms')
-            ->join('Programa as p', 'p.idPrograma', '=', 'ms.idPrograma')
-            ->whereIn('p.idProgramaGeneral', $pgIds)
-            ->where('ms.tipo', MovimientoStock::TIPO_EGRESO)
-            ->where('ms.estado', 1)
-            ->whereNotNull('ms.idPrograma')
-            ->whereBetween('ms.fecha', [$minFecha, $maxFecha])
-            ->select('p.idProgramaGeneral', 'ms.fecha', DB::raw('SUM(ms.cantidad) as total'))
-            ->groupBy('p.idProgramaGeneral', 'ms.fecha')
-            ->get();
-
-        if ($rows->isEmpty()) {
-            return [];
-        }
-
-        // Construir mapa fecha → idSemProduccion
-        $fechaSemMap = [];
-        foreach ($semanas as $sem) {
-            $inicio = $sem->fechaInicio?->toDateString();
-            if (! $inicio) {
-                continue;
-            }
-            for ($d = 0; $d <= 6; $d++) {
-                $dia = date('Y-m-d', strtotime("+{$d} days", strtotime($inicio)));
-                $fechaSemMap[$dia] = $sem->idSemProduccion;
-            }
-        }
-
+        $limite = app(ConsumoPlanLimiteService::class);
         $resultado = [];
-        foreach ($rows as $row) {
-            $fecha = is_string($row->fecha)
-                ? $row->fecha
-                : $row->fecha->toDateString();
 
-            $idSem = $fechaSemMap[$fecha] ?? null;
-            if ($idSem === null) {
+        foreach ($pgIds as $idPg) {
+            $idPg = (int) $idPg;
+            if ($idPg <= 0) {
                 continue;
             }
-
-            $k = $row->idProgramaGeneral.'_'.$idSem;
-            $resultado[$k] = ($resultado[$k] ?? 0.0) + (float) $row->total;
+            foreach ($semanas as $sem) {
+                $idSem = (int) $sem->idSemProduccion;
+                if ($idSem <= 0) {
+                    continue;
+                }
+                $cajas = $limite->cajasConsumidasProgramaGeneralSemana($idPg, $idSem);
+                if ($cajas > 0) {
+                    $resultado[$idPg.'_'.$idSem] = $cajas;
+                }
+            }
         }
 
         return $resultado;

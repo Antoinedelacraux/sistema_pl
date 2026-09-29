@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"></noscript>
-    <link rel="stylesheet" href="{{ asset('css/app.css') }}?v=38">
+    <link rel="stylesheet" href="{{ asset('css/app.css') }}?v=39">
     <link rel="stylesheet" href="{{ asset('css/grids.css') }}?v=2">
     <link rel="stylesheet" href="{{ asset('css/responsive.css') }}?v=13">
     @stack('head')
@@ -29,7 +29,7 @@
     @yield('content')
     <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="true"></div>
     <script src="{{ asset('js/toasts.js') }}" defer></script>
-    <script src="{{ asset('js/confirm-dialog.js') }}" defer></script>
+    <script src="{{ asset('js/confirm-dialog.js') }}?v=2" defer></script>
     @stack('scripts')
 </body>
 </html>

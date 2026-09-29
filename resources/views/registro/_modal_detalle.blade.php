@@ -1,6 +1,6 @@
 <div class="modal" id="registro-detalle-modal" aria-hidden="true">
     <div class="modal__backdrop" data-cerrar-modal-registro="detalle"></div>
-    <div class="modal__panel modal__panel--wide" role="dialog" aria-modal="true" aria-labelledby="registro-detalle-titulo">
+    <div class="modal__panel modal__panel--wide registro-modal-panel" role="dialog" aria-modal="true" aria-labelledby="registro-detalle-titulo">
         <header class="modal__head">
             <div class="registro-detalle-head">
                 <span class="registro-detalle-tipo" id="registro-detalle-tipo" hidden></span>

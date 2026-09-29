@@ -88,25 +88,25 @@ class IngresoStockExcelParserService
         $ultimaFila = (int) $hoja->getHighestDataRow();
 
         for ($fila = $filaEncabezado + 1; $fila <= $ultimaFila; $fila++) {
-            $codigo = $this->normalizarCodigo($this->valorCelda($hoja, $mapa['id_producto'].$fila));
+            $codigo = $this->normalizarCodigo($this->valorCodigoProducto($hoja, $mapa['id_producto'].$fila));
             $descripcion = trim($this->valorCelda($hoja, $mapa['descripcion'].$fila));
             $familia = isset($mapa['observaciones'])
                 ? trim($this->valorCelda($hoja, $mapa['observaciones'].$fila))
                 : null;
-            $cantidad = $this->parseCantidad($this->valorCelda($hoja, $mapa['stock'].$fila));
+            $cantidad = $this->parseCantidadCelda($hoja, $mapa['stock'].$fila);
 
             if ($codigo === '' && $descripcion === '') {
                 continue;
             }
 
-            if ($codigo === '' || $codigo === '-') {
+            if ($codigo === '') {
                 if ($descripcion === '') {
                     continue;
                 }
                 $codigo = '-';
-                $advertencias[] = 'Fila '.$fila.': sin Idproducto; se asignó código "-".';
             }
 
+            // Stock "-" o vacío = 0; Idproducto "-" = sin código pero sí puede ingresar
             if ($cantidad <= 0) {
                 continue;
             }
@@ -214,14 +214,37 @@ class IngresoStockExcelParserService
         return trim((string) ($valor ?? ''));
     }
 
+    private function valorCodigoProducto(Worksheet $hoja, string $celda): string
+    {
+        $cell = $hoja->getCell($celda);
+        $valor = $cell->getValue();
+
+        if ($valor === null || $valor === '') {
+            return '';
+        }
+
+        if (is_int($valor) || is_float($valor)) {
+            return sprintf('%.0f', (float) $valor);
+        }
+
+        return trim((string) $cell->getFormattedValue());
+    }
+
     private function normalizarCodigo(string $codigo): string
     {
         return MaterialProgramaLookup::normalizarCodigo($codigo);
     }
 
-    private function parseCantidad(string $valor): float
+    private function parseCantidadCelda(Worksheet $hoja, string $celda): float
     {
-        $texto = trim($valor);
+        $cell = $hoja->getCell($celda);
+        $valor = $cell->getValue();
+
+        if (is_int($valor) || is_float($valor)) {
+            return max(0.0, round((float) $valor, 2));
+        }
+
+        $texto = trim((string) $cell->getFormattedValue());
         if ($texto === '' || $texto === '-' || $texto === '—') {
             return 0.0;
         }

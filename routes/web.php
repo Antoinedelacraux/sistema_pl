@@ -46,7 +46,7 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         ->name('programas.import');
 
     Route::post('/programas/vaciar', [ProgramaController::class, 'vaciarReceta'])
-        ->middleware('permiso:programas,crear')
+        ->middleware('permiso:programas,eliminar')
         ->name('programas.vaciar');
 
     Route::get('/mrp', [MrpController::class, 'index'])
@@ -67,7 +67,7 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         ->name('mrp.import');
 
     Route::post('/mrp/vaciar', [MrpController::class, 'vaciarPlan'])
-        ->middleware('permiso:mrp,crear')
+        ->middleware('permiso:mrp,eliminar')
         ->name('mrp.vaciar');
 
     Route::put('/mrp/plan', [MrpController::class, 'updatePlan'])
@@ -116,7 +116,7 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         ->name('plan-produccion.import');
 
     Route::post('/plan-produccion/vaciar', [PlanProduccionController::class, 'vaciar'])
-        ->middleware('permiso:plan_produccion,crear')
+        ->middleware('permiso:plan_produccion,eliminar')
         ->name('plan-produccion.vaciar');
 
     Route::put('/plan-produccion/plan', [PlanProduccionController::class, 'updatePlan'])
@@ -323,6 +323,10 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         ->middleware('permiso:registro,ver')
         ->name('registro.consumo.hint');
 
+    Route::get('/registro/consumo/limite-plan', [MovimientoController::class, 'limitePlanConsumo'])
+        ->middleware('permiso:registro,ver')
+        ->name('registro.consumo.limite-plan');
+
     Route::get('/registro/movimiento/{idMovimiento}/detalle', [MovimientoController::class, 'detalleMovimiento'])
         ->middleware('permiso:registro,ver')
         ->whereNumber('idMovimiento')
@@ -335,6 +339,7 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
 
     Route::get('/usuario/{usuario}/tarjeta', [UsuarioController::class, 'tarjeta'])
         ->whereNumber('usuario')
+        ->middleware('throttle:60,1')
         ->name('usuario.tarjeta');
 
     Route::middleware('admin')->group(function () {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Mrp\ImportMrpExcelRequest;
 use App\Http\Requests\Mrp\UpdateMrpPlanRequest;
+use App\Http\Requests\VaciarConfirmacionRequest;
 use App\Services\Auditoria\AuditoriaService;
 use App\Services\Mrp\MrpGridService;
 use App\Services\Mrp\MrpImportService;
@@ -36,6 +37,7 @@ class MrpController extends Controller
             'filtros' => $filtros,
             'puedeImportar' => $request->user()?->puede('mrp', 'crear') ?? false,
             'puedeEditar' => $request->user()?->puede('mrp', 'editar') ?? false,
+            'puedeVaciar' => $request->user()?->puede('mrp', 'eliminar') ?? false,
             'activeNav' => 'mrp',
         ]);
     }
@@ -145,7 +147,7 @@ class MrpController extends Controller
             );
     }
 
-    public function vaciarPlan(Request $request): \Illuminate\Http\RedirectResponse
+    public function vaciarPlan(VaciarConfirmacionRequest $request): \Illuminate\Http\RedirectResponse
     {
         $this->importService->vaciarPlan();
         $this->gridService->forgetCaches();

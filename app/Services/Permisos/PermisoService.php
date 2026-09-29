@@ -115,7 +115,7 @@ class PermisoService
             $payload[$rol->idRol] = $this->matrizPorRol((int) $rol->idRol);
         }
 
-        return json_encode($payload, JSON_UNESCAPED_UNICODE);
+        return json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     }
 
     private function matrizCompleta($modulos): array

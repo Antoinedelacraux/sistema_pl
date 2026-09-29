@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\PlanProduccion\ImportPlanProduccionExcelRequest;
 use App\Http\Requests\PlanProduccion\UpdatePlanProduccionRequest;
+use App\Http\Requests\VaciarConfirmacionRequest;
 use App\Services\Auditoria\AuditoriaService;
 use App\Services\PlanProduccion\PlanProduccionExportService;
 use App\Services\PlanProduccion\PlanProduccionGridService;
@@ -48,6 +49,7 @@ class PlanProduccionController extends Controller
             'totalProgramas' => $datos['total_programas'],
             'puedeImportar' => $request->user()?->puede('plan_produccion', 'crear') ?? false,
             'puedeEditar' => $request->user()?->puede('plan_produccion', 'editar') ?? false,
+            'puedeVaciar' => $request->user()?->puede('plan_produccion', 'eliminar') ?? false,
             'activeNav' => 'plan_produccion',
         ]);
     }
@@ -148,7 +150,7 @@ class PlanProduccionController extends Controller
         );
     }
 
-    public function vaciar(Request $request): RedirectResponse
+    public function vaciar(VaciarConfirmacionRequest $request): RedirectResponse
     {
         $this->importService->vaciar();
         $this->gridService->forgetCaches();

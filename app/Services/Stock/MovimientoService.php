@@ -146,7 +146,7 @@ class MovimientoService
     }
 
     /**
-     * Carga mÃ­nima de materiales (p.ej. old() / ediciÃ³n) sin el catÃ¡logo completo.
+     * Carga mínima de materiales (p.ej. old() / edición) sin el catálogo completo.
      *
      * @param  list<int>  $ids
      * @return Collection<int, MaterialProgramaPL>
@@ -178,7 +178,7 @@ class MovimientoService
             ->map(function (Collection $lineas) {
                 $principal = $lineas->first();
                 $totalLineas = $lineas->count();
-                $nombreMaterial = $principal->materialPl?->nomMaterial ?: 'â€”';
+                $nombreMaterial = $principal->materialPl?->nomMaterial ?: '—';
 
                 return (object) [
                     'idMovimiento' => $principal->idMovimiento,
@@ -189,7 +189,7 @@ class MovimientoService
                     'archivoOneDriveUrl' => $principal->archivoOneDriveUrl,
                     'observacion' => $principal->observacion,
                     'material' => $totalLineas > 1 ? $nombreMaterial.' y varios' : $nombreMaterial,
-                    'codigo_pl' => $totalLineas > 1 ? 'Varios' : ($principal->materialPl?->CodigoPL ?: 'â€”'),
+                    'codigo_pl' => $totalLineas > 1 ? 'Varios' : ($principal->materialPl?->CodigoPL ?: '—'),
                     'cantidad' => $lineas->sum(fn (MovimientoStock $linea) => (float) $linea->cantidad),
                     'es_lote' => $totalLineas > 1,
                     'total_lineas' => $totalLineas,
@@ -268,7 +268,7 @@ class MovimientoService
             ->map(function (Collection $lineas) {
                 $principal = $lineas->first();
                 $totalLineas = $lineas->count();
-                $nombreMaterial = $principal->materialPl?->nomMaterial ?: 'â€”';
+                $nombreMaterial = $principal->materialPl?->nomMaterial ?: '—';
 
                 return (object) [
                     'idMovimiento' => $principal->idMovimiento,
@@ -283,7 +283,7 @@ class MovimientoService
                     'presentacion' => $principal->presentacion,
                     'materialPl' => $principal->materialPl,
                     'material' => $totalLineas > 1 ? $nombreMaterial.' y varios' : $nombreMaterial,
-                    'codigo_pl' => $totalLineas > 1 ? 'Varios' : ($principal->materialPl?->CodigoPL ?: 'â€”'),
+                    'codigo_pl' => $totalLineas > 1 ? 'Varios' : ($principal->materialPl?->CodigoPL ?: '—'),
                     'cantidad' => $lineas->sum(fn (MovimientoStock $linea) => (float) $linea->cantidad),
                     'es_lote' => $totalLineas > 1,
                     'total_lineas' => $totalLineas,
@@ -615,7 +615,7 @@ class MovimientoService
         $cantidad = (float) $datos['cantidad'];
 
         if ($idOrigen === $idDestino) {
-            throw new InvalidArgumentException('El almacÃ©n origen y destino deben ser distintos.');
+            throw new InvalidArgumentException('El almacén origen y destino deben ser distintos.');
         }
 
         $referenciaPdf = $this->referenciaDocumento($datos);
@@ -833,7 +833,7 @@ class MovimientoService
             $cantidad = (float) $datos['cantidad'];
 
             if ($idOrigen === $idDestino) {
-                throw new InvalidArgumentException('El almacÃ©n origen y destino deben ser distintos.');
+                throw new InvalidArgumentException('El almacén origen y destino deben ser distintos.');
             }
 
             $disponible = $this->stockDisponible($idMaterialPL, $idOrigen);
@@ -1008,7 +1008,7 @@ class MovimientoService
 
         if ($stock < $delta) {
             throw new InvalidArgumentException(
-                'No se puede reducir o quitar el material: stock insuficiente en almacÃ©n.'
+                'No se puede reducir o quitar el material: stock insuficiente en almacén.'
             );
         }
     }
@@ -1088,7 +1088,7 @@ class MovimientoService
             'tipo' => 'traslado',
             'titulo' => 'Detalle de traslado',
             'id' => $traslado->idTraslado,
-            'usuario' => $persona?->nombreCompleto() ?: ($usuario?->Usuario ?: 'â€”'),
+            'usuario' => $persona?->nombreCompleto() ?: ($usuario?->Usuario ?: '—'),
             'id_usuario' => $usuario?->idUsuario,
             'usuario_email' => $persona?->Correo ?: ($usuario?->Usuario ?: null),
             'fecha_operacion' => $traslado->fecha?->format('d/m/Y'),
@@ -1106,7 +1106,7 @@ class MovimientoService
                 'codigo_pl' => $traslado->materialPl?->CodigoPL,
                 'material' => $traslado->materialPl?->nomMaterial,
                 'cantidad' => $this->formatearCantidad($traslado->cantidad),
-                'almacen' => ($traslado->almacenOrigen?->codigo ?? 'â€”').' â†’ '.($traslado->almacenDestino?->codigo ?? 'â€”'),
+                'almacen' => ($traslado->almacenOrigen?->codigo ?? '—').' → '.($traslado->almacenDestino?->codigo ?? '—'),
             ]],
             'movimientos_vinculados' => $traslado->movimientos
                 ->sortBy('tipo')
@@ -1380,7 +1380,7 @@ class MovimientoService
     private function mapearLotePaginado(object $lote, ?MovimientoStock $principal, string $tipo): object
     {
         $totalLineas = (int) $lote->total_lineas;
-        $nombreMaterial = $principal?->materialPl?->nomMaterial ?: 'â€”';
+        $nombreMaterial = $principal?->materialPl?->nomMaterial ?: '—';
 
         $item = (object) [
             'idMovimiento' => (int) $lote->id_principal,
@@ -1391,7 +1391,7 @@ class MovimientoService
             'archivoOneDriveUrl' => $principal?->archivoOneDriveUrl,
             'observacion' => $principal?->observacion,
             'material' => $totalLineas > 1 ? $nombreMaterial.' y varios' : $nombreMaterial,
-            'codigo_pl' => $totalLineas > 1 ? 'Varios' : ($principal?->materialPl?->CodigoPL ?: 'â€”'),
+            'codigo_pl' => $totalLineas > 1 ? 'Varios' : ($principal?->materialPl?->CodigoPL ?: '—'),
             'cantidad' => (float) $lote->cantidad_total,
             'es_lote' => $totalLineas > 1,
             'total_lineas' => $totalLineas,
@@ -1422,7 +1422,7 @@ class MovimientoService
             'tipo' => $movimiento->tipo,
             'titulo' => $esIngreso ? 'Detalle de ingreso' : 'Detalle de consumo',
             'id' => $movimiento->idMovimiento,
-            'usuario' => $persona?->nombreCompleto() ?: ($usuario?->Usuario ?: 'â€”'),
+            'usuario' => $persona?->nombreCompleto() ?: ($usuario?->Usuario ?: '—'),
             'id_usuario' => $usuario?->idUsuario,
             'usuario_email' => $persona?->Correo ?: ($usuario?->Usuario ?: null),
             'fecha_operacion' => $movimiento->fecha?->format('d/m/Y'),
@@ -1607,8 +1607,8 @@ class MovimientoService
         try {
             return $this->procesarArchivoPdfStrict($archivo, $tipo, $facturaGuia);
         } catch (\Throwable $exception) {
-            // En campaÃ±a el movimiento no debe fallar por OneDrive/Power Automate.
-            Log::warning('No se pudo subir el PDF; el movimiento se guardÃ³ sin archivo.', [
+            // En campaña el movimiento no debe fallar por OneDrive/Power Automate.
+            Log::warning('No se pudo subir el PDF; el movimiento se guardó sin archivo.', [
                 'tipo' => $tipo,
                 'referencia' => $facturaGuia,
                 'error' => $exception->getMessage(),
@@ -1637,7 +1637,7 @@ class MovimientoService
     }
 
     /**
-     * Bloqueo corto por material+almacÃ©n para evitar stock negativo con usuarios concurrentes.
+     * Bloqueo corto por material+almacén para evitar stock negativo con usuarios concurrentes.
      *
      * @template T
      * @param  callable(): T  $callback
@@ -1659,7 +1659,7 @@ class MovimientoService
 
         if (! $resultado || (int) $resultado->locked !== 1) {
             throw new InvalidArgumentException(
-                'Otro usuario estÃ¡ usando este almacÃ©n. Intente de nuevo en unos segundos.'
+                'Otro usuario está usando este almacén. Intente de nuevo en unos segundos.'
             );
         }
 

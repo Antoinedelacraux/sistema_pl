@@ -57,7 +57,7 @@ class AppServiceProvider extends ServiceProvider
 
     private function shouldLogQueries(): bool
     {
-        if (! filter_var(env('LOG_QUERIES', false), FILTER_VALIDATE_BOOL)) {
+        if (! config('logging.log_queries', false)) {
             return false;
         }
 

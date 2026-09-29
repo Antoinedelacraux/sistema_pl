@@ -1,6 +1,6 @@
 <div class="modal" id="registro-egreso-modal" aria-hidden="true">
     <div class="modal__backdrop" data-cerrar-modal-registro="egreso"></div>
-    <div class="modal__panel modal__panel--wide" role="dialog" aria-modal="true">
+    <div class="modal__panel modal__panel--wide registro-modal-panel" role="dialog" aria-modal="true">
         <header class="modal__head">
             <h2 class="modal__title" id="registro-egreso-title">Agregar consumo</h2>
             <button type="button" class="modal__close" data-cerrar-modal-registro="egreso">&times;</button>
@@ -105,6 +105,7 @@
                         </div>
                     </div>
                     <p class="field__hint" id="egreso-materiales-hint">Seleccione un producto para cargar los materiales desde Receta.</p>
+                    <p class="field__hint registro-consumo-plan-limite" id="egreso-plan-limite-hint" hidden></p>
                     <div class="registro-consumo-stock-alert" id="egreso-stock-alert" hidden role="alert"></div>
                     <div class="registro-consumo-tabla-wrap" id="egreso-materiales-tabla-wrap" hidden>
                         <table class="registro-consumo-tabla" id="egreso-materiales-tabla">

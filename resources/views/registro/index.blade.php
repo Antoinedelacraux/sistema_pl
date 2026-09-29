@@ -6,7 +6,7 @@
 @section('crumbs', 'Stock · ingresos, consumos y traslados')
 
 @push('head')
-<link rel="stylesheet" href="{{ asset('css/registro.css') }}?v=6">
+<link rel="stylesheet" href="{{ asset('css/registro.css') }}?v=9">
 @endpush
 
 @section('page')
@@ -343,6 +343,7 @@
     window.registroConsumoPresentacionesUrl = @json(route('registro.consumo.presentaciones'));
     window.registroConsumoMaterialesUrl = @json(route('registro.consumo.materiales'));
     window.registroConsumoHintUrl = @json(route('registro.consumo.hint'));
+    window.registroConsumoLimitePlanUrl = @json(route('registro.consumo.limite-plan'));
     window.registroIngresoLeerXmlUrl = @json(route('registro.ingreso.leer-xml'));
     window.registroIngresoLeerExcelUrl = @json(route('registro.ingreso.leer-excel'));
     window.registroDetalleMovimientoUrl = @json(route('registro.movimiento.detalle', ['idMovimiento' => '__ID__']));
@@ -360,5 +361,5 @@
 <script src="{{ asset('js/offline-queue.js') }}" defer></script>
 <script src="{{ asset('js/offline-sync-registro.js') }}?v=3" defer></script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script src="{{ asset('js/registro.js') }}?v=19" defer></script>
+<script src="{{ asset('js/registro.js') }}?v=21" defer></script>
 @endpush

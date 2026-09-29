@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Stock;
 
+use App\Services\Stock\ConsumoPlanLimiteService;
 use App\Services\Stock\ConsumoRecetaService;
 use App\Services\Stock\MovimientoService;
 use Illuminate\Foundation\Http\FormRequest;
@@ -87,6 +88,20 @@ class UpdateEgresoRequest extends FormRequest
                         .($faltante > 0 ? ' · Faltan: '.number_format($faltante, 2, '.', '') : '')
                     );
                 }
+            }
+
+            $excluir = $movimiento->idsMovimientosLoteEgreso($idMovimiento);
+            $limite = app(ConsumoPlanLimiteService::class)->evaluar(
+                $idPrograma,
+                $idPresentacion,
+                (string) $this->input('fecha'),
+                $this->input('lineas', []),
+                $this->input('pallets_fuera'),
+                $this->input('conformacion_dentro'),
+                $excluir
+            );
+            if ($limite['mensaje'] !== null) {
+                $validator->errors()->add('lineas', $limite['mensaje']);
             }
         });
     }

@@ -53,7 +53,7 @@ class ProgramaGridService
             ->withQueryString();
     }
 
-    /** Programas distintos presentes en la grilla de receta (no el catÃ¡logo CRUD). */
+    /** Programas distintos presentes en la grilla de receta (no el catálogo CRUD). */
     public function totalProgramasDistintos(array $filtros = []): int
     {
         $version = (int) Cache::get('programa.cache_version', 0);
@@ -282,7 +282,7 @@ class ProgramaGridService
 
     private function queryFilas(array $filtros): Builder
     {
-        $query = ProgramaFila::query()->with([
+        $query = ProgramaFila::query()->activo()->with([
             'mercado:idMercado,nomMercado',
             'cliente:idCliente,nomCliente',
             'variedad:idVariedad,nomVariedad',
@@ -327,7 +327,7 @@ class ProgramaGridService
 
     private function queryIdsReceta(array $filtros): Builder
     {
-        $query = ProgramaFila::query();
+        $query = ProgramaFila::query()->activo();
 
         if (! empty($filtros['mercado'])) {
             $query->where('idMercado', (int) $filtros['mercado']);
@@ -445,12 +445,13 @@ class ProgramaGridService
     {
         return $this->memoOpcionesFiltro('programa_general', function (): Collection {
             $idsGeneral = ProgramaFila::query()
+                ->activo()
                 ->whereNotNull('idProgramaGeneral')
                 ->distinct()
                 ->pluck('idProgramaGeneral');
 
             if ($idsGeneral->isEmpty()) {
-                $idsProgramas = ProgramaFila::query()->distinct()->pluck('idPrograma');
+                $idsProgramas = ProgramaFila::query()->activo()->distinct()->pluck('idPrograma');
                 $idsGeneral = ProgramaCatalogo::query()
                     ->whereIn('idPrograma', $idsProgramas)
                     ->whereNotNull('idProgramaGeneral')
@@ -596,7 +597,7 @@ class ProgramaGridService
     }
 
     /**
-     * VacÃ­a la grilla Receta (filas + pallets/conformaciÃ³n). No toca catÃ¡logos ni proveedores.
+     * Vacía la grilla Receta (filas + pallets/conformación). No toca catálogos ni proveedores.
      *
      * @return array{filas: int, params: int}
      */
@@ -605,14 +606,20 @@ class ProgramaGridService
         $filas = ProgramaFila::query()->count();
         $params = ProgramaPresentacionParam::query()->count();
 
-        DB::transaction(function () {
-            ProgramaFila::query()->pluck('idProgramaFila')->each(
-                fn (int $id) => $this->imagenService->eliminarVariantes($id)
-            );
+        /** @var list<int> $idsConImagen */
+        $idsConImagen = DB::transaction(function (): array {
+            $ids = ProgramaFila::query()->pluck('idProgramaFila')->map(fn ($id) => (int) $id)->all();
 
             ProgramaFila::query()->delete();
             ProgramaPresentacionParam::query()->delete();
+
+            return $ids;
         });
+
+        // Los archivos no se pueden revertir: se borran solo después del commit.
+        foreach ($idsConImagen as $id) {
+            $this->imagenService->eliminarVariantes($id);
+        }
 
         $this->olvidarCaches();
 

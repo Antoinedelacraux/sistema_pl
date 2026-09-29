@@ -19,6 +19,7 @@ use App\Models\Programas\Variedad;
 use App\Support\CantidadCajaSupport;
 use App\Support\FamiliaMaterialSupport;
 use App\Support\MaterialProgramaLookup;
+use App\Support\RecetaFilaOrdenSupport;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -102,10 +103,10 @@ class ProgramaImportService
     private const OBSERVACION_VACIA = 'Oficial';
 
     /**
-     * Importa Receta desde Excel. Si ya hay filas, fusiona (actualiza catálogos/programa)
-     * y conserva cantidad x caja editada en pantalla cuando el Excel trae el valor anterior.
+     * Sincroniza Receta con el Excel: inserta/actualiza filas del archivo, desactiva las que
+     * ya no están en el Excel y no modifica cantidad x caja en filas existentes.
      *
-     * @return array{leidas: int, insertadas: int, actualizadas: int, cantidades_preservadas: int, duplicadas: int, omitidas: int, total: int}
+     * @return array{leidas: int, insertadas: int, actualizadas: int, cantidades_preservadas: int, desactivadas: int, reordenadas: int, duplicadas: int, omitidas: int, total: int}
      */
     public function importar(UploadedFile $archivo): array
     {
@@ -120,21 +121,29 @@ class ProgramaImportService
         $insertadas = 0;
         $actualizadas = 0;
         $cantidadesPreservadas = 0;
+        $desactivadas = 0;
         $duplicadas = 0;
         $omitidas = 0;
         $vistasEnExcel = [];
 
         $indiceExistentes = $this->indiceFilasPorMatchKey();
+        $indiceSinProgramaGeneral = $this->indiceFilasPorMatchKeySinProgramaGeneral();
+
+        /** @var array<int, true> */
+        $filasSincronizadas = [];
 
         DB::transaction(function () use (
             $filasExcel,
             $indiceExistentes,
+            $indiceSinProgramaGeneral,
             &$insertadas,
             &$actualizadas,
             &$cantidadesPreservadas,
+            &$desactivadas,
             &$duplicadas,
             &$omitidas,
-            &$vistasEnExcel
+            &$vistasEnExcel,
+            &$filasSincronizadas
         ) {
             $nroFila = (int) ProgramaFila::query()->max('nroFila');
 
@@ -153,11 +162,28 @@ class ProgramaImportService
                 }
 
                 $vistasEnExcel[$matchKey] = true;
-                $existentes = $indiceExistentes[$matchKey] ?? [];
+                $existentes = $this->filasCandidatasSinSincronizar(
+                    $indiceExistentes[$matchKey] ?? [],
+                    $filasSincronizadas
+                );
+
+                if ($existentes === []) {
+                    $claveSinPg = $this->matchKeySinProgramaGeneralDesdeExcel($filaExcel);
+                    $sinPg = $this->filasCandidatasSinSincronizar(
+                        $indiceSinProgramaGeneral[$claveSinPg] ?? [],
+                        $filasSincronizadas
+                    );
+                    if ($sinPg !== []) {
+                        $existentes = [$sinPg[0]];
+                    }
+                }
 
                 if ($existentes === []) {
                     $nroFila++;
-                    $this->insertarFila($filaExcel, $nroFila);
+                    $nueva = ProgramaFila::query()->create(
+                        $this->datosFilaDesdeExcel($filaExcel, $nroFila)
+                    );
+                    $filasSincronizadas[(int) $nueva->idProgramaFila] = true;
                     $insertadas++;
 
                     continue;
@@ -167,23 +193,34 @@ class ProgramaImportService
                     if ($this->fusionarFilaDesdeExcel($fila, $filaExcel)) {
                         $cantidadesPreservadas++;
                     }
+                    $filasSincronizadas[(int) $fila->idProgramaFila] = true;
                     $actualizadas++;
                 }
+            }
+
+            if ($filasSincronizadas !== []) {
+                $desactivadas = ProgramaFila::query()
+                    ->activo()
+                    ->whereNotIn('idProgramaFila', array_keys($filasSincronizadas))
+                    ->update(['Estado' => Estado::INACTIVO]);
             }
         });
 
         Cache::forget('catalogo.programas_consumo');
         Cache::forget('catalogo.programas_por_general_consumo');
-        $this->backfillProgramaGeneralEnFilas();
+
+        $reordenadas = RecetaFilaOrdenSupport::renumerarFilasActivas();
 
         return [
             'leidas' => count($filasExcel),
             'insertadas' => $insertadas,
             'actualizadas' => $actualizadas,
             'cantidades_preservadas' => $cantidadesPreservadas,
+            'desactivadas' => $desactivadas,
+            'reordenadas' => $reordenadas,
             'duplicadas' => $duplicadas,
             'omitidas' => $omitidas,
-            'total' => ProgramaFila::query()->count(),
+            'total' => ProgramaFila::query()->activo()->count(),
         ];
     }
 
@@ -237,14 +274,17 @@ class ProgramaImportService
 
                 $idPg = $this->resolverProgramaGeneralId($nombreGeneral, $codigoGeneral);
 
-                foreach ($candidatas as $fila) {
-                    if ((int) $fila->idProgramaGeneral === $idPg) {
-                        continue;
-                    }
-
-                    $fila->update(['idProgramaGeneral' => $idPg]);
-                    $actualizadas++;
+                if (count($candidatas) !== 1) {
+                    continue;
                 }
+
+                $fila = $candidatas[0];
+                if ((int) $fila->idProgramaGeneral === $idPg) {
+                    continue;
+                }
+
+                $fila->update(['idProgramaGeneral' => $idPg]);
+                $actualizadas++;
             }
         });
 
@@ -644,50 +684,53 @@ class ProgramaImportService
     }
 
     /**
-     * @param  array<string, string>  $filaExcel
-     * @return bool true si se conservó la cantidad editada en pantalla
+     * @return array<string, list<ProgramaFila>>
      */
-    private function fusionarFilaDesdeExcel(ProgramaFila $fila, array $filaExcel): bool
+    private function indiceFilasPorMatchKeySinProgramaGeneral(): array
     {
-        $datos = $this->datosFilaDesdeExcel($filaExcel, (int) $fila->nroFila);
-        unset($datos['nroFila']);
+        $indice = [];
 
-        $preservarCantidad = $this->debePreservarCantidadCaja($fila, $filaExcel);
-        if ($preservarCantidad) {
-            unset($datos['idCantidadCaja'], $datos['idCantidadCajaRefExcel']);
-        }
+        ProgramaFila::query()
+            ->activo()
+            ->with([
+                'mercado', 'cliente', 'programa', 'variedad',
+                'presentacion', 'material', 'uso', 'familia',
+            ])
+            ->orderBy('idProgramaFila')
+            ->lazy(500)
+            ->each(function (ProgramaFila $fila) use (&$indice) {
+                $clave = $this->matchKeySinProgramaGeneralDesdeFila($fila);
+                $indice[$clave][] = $fila;
+            });
 
-        $fila->update($datos);
+        return $indice;
+    }
 
-        return $preservarCantidad;
+    /**
+     * @param  list<ProgramaFila>  $filas
+     * @param  array<int, true>  $filasSincronizadas
+     * @return list<ProgramaFila>
+     */
+    private function filasCandidatasSinSincronizar(array $filas, array $filasSincronizadas): array
+    {
+        return array_values(array_filter(
+            $filas,
+            fn (ProgramaFila $fila) => ! isset($filasSincronizadas[(int) $fila->idProgramaFila])
+        ));
     }
 
     /**
      * @param  array<string, string>  $filaExcel
+     * @return bool true si se conservó la cantidad x caja de la fila existente
      */
-    private function debePreservarCantidadCaja(ProgramaFila $fila, array $filaExcel): bool
+    private function fusionarFilaDesdeExcel(ProgramaFila $fila, array $filaExcel): bool
     {
-        $idRef = (int) ($fila->idCantidadCajaRefExcel ?? $fila->idCantidadCaja);
-        $idActual = (int) $fila->idCantidadCaja;
+        $datos = $this->datosFilaDesdeExcel($filaExcel, (int) $fila->nroFila);
+        unset($datos['nroFila'], $datos['idCantidadCaja'], $datos['idCantidadCajaRefExcel']);
 
-        if ($idActual === $idRef) {
-            return false;
-        }
+        $fila->update($datos);
 
-        $nomFamilia = $this->normalizarFamiliaImport($filaExcel['Material']);
-        $ref = CantidadCaja::query()->find($idRef);
-        if ($ref === null) {
-            return false;
-        }
-
-        $claveRef = CantidadCajaSupport::claveCantidad($ref->cantidad, $nomFamilia);
-        $claveExcel = CantidadCajaSupport::claveCantidad($filaExcel['Cantidad x Caja'], $nomFamilia);
-
-        if ($claveExcel === $claveRef) {
-            return true;
-        }
-
-        return false;
+        return true;
     }
 
     private function codigoPlanificacionValido(string $codigo): bool
@@ -718,11 +761,6 @@ class ProgramaImportService
     /**
      * @param  array<string, string>  $filaExcel
      */
-    private function insertarFila(array $filaExcel, int $nroFila): void
-    {
-        ProgramaFila::query()->create($this->datosFilaDesdeExcel($filaExcel, $nroFila));
-    }
-
     /**
      * @param  array<string, string>  $filaExcel
      * @return array<string, int|string>
@@ -1080,16 +1118,5 @@ class ProgramaImportService
                     $this->cacheMaterialPl[$material->CodigoPL] = $material;
                 });
         }
-    }
-
-    private function backfillProgramaGeneralEnFilas(): void
-    {
-        DB::statement('
-            UPDATE ProgramaFila pf
-            INNER JOIN Programa p ON p.idPrograma = pf.idPrograma
-            SET pf.idProgramaGeneral = p.idProgramaGeneral
-            WHERE pf.idProgramaGeneral IS NULL
-              AND p.idProgramaGeneral IS NOT NULL
-        ');
     }
 }

@@ -12,6 +12,7 @@ use App\Http\Requests\Stock\UpdateIngresoRequest;
 use App\Http\Requests\Stock\UpdateTrasladoRequest;
 use App\Models\Stock\MovimientoStock;
 use App\Services\Auditoria\AuditoriaService;
+use App\Services\Stock\ConsumoPlanLimiteService;
 use App\Services\Stock\ConsumoRecetaService;
 use App\Services\Stock\GuiaXmlParserService;
 use App\Services\Stock\IngresoNotificacionService;
@@ -33,6 +34,7 @@ class MovimientoController extends Controller
     public function __construct(
         private readonly MovimientoService $movimientoService,
         private readonly ConsumoRecetaService $consumoRecetaService,
+        private readonly ConsumoPlanLimiteService $consumoPlanLimiteService,
         private readonly GuiaXmlParserService $guiaXmlParserService,
         private readonly IngresoStockExcelParserService $ingresoStockExcelParserService,
         private readonly RegistroExportService $exportService,
@@ -565,6 +567,21 @@ class MovimientoController extends Controller
     public function offlineCsrf(): JsonResponse
     {
         return response()->json(['token' => csrf_token()]);
+    }
+
+    public function limitePlanConsumo(Request $request): JsonResponse
+    {
+        $idPrograma = (int) $request->query('id_programa', 0);
+        $fecha = (string) $request->query('fecha', '');
+        $excluir = (int) $request->query('excluir_id_movimiento', 0);
+
+        $excluirIds = $excluir > 0
+            ? $this->movimientoService->idsMovimientosLoteEgreso($excluir)
+            : [];
+
+        return response()->json(
+            $this->consumoPlanLimiteService->resumen($idPrograma, $fecha, $excluirIds)
+        );
     }
 
     public function hintConsumo(Request $request): JsonResponse

@@ -376,6 +376,16 @@ body.page-app[data-theme="dark"] .registro-grid tbody tr:nth-child(even) .provee
     margin: 4px 0 8px;
 }
 
+.registro-consumo-plan-limite.is-error{
+    color: #b42318;
+    font-weight: 600;
+}
+
+#registro-egreso-guardar:disabled{
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 .registro-consumo-materiales .field__hint[hidden],
 .registro-consumo-tabla-wrap[hidden]{
     display: none !important;
@@ -891,6 +901,97 @@ body.page-app[data-theme="dark"] .registro-tipo-mark--ingreso{
     color: var(--ink);
 }
 
+/* Modales registro (detalle, ingreso, consumo, traslado) */
+.registro-modal-panel{
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    width: min(980px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+}
+
+.registro-modal-panel .modal__head{
+    flex-shrink: 0;
+}
+
+.registro-modal-panel .modal__body,
+.registro-modal-panel .modal__form{
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.registro-modal-panel .modal__actions,
+.registro-modal-panel > footer.modal__actions{
+    flex-shrink: 0;
+    margin-top: 0;
+    position: sticky;
+    bottom: 0;
+    background: var(--app-surface);
+    border-top: 1px solid var(--app-line);
+    box-shadow: 0 -8px 16px rgba(18, 10, 7, 0.06);
+}
+
+#registro-detalle-modal .registro-detalle-body{
+    padding-top: 16px;
+    padding-bottom: 8px;
+}
+
+#registro-detalle-modal .programas-grid-wrap{
+    max-height: min(460px, calc(100vh - 320px));
+    border: 1px solid var(--app-line);
+    border-radius: var(--radius-sm);
+    border-top: 1px solid var(--app-line);
+}
+
+#registro-detalle-modal .registro-detalle-grid{
+    table-layout: fixed;
+    width: 100%;
+    font-size: 12px;
+}
+
+#registro-detalle-modal .registro-detalle-grid .programas-grid__th,
+#registro-detalle-modal .registro-detalle-grid td{
+    padding: 8px 10px;
+    vertical-align: middle;
+}
+
+#registro-detalle-modal .registro-detalle-grid .programas-grid__code{
+    width: 14%;
+    min-width: 112px;
+    max-width: 130px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#registro-detalle-modal .registro-detalle-grid .programas-grid__material{
+    min-width: 0;
+    width: auto;
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+#registro-detalle-modal .registro-detalle-grid__th--almacen,
+#registro-detalle-modal .registro-detalle-grid .programas-grid__th:nth-child(3):not(.programas-grid__th--num),
+#registro-detalle-modal .registro-detalle-grid tbody td:nth-child(3):not(.programas-grid__qty){
+    width: 76px;
+    min-width: 76px;
+    max-width: 88px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+#registro-detalle-modal .registro-detalle-grid .programas-grid__th--num,
+#registro-detalle-modal .registro-detalle-grid .programas-grid__qty{
+    width: 100px;
+    min-width: 100px;
+    max-width: 120px;
+    padding-right: 14px;
+    text-align: right;
+}
+
 .registro-detalle-grid .programas-grid__material{
     min-width: 180px;
 }
@@ -934,41 +1035,12 @@ body.page-app[data-theme="dark"] .registro-tipo-mark--ingreso{
     color: #b91c1c;
 }
 
-/* Modal consumo: un solo scroll (evita doble barra panel + tabla) */
-#registro-egreso-modal .modal__panel--wide{
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    width: min(920px, calc(100vw - 24px));
-    max-height: calc(100vh - 24px);
-}
-
-#registro-egreso-modal .modal__head{
-    flex-shrink: 0;
-}
-
 #registro-egreso-modal .modal__form{
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
     padding-bottom: 12px;
 }
 
-#registro-egreso-modal .modal__actions{
-    flex-shrink: 0;
-    position: sticky;
-    bottom: 0;
-    margin-top: 0;
-    padding-top: 14px;
-    padding-bottom: 18px;
-    background: var(--app-surface);
-    border-top: 1px solid var(--app-line);
-    box-shadow: 0 -8px 16px rgba(18, 10, 7, 0.06);
-}
-
 #registro-egreso-modal .registro-consumo-tabla{
-    min-width: 680px;
+    min-width: 720px;
 }
 
 .registro-consumo-stock-alert{

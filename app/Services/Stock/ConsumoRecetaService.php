@@ -236,15 +236,13 @@ class ConsumoRecetaService
                 ];
             })
             ->sortBy(function (array $item) {
-                $familia = FamiliaMaterialSupport::normalizar($item['nom_familia'] ?? null);
-                $ordenFamilia = match ($familia) {
-                    'cajas', 'box' => '0',
-                    default => '1_'.$familia,
-                };
-                $ordenFactor = ! empty($item['es_caja_factor']) ? '0' : '1';
+                $prioridad = \App\Support\RecetaFilaOrdenSupport::prioridadDesdeNombres(
+                    $item['nom_familia'] ?? null,
+                    $item['nom_uso'] ?? null
+                );
                 $material = mb_strtolower((string) ($item['nom_material'] ?? ''));
 
-                return $ordenFamilia.'|'.$ordenFactor.'|'.$material;
+                return sprintf('%04d|%s', $prioridad, $material);
             })
             ->values()
             ->all();
@@ -494,6 +492,52 @@ class ConsumoRecetaService
      * @param  Collection<int, mixed>  $inputPorId
      * @return array<string, float>
      */
+    /**
+     * Cajas indicadas en el formulario (campo «otra cantidad» en filas Box / alternativa).
+     */
+    public function cajasSolicitadasEnLineas(
+        int $idPrograma,
+        int $idPresentacion,
+        array $lineasInput,
+        mixed $palletsInput = null,
+        mixed $conformacionInput = null
+    ): float {
+        if ($idPrograma <= 0 || $idPresentacion <= 0) {
+            return 0.0;
+        }
+
+        $inputPorId = collect($lineasInput)->keyBy(fn ($linea) => (int) ($linea['id_material_pl'] ?? 0));
+        $receta = $this->materialesDePresentacion($idPrograma, $idPresentacion);
+        $factores = $this->factoresCajasDesdeLineas($receta, $inputPorId);
+
+        if ($factores !== []) {
+            return max($factores);
+        }
+
+        $lineas = $this->resolverLineasConsumo(
+            $idPrograma,
+            $idPresentacion,
+            $lineasInput,
+            $palletsInput,
+            $conformacionInput
+        );
+
+        $cajas = 0.0;
+        foreach ($receta as $item) {
+            if (empty($item['es_caja_factor'])) {
+                continue;
+            }
+            $idMaterial = (int) $item['id_material_pl'];
+            foreach ($lineas as $linea) {
+                if ((int) $linea['id_material_pl'] === $idMaterial) {
+                    $cajas = max($cajas, (float) $linea['cantidad']);
+                }
+            }
+        }
+
+        return $cajas;
+    }
+
     private function factoresCajasDesdeLineas(array $receta, Collection $inputPorId): array
     {
         $factores = [];

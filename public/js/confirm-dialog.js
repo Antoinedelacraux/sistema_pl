@@ -6,7 +6,21 @@
     var iconEl = null;
     var cancelBtn = null;
     var confirmBtn = null;
+    var textoWrap = null;
+    var textoLabel = null;
+    var textoInput = null;
+    var textoRequerido = '';
     var resolver = null;
+
+    function textoValido() {
+        return textoRequerido === '' || (textoInput && textoInput.value.trim() === textoRequerido);
+    }
+
+    function actualizarBotonConfirmar() {
+        if (confirmBtn) {
+            confirmBtn.disabled = !textoValido();
+        }
+    }
 
     var icons = {
         danger: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>',
@@ -29,6 +43,10 @@
                 '<div class="confirm-dialog__icon" data-confirm-icon></div>' +
                 '<h2 class="confirm-dialog__title" id="confirm-dialog-title"></h2>' +
                 '<p class="confirm-dialog__message" id="confirm-dialog-message"></p>' +
+                '<div class="confirm-dialog__texto" data-confirm-texto-wrap hidden>' +
+                    '<label class="confirm-dialog__texto-label" for="confirm-dialog-texto"></label>' +
+                    '<input type="text" class="confirm-dialog__texto-input" id="confirm-dialog-texto" autocomplete="off" spellcheck="false">' +
+                '</div>' +
                 '<div class="confirm-dialog__actions">' +
                     '<button type="button" class="btn btn--outline btn--sm" data-confirm-cancel>Cancelar</button>' +
                     '<button type="button" class="btn btn--sm" data-confirm-ok>Confirmar</button>' +
@@ -43,12 +61,20 @@
         iconEl = root.querySelector('[data-confirm-icon]');
         cancelBtn = root.querySelector('[data-confirm-cancel]');
         confirmBtn = root.querySelector('[data-confirm-ok]');
+        textoWrap = root.querySelector('[data-confirm-texto-wrap]');
+        textoLabel = root.querySelector('.confirm-dialog__texto-label');
+        textoInput = root.querySelector('.confirm-dialog__texto-input');
+
+        textoInput.addEventListener('input', actualizarBotonConfirmar);
 
         cancelBtn.addEventListener('click', function () {
             close(false);
         });
 
         confirmBtn.addEventListener('click', function () {
+            if (!textoValido()) {
+                return;
+            }
             close(true);
         });
 
@@ -65,7 +91,9 @@
             }
             if (event.key === 'Enter') {
                 event.preventDefault();
-                close(true);
+                if (textoValido()) {
+                    close(true);
+                }
             }
         });
     }
@@ -80,9 +108,10 @@
         document.body.classList.remove('confirm-dialog-open');
 
         var resolve = resolver;
+        var textoIngresado = textoInput ? textoInput.value.trim() : '';
         resolver = null;
         window.setTimeout(function () {
-            resolve(result);
+            resolve(result ? (textoRequerido !== '' ? { approved: true, texto: textoIngresado } : true) : false);
         }, 200);
     }
 
@@ -104,13 +133,25 @@
 
         confirmBtn.className = 'btn btn--sm ' + (variant === 'danger' ? 'btn--confirm-danger' : 'btn--purple');
 
+        // Confirmación escrita opcional (p.ej. escribir VACIAR).
+        textoRequerido = typeof config.requireText === 'string' ? config.requireText.trim() : '';
+        textoInput.value = '';
+        textoWrap.hidden = textoRequerido === '';
+        textoLabel.textContent = textoRequerido !== '' ? 'Escriba ' + textoRequerido + ' para confirmar:' : '';
+        textoInput.setAttribute('placeholder', textoRequerido);
+        actualizarBotonConfirmar();
+
         return new Promise(function (resolve) {
             resolver = resolve;
             root.classList.add('is-open');
             root.setAttribute('aria-hidden', 'false');
             document.body.classList.add('confirm-dialog-open');
             window.requestAnimationFrame(function () {
-                confirmBtn.focus();
+                if (textoRequerido !== '') {
+                    textoInput.focus();
+                } else {
+                    confirmBtn.focus();
+                }
             });
         });
     }
@@ -132,15 +173,27 @@
         var title = form.getAttribute('data-confirm-title') || 'Confirmar acción';
         var variant = form.getAttribute('data-confirm-variant') || 'danger';
         var confirmLabel = form.getAttribute('data-confirm-ok') || 'Sí, continuar';
+        var requireText = form.getAttribute('data-confirm-texto') || '';
 
         show({
             title: title,
             message: message,
             variant: variant,
             confirmLabel: confirmLabel,
+            requireText: requireText,
         }).then(function (approved) {
             if (!approved) {
                 return;
+            }
+            if (requireText !== '') {
+                var campo = form.querySelector('input[name="confirmacion"]');
+                if (!campo) {
+                    campo = document.createElement('input');
+                    campo.type = 'hidden';
+                    campo.name = 'confirmacion';
+                    form.appendChild(campo);
+                }
+                campo.value = approved && approved.texto ? approved.texto : '';
             }
             form.dataset.confirmApproved = '1';
             if (typeof form.requestSubmit === 'function') {

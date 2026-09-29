@@ -25,9 +25,11 @@ yarn-error.log
 # Comprobantes XML locales (no versionar)
 /*.xml
 
-# SQL de esquema local (no versionar)
+# Dumps SQL con datos (no versionar). El esquema SÍ se versiona en database/schema/
 *.sql
 /database/*.sql
+!/database/schema/
+!/database/schema/*.sql
 /database/*.sqlite
 /database/*.sqlite-journal
 
@@ -39,6 +41,10 @@ yarn-error.log
 # Archivos de trabajo Excel (no versionar)
 /*.xlsx
 /*.xls
+
+# Redis / dumps locales
+dump.rdb
+*.rdb
 
 # Leftovers locales (no versionar)
 /plantilla

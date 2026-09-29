@@ -1,6 +1,6 @@
 <div class="modal" id="registro-traslado-modal" aria-hidden="true">
     <div class="modal__backdrop" data-cerrar-modal-registro="traslado"></div>
-    <div class="modal__panel" role="dialog" aria-modal="true">
+    <div class="modal__panel modal__panel--wide registro-modal-panel" role="dialog" aria-modal="true">
         <header class="modal__head">
             <h2 class="modal__title" id="registro-traslado-title">Agregar traslado</h2>
             <button type="button" class="modal__close" data-cerrar-modal-registro="traslado">&times;</button>

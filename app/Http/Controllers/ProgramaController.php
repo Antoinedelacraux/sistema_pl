@@ -6,6 +6,7 @@ use App\Http\Requests\Programas\ImportProgramaExcelRequest;
 use App\Http\Requests\Programas\StoreProgramaFilaRequest;
 use App\Http\Requests\Programas\UpdateProgramaFilaImagenRequest;
 use App\Http\Requests\Programas\UpdateProgramaFilaRequest;
+use App\Http\Requests\VaciarConfirmacionRequest;
 use App\Models\Programas\ProgramaFila;
 use App\Services\Auditoria\AuditoriaService;
 use App\Services\PlanProduccion\PlanProduccionGridService;
@@ -38,6 +39,7 @@ class ProgramaController extends Controller
 
         $puedeCrear = $request->user()?->puede('programas', 'crear') ?? false;
         $puedeEditar = $request->user()?->puede('programas', 'editar') ?? false;
+        $puedeVaciar = $request->user()?->puede('programas', 'eliminar') ?? false;
 
         $viewData = [
             'catalogosFiltro' => $resuelto['catalogos_filtro'],
@@ -47,6 +49,7 @@ class ProgramaController extends Controller
             'totalProgramas' => $this->gridService->totalProgramasDistintos($filtros),
             'puedeCrear' => $puedeCrear,
             'puedeEditar' => $puedeEditar,
+            'puedeVaciar' => $puedeVaciar,
             'activeNav' => 'programas',
         ];
 
@@ -102,7 +105,7 @@ class ProgramaController extends Controller
             );
     }
 
-    public function vaciarReceta(Request $request): RedirectResponse
+    public function vaciarReceta(VaciarConfirmacionRequest $request): RedirectResponse
     {
         $resultado = $this->gridService->vaciarReceta();
 
@@ -142,9 +145,13 @@ class ProgramaController extends Controller
 
         if (($resultado['cantidades_preservadas'] ?? 0) > 0) {
             $partes[] = sprintf(
-                '%d cantidad(es) x caja conservada(s) (editadas en pantalla)',
+                '%d cantidad(es) x caja conservada(s)',
                 $resultado['cantidades_preservadas']
             );
+        }
+
+        if (($resultado['desactivadas'] ?? 0) > 0) {
+            $partes[] = sprintf('%d fila(s) fuera del Excel desactivada(s)', $resultado['desactivadas']);
         }
 
         $partes[] = sprintf('%d duplicada(s) en Excel', $resultado['duplicadas']);
