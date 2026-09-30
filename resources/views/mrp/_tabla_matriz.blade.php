@@ -23,7 +23,7 @@
             return CantidadCajaSupport::formatearVisualizacionCelda($num, $nomFamilia);
         }
 
-        return number_format($num, 2, '.', ',');
+        return CantidadCajaSupport::formatearCantidadFlexible($num);
     };
 
     $editablePlan = ! empty($editablePlan);
@@ -40,7 +40,7 @@
                 $texto = $num == 0.0 ? '—' : (
                     $layoutPlan
                         ? CantidadCajaSupport::formatearVisualizacionCelda($num, $nomFamilia)
-                        : number_format($num, 2, '.', ',')
+                        : CantidadCajaSupport::formatearCantidadFlexible($num)
                 );
             }
 
@@ -67,7 +67,7 @@
             'texto' => $num == 0.0 ? '—' : (
                 $layoutPlan
                     ? CantidadCajaSupport::formatearVisualizacionCelda($num, $nomFamilia)
-                    : number_format($num, 2, '.', ',')
+                    : CantidadCajaSupport::formatearCantidadFlexible($num)
             ),
             'alerta' => false,
             'negativo' => $num < 0,

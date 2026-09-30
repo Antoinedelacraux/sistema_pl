@@ -110,7 +110,8 @@ class PlanProduccionMrpSyncService
             $filas[] = $fila;
         }
 
-        PlanConsumoOrdenSupport::asegurarOrden(array_map(fn (array $f): int => (int) $f['idMaterialPL'], $filas));
+        $idsFilas = array_map(fn (array $f): int => (int) $f['idMaterialPL'], $filas);
+        PlanConsumoOrdenSupport::asegurarOrden($idsFilas);
         $mapaOrden = PlanConsumoOrdenSupport::mapaOrden();
         usort($filas, static fn (array $a, array $b): int => PlanConsumoOrdenSupport::compararFilas($a, $b, $mapaOrden));
 

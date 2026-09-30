@@ -36,6 +36,7 @@
                 data-confirm="{{ $confirmMessage }}"
                 data-confirm-title="{{ $confirmTitle }}"
                 data-confirm-ok="{{ $confirmOk }}"
+                data-confirm-variant="danger"
             >
                 @csrf
                 @method('DELETE')

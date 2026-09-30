@@ -23,9 +23,11 @@
 
         ['key' => 'programas', 'label' => 'Receta', 'route' => 'programas.index', 'modulo' => 'programas'],
 
-        ['key' => 'mrp', 'label' => 'Plan MRP', 'route' => 'mrp.index', 'modulo' => 'mrp'],
+        ['key' => 'registro', 'label' => 'Registro', 'route' => 'registro.index', 'modulo' => 'registro'],
 
         ['key' => 'plan_produccion', 'label' => 'Plan Producción', 'route' => 'plan-produccion.index', 'modulo' => 'plan_produccion'],
+
+        ['key' => 'mrp', 'label' => 'Plan MRP', 'route' => 'mrp.index', 'modulo' => 'mrp'],
 
         ['key' => 'tabla_comercial', 'label' => 'Tabla Comercial', 'route' => 'tabla-comercial.index', 'modulo' => 'plan_produccion'],
 
@@ -56,8 +58,6 @@
             })->values()->all(),
 
         ],
-
-        ['key' => 'registro', 'label' => 'Registro', 'route' => 'registro.index', 'modulo' => 'registro'],
 
         ['key' => 'usuarios', 'label' => 'Usuarios', 'route' => 'usuarios.index', 'modulo' => 'usuarios', 'admin' => true],
 

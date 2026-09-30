@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -27,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configurePublicUrl();
+        $this->configurePasswordDefaults();
 
         if (! $this->shouldLogQueries()) {
             return;
@@ -40,6 +42,15 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Evita mixed content (HTTPS página + HTTP CSS) detrás de Cloudflare Tunnel.
      */
+    private function configurePasswordDefaults(): void
+    {
+        Password::defaults(function () {
+            return Password::min(8)
+                ->letters()
+                ->numbers();
+        });
+    }
+
     private function configurePublicUrl(): void
     {
         if ($this->app->runningInConsole()) {

@@ -102,7 +102,7 @@ class MrpImportService
                 }
             }
 
-            PlanConsumoOrdenSupport::reemplazarOrden($idsOrden);
+            PlanConsumoOrdenSupport::asegurarOrden(array_values(array_unique($idsOrden)));
         });
 
         return [

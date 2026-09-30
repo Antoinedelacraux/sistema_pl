@@ -29,3 +29,40 @@ Reemplazan a los scripts `database/NN_*.php` (copias originales en `database/leg
 | `pl:vaciar-receta` | 30 | Vaciar la receta |
 | `pl:deduplicar-materiales` | 35 | Fusionar materiales duplicados por CodigoPL |
 | `pl:verificar-stock-indices` | 50 | Verificar vistas de stock e índices |
+
+## Logs
+
+Dos capas:
+
+1. **Técnicos (archivos)** — Laravel/Monolog en `storage/logs/` (requiere permiso de escritura en el servidor).
+   - Por defecto: `LOG_STACK=daily` → `laravel-YYYY-MM-DD.log` (errores, excepciones, `Log::warning`, etc.).
+   - Opcional: `Log::channel('app')` → `app-YYYY-MM-DD.log`.
+   - Solo desarrollo: `LOG_QUERIES=true` → `queries.log`.
+   - Producción recomendado: `LOG_LEVEL=warning`, `APP_DEBUG=false`.
+
+2. **Auditoría (negocio)** — tabla `AuditoriaLog` + pantalla **Auditoría** (admin): login, fallos de acceso, cambios en receta, registro, usuarios, etc.
+
+Tras cambiar `.env` de logs en producción: `php artisan config:cache`.
+
+## Seguridad (OWASP-oriented)
+
+| Control | Implementación |
+|---------|----------------|
+| **A01 Acceso** | `auth`, `usuario.activo`, `permiso:modulo,accion`, `admin`; tarjeta usuario con reglas en controlador |
+| **A02 Cripto** | HTTPS forzado detrás de proxy, cookies `httpOnly`, HSTS en HTTPS, contraseñas bcrypt + regla mín. 8 con letras y números |
+| **A03 Inyección** | Eloquent/bindings, validación Form Request, uploads con `mimes` y tamaño |
+| **A04 Diseño** | Sin API pública; reglas de negocio en servidor |
+| **A05 Config** | `APP_DEBUG` off fuera de local, headers en `SecurityHeaders`, docroot `public/` |
+| **A07 Auth** | Rate limit login (IP + usuario), auditoría de fallos, regeneración de sesión |
+| **A09 Logging** | `storage/logs` + `AuditoriaLog` |
+
+**Rate limits** (`config/security.php`, `.env` `RATE_LIMIT_*`):
+
+- `login` — intentos de acceso
+- `web` — 120 req/min por usuario (rutas autenticadas)
+- `imports` — Excel/XML y imports pesados
+- `destructive` — vaciar, anular, borrar filas
+
+Respuesta **429** si se excede. Opcional en prod: WAF/Cloudflare delante del login.
+
+Tras cambiar variables de seguridad: `php artisan config:cache`.

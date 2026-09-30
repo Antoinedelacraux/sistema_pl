@@ -18,11 +18,11 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('guest')->group(function () {
     Route::get('/', [LoginController::class, 'create'])->name('login');
     Route::post('/login', [LoginController::class, 'store'])
-        ->middleware('throttle:5,1')
+        ->middleware('throttle:login')
         ->name('login.store');
 });
 
-Route::middleware(['auth', 'usuario.activo'])->group(function () {
+Route::middleware(['auth', 'usuario.activo', 'throttle:web'])->group(function () {
     Route::get('/inicio', [StockResumenController::class, 'index'])
         ->middleware('permiso:inicio,ver')
         ->name('inicio');
@@ -42,11 +42,11 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         ->name('programas.index');
 
     Route::post('/programas/import', [ProgramaController::class, 'importExcel'])
-        ->middleware('permiso:programas,crear')
+        ->middleware(['permiso:programas,crear', 'throttle:imports'])
         ->name('programas.import');
 
     Route::post('/programas/vaciar', [ProgramaController::class, 'vaciarReceta'])
-        ->middleware('permiso:programas,eliminar')
+        ->middleware(['permiso:programas,eliminar', 'throttle:destructive'])
         ->name('programas.vaciar');
 
     Route::get('/mrp', [MrpController::class, 'index'])
@@ -63,11 +63,11 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         ->name('mrp.secciones-extra');
 
     Route::post('/mrp/import', [MrpController::class, 'importExcel'])
-        ->middleware('permiso:mrp,crear')
+        ->middleware(['permiso:mrp,crear', 'throttle:imports'])
         ->name('mrp.import');
 
     Route::post('/mrp/vaciar', [MrpController::class, 'vaciarPlan'])
-        ->middleware('permiso:mrp,eliminar')
+        ->middleware(['permiso:mrp,eliminar', 'throttle:destructive'])
         ->name('mrp.vaciar');
 
     Route::put('/mrp/plan', [MrpController::class, 'updatePlan'])
@@ -112,11 +112,11 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         ->name('plan-produccion.export.pdf');
 
     Route::post('/plan-produccion/import', [PlanProduccionController::class, 'importExcel'])
-        ->middleware('permiso:plan_produccion,crear')
+        ->middleware(['permiso:plan_produccion,crear', 'throttle:imports'])
         ->name('plan-produccion.import');
 
     Route::post('/plan-produccion/vaciar', [PlanProduccionController::class, 'vaciar'])
-        ->middleware('permiso:plan_produccion,eliminar')
+        ->middleware(['permiso:plan_produccion,eliminar', 'throttle:destructive'])
         ->name('plan-produccion.vaciar');
 
     Route::put('/plan-produccion/plan', [PlanProduccionController::class, 'updatePlan'])
@@ -197,11 +197,11 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         ->name('proveedor.store');
 
     Route::post('/proveedor/import/preview', [ProveedorController::class, 'importPreview'])
-        ->middleware('permiso:proveedor,crear')
+        ->middleware(['permiso:proveedor,crear', 'throttle:imports'])
         ->name('proveedor.import.preview');
 
     Route::post('/proveedor/import', [ProveedorController::class, 'importConfirm'])
-        ->middleware('permiso:proveedor,crear')
+        ->middleware(['permiso:proveedor,crear', 'throttle:imports'])
         ->name('proveedor.import');
 
     Route::get('/proveedor/material-por-codigo', [ProveedorController::class, 'materialPorCodigo'])
@@ -218,7 +218,7 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         ->name('proveedor.update');
 
     Route::delete('/proveedor/fila/{nroFila}', [ProveedorController::class, 'destroy'])
-        ->middleware('permiso:proveedor,eliminar')
+        ->middleware(['permiso:proveedor,eliminar', 'throttle:destructive'])
         ->whereNumber('nroFila')
         ->name('proveedor.destroy');
 
@@ -251,11 +251,11 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         ->name('registro.offline.csrf');
 
     Route::post('/registro/ingreso/leer-xml', [MovimientoController::class, 'parseIngresoXml'])
-        ->middleware('permiso:registro,crear')
+        ->middleware(['permiso:registro,crear', 'throttle:imports'])
         ->name('registro.ingreso.leer-xml');
 
     Route::post('/registro/ingreso/leer-excel', [MovimientoController::class, 'parseIngresoExcel'])
-        ->middleware('permiso:registro,crear')
+        ->middleware(['permiso:registro,crear', 'throttle:imports'])
         ->name('registro.ingreso.leer-excel');
 
     Route::post('/registro/ingreso', [MovimientoController::class, 'storeIngreso'])
@@ -286,12 +286,12 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         ->name('registro.traslado.update');
 
     Route::delete('/registro/movimiento/{idMovimiento}', [MovimientoController::class, 'destroyMovimiento'])
-        ->middleware('permiso:registro,eliminar')
+        ->middleware(['permiso:registro,eliminar', 'throttle:destructive'])
         ->whereNumber('idMovimiento')
         ->name('registro.movimiento.destroy');
 
     Route::delete('/registro/traslado/{idTraslado}', [MovimientoController::class, 'destroyTraslado'])
-        ->middleware('permiso:registro,eliminar')
+        ->middleware(['permiso:registro,eliminar', 'throttle:destructive'])
         ->whereNumber('idTraslado')
         ->name('registro.traslado.destroy');
 

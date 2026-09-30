@@ -23,5 +23,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->context(function () {
+            if (app()->runningInConsole()) {
+                return [];
+            }
+
+            return [
+                'user_id' => auth()->id(),
+                'url' => request()->fullUrl(),
+                'method' => request()->method(),
+            ];
+        });
     })->create();

@@ -5,7 +5,17 @@
             <h2 class="modal__title" id="registro-egreso-title">Agregar consumo</h2>
             <button type="button" class="modal__close" data-cerrar-modal-registro="egreso">&times;</button>
         </header>
-        <form method="POST" action="{{ route('registro.egreso.store') }}" class="modal__form" id="registro-egreso-form" data-store-action="{{ route('registro.egreso.store') }}">
+        <form
+            method="POST"
+            action="{{ route('registro.egreso.store') }}"
+            class="modal__form"
+            id="registro-egreso-form"
+            data-store-action="{{ route('registro.egreso.store') }}"
+            data-confirm="¿Está seguro de guardar este consumo?"
+            data-confirm-title="Guardar consumo"
+            data-confirm-ok="Sí, guardar"
+            data-confirm-variant="warning"
+        >
             @csrf
             <input type="hidden" name="_method" id="registro-egreso-method" value="POST" disabled>
             <div class="modal__grid">
@@ -75,34 +85,6 @@
                 <div class="field field--full registro-consumo-materiales" id="egreso-materiales-wrap">
                     <div class="registro-consumo-materiales__head">
                         <span class="field__label">Materiales del producto</span>
-                        <div class="registro-consumo-extra">
-                            <label class="field registro-consumo-extra__field">
-                                <span class="field__label">Conformación (Dentro)</span>
-                                <input
-                                    type="number"
-                                    class="field__input @error('conformacion_dentro') is-invalid @enderror"
-                                    name="conformacion_dentro"
-                                    id="egreso-conformacion-dentro"
-                                    value="{{ old('conformacion_dentro') }}"
-                                    min="0"
-                                    step="0.01"
-                                    placeholder="—"
-                                >
-                            </label>
-                            <label class="field registro-consumo-extra__field">
-                                <span class="field__label">Pallets (Fuera)</span>
-                                <input
-                                    type="number"
-                                    class="field__input @error('pallets_fuera') is-invalid @enderror"
-                                    name="pallets_fuera"
-                                    id="egreso-pallets-fuera"
-                                    value="{{ old('pallets_fuera') }}"
-                                    min="0"
-                                    step="0.01"
-                                    placeholder="—"
-                                >
-                            </label>
-                        </div>
                     </div>
                     <p class="field__hint" id="egreso-materiales-hint">Seleccione un producto para cargar los materiales desde Receta.</p>
                     <p class="field__hint registro-consumo-plan-limite" id="egreso-plan-limite-hint" hidden></p>

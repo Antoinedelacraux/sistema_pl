@@ -29,7 +29,7 @@
     @yield('content')
     <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="true"></div>
     <script src="{{ asset('js/toasts.js') }}" defer></script>
-    <script src="{{ asset('js/confirm-dialog.js') }}?v=2" defer></script>
+    <script src="{{ asset('js/confirm-dialog.js') }}?v=4" defer></script>
     @stack('scripts')
 </body>
 </html>

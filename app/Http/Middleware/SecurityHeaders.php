@@ -27,6 +27,14 @@ class SecurityHeaders
         $response->headers->set('Cross-Origin-Opener-Policy', 'same-origin');
         $response->headers->set('X-DNS-Prefetch-Control', 'on');
 
+        if ($this->shouldSendHsts($request)) {
+            $maxAge = (int) config('security.hsts_max_age', 31_536_000);
+            $response->headers->set(
+                'Strict-Transport-Security',
+                'max-age='.$maxAge.'; includeSubDomains'
+            );
+        }
+
         // Hide framework fingerprint (Symfony + PHP SAPI)
         $response->headers->remove('X-Powered-By');
         if (function_exists('header_remove')) {
@@ -69,5 +77,18 @@ class SecurityHeaders
         $contentType = (string) $response->headers->get('Content-Type', '');
 
         return $contentType === '' || str_contains($contentType, 'text/html');
+    }
+
+    private function shouldSendHsts(Request $request): bool
+    {
+        if (! config('security.hsts', true)) {
+            return false;
+        }
+
+        if ($request->secure()) {
+            return true;
+        }
+
+        return strtolower((string) $request->headers->get('X-Forwarded-Proto', '')) === 'https';
     }
 }

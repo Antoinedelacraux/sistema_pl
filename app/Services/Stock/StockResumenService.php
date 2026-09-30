@@ -65,19 +65,13 @@ class StockResumenService
         $idPrograma = (int) ($filtros['programa'] ?? 0);
         $idProducto = (int) ($filtros['producto'] ?? 0);
         $cajasSimulacion = (float) ($filtros['cajas'] ?? 0);
-        $palletsSimulacion = $filtros['pallets'] ?? null;
-        $palletsSimulacion = $palletsSimulacion === null || $palletsSimulacion === ''
-            ? null
-            : (float) $palletsSimulacion;
-        $simulaCajas = $idPrograma > 0 && $idProducto > 0
-            && ($cajasSimulacion > 0 || $palletsSimulacion !== null);
+        $simulaCajas = $idPrograma > 0 && $idProducto > 0 && $cajasSimulacion > 0;
 
         $necesidades = $simulaCajas
             ? $this->consumoRecetaService->proyectarNecesidadesPorCajas(
                 $idPrograma,
                 $idProducto,
-                $cajasSimulacion,
-                $palletsSimulacion
+                $cajasSimulacion
             )
             : [];
 

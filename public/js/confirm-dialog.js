@@ -156,9 +156,30 @@
         });
     }
 
+    function formularioDesdeSubmit(event) {
+        var target = event.target;
+        if (target instanceof HTMLFormElement) {
+            return target;
+        }
+
+        if (event.submitter && event.submitter.form instanceof HTMLFormElement) {
+            return event.submitter.form;
+        }
+
+        if (target && target.form instanceof HTMLFormElement) {
+            return target.form;
+        }
+
+        return null;
+    }
+
     document.addEventListener('submit', function (event) {
-        var form = event.target;
-        if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-confirm')) {
+        if (event.defaultPrevented) {
+            return;
+        }
+
+        var form = formularioDesdeSubmit(event);
+        if (!form || !form.hasAttribute('data-confirm')) {
             return;
         }
 

@@ -318,7 +318,6 @@ class ConsumoRecetaService
         $receta = $this->materialesDePresentacion($idPrograma, $idPresentacion);
         $inputPorId = collect($lineasInput)->keyBy(fn ($linea) => (int) ($linea['id_material_pl'] ?? 0));
         $factoresCajas = $this->factoresCajasDesdeLineas($receta, $inputPorId);
-        $params = $this->resolverParametrosPresentacion($idPrograma, $idPresentacion, $palletsInput, $conformacionInput);
 
         $lineas = [];
         foreach ($receta as $item) {
@@ -332,9 +331,7 @@ class ConsumoRecetaService
                 $cantidad = $this->calcularCantidadMaterial(
                     $item,
                     $factoresCajas,
-                    $input,
-                    $params['pallets'],
-                    $params['conformacion']
+                    $input
                 );
             }
 
@@ -363,46 +360,31 @@ class ConsumoRecetaService
         float $cajas,
         ?float $pallets = null
     ): array {
-        if ($idPrograma <= 0 || $idPresentacion <= 0 || ($cajas <= 0 && ($pallets === null || $pallets < 0))) {
+        unset($pallets);
+
+        if ($idPrograma <= 0 || $idPresentacion <= 0 || $cajas <= 0) {
             return [];
         }
 
         $receta = $this->materialesDePresentacion($idPrograma, $idPresentacion);
         $lineasInput = [];
 
-        if ($cajas > 0) {
-            foreach ($receta as $item) {
-                if (empty($item['es_caja_factor'])) {
-                    continue;
-                }
-
-                $lineasInput[] = [
-                    'id_material_pl' => (int) $item['id_material_pl'],
-                    'cantidad' => $cajas,
-                ];
-            }
-        }
-
-        $lineas = $this->resolverLineasConsumo($idPrograma, $idPresentacion, $lineasInput, $pallets);
-        $mapa = [];
-        $soloPallets = $cajas <= 0;
-        $idsPallets = [];
-
-        if ($soloPallets) {
-            foreach ($receta as $item) {
-                if (! empty($item['usa_pallets'])) {
-                    $idsPallets[(int) $item['id_material_pl']] = true;
-                }
-            }
-        }
-
-        foreach ($lineas as $linea) {
-            $idMaterial = (int) $linea['id_material_pl'];
-            if ($soloPallets && ! isset($idsPallets[$idMaterial])) {
+        foreach ($receta as $item) {
+            if (empty($item['es_caja_factor'])) {
                 continue;
             }
 
-            $mapa[$idMaterial] = (float) $linea['cantidad'];
+            $lineasInput[] = [
+                'id_material_pl' => (int) $item['id_material_pl'],
+                'cantidad' => $cajas,
+            ];
+        }
+
+        $lineas = $this->resolverLineasConsumo($idPrograma, $idPresentacion, $lineasInput);
+        $mapa = [];
+
+        foreach ($lineas as $linea) {
+            $mapa[(int) $linea['id_material_pl']] = (float) $linea['cantidad'];
         }
 
         return $mapa;
@@ -415,9 +397,7 @@ class ConsumoRecetaService
     private function calcularCantidadMaterial(
         array $item,
         array $factoresCajas,
-        array $input,
-        float $pallets,
-        float $conformacion
+        array $input
     ): float {
         $nomFamilia = $item['nom_familia'] ?? null;
 
@@ -426,12 +406,6 @@ class ConsumoRecetaService
         }
 
         $factorCaja = $this->factorCajaParaItem($item, $factoresCajas);
-
-        if (! empty($item['usa_pallets'])) {
-            $conf = max($conformacion, 0.00001);
-
-            return CantidadCajaSupport::redondear(($pallets / $conf) * $factorCaja, $nomFamilia);
-        }
 
         return CantidadCajaSupport::redondear($this->baseCantidad($item, $input) * $factorCaja, $nomFamilia);
     }

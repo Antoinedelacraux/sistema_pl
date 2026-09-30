@@ -26,6 +26,63 @@
         detalle: document.getElementById('registro-detalle-modal'),
     };
 
+    var confirmGuardarRegistro = {
+        ingreso: {
+            crear: {
+                message: '¿Está seguro de guardar este ingreso?',
+                title: 'Guardar ingreso',
+                ok: 'Sí, guardar',
+            },
+            editar: {
+                message: '¿Está seguro de guardar los cambios en este ingreso?',
+                title: 'Guardar cambios',
+                ok: 'Sí, guardar cambios',
+            },
+        },
+        egreso: {
+            crear: {
+                message: '¿Está seguro de guardar este consumo?',
+                title: 'Guardar consumo',
+                ok: 'Sí, guardar',
+            },
+            editar: {
+                message: '¿Está seguro de guardar los cambios en este consumo?',
+                title: 'Guardar cambios',
+                ok: 'Sí, guardar cambios',
+            },
+        },
+        traslado: {
+            crear: {
+                message: '¿Está seguro de guardar este traslado?',
+                title: 'Guardar traslado',
+                ok: 'Sí, guardar',
+            },
+            editar: {
+                message: '¿Está seguro de guardar los cambios en este traslado?',
+                title: 'Guardar cambios',
+                ok: 'Sí, guardar cambios',
+            },
+        },
+    };
+
+    function aplicarConfirmGuardarFormulario(tipo, modo) {
+        var form = document.getElementById('registro-' + tipo + '-form');
+        var cfgPorTipo = confirmGuardarRegistro[tipo];
+        if (!form || !cfgPorTipo) {
+            return;
+        }
+
+        var cfg = cfgPorTipo[modo === 'editar' ? 'editar' : 'crear'];
+        if (!cfg) {
+            return;
+        }
+
+        form.setAttribute('data-confirm', cfg.message);
+        form.setAttribute('data-confirm-title', cfg.title);
+        form.setAttribute('data-confirm-ok', cfg.ok);
+        form.setAttribute('data-confirm-variant', 'warning');
+    }
+
     function abrirModal(tipo) {
         var modal = modales[tipo];
         if (!modal) {
@@ -97,6 +154,8 @@
             ocultarHintLimitePlanConsumo();
             resetConsumoCascada();
         }
+
+        aplicarConfirmGuardarFormulario(tipo, 'crear');
     }
 
     function decimalesFamiliaConsumo(nomFamilia, decimalesApi) {
@@ -120,11 +179,91 @@
         return 2;
     }
 
-    function redondearConsumo(valor, nomFamilia, decimalesApi) {
-        var dec = decimalesFamiliaConsumo(nomFamilia, decimalesApi);
+    var DECIMALES_VISUAL_REGISTRO = 2;
+    var DECIMALES_CANTIDAD_REGISTRO = 2;
+
+    function decimalesPersistenciaRegistro(decimales) {
+        var dec = decimales != null && decimales !== '' ? Number(decimales) : DECIMALES_CANTIDAD_REGISTRO;
+        if (!isFinite(dec) || dec < 0) {
+            dec = DECIMALES_CANTIDAD_REGISTRO;
+        }
+
+        return dec;
+    }
+
+    /** Precisión al guardar (familia: p. ej. 7 dec. termógrafo). */
+    function cantidadNormalizadaRegistro(valor, decimales) {
+        var dec = decimalesPersistenciaRegistro(decimales);
+        var n = Number(valor);
+        if (!isFinite(n)) {
+            return NaN;
+        }
+
         var factor = Math.pow(10, dec);
 
-        return Math.round(Number(valor || 0) * factor) / factor;
+        return Math.round(n * factor) / factor;
+    }
+
+    /** Solo pantalla: trunca a 2 dec. (0.95841 → 0,95). */
+    function truncarVisualRegistro(valor) {
+        var n = Number(valor);
+        if (!isFinite(n)) {
+            return NaN;
+        }
+
+        if (Math.abs(n - Math.round(n)) < 1e-12) {
+            return Math.round(n);
+        }
+
+        var factor = Math.pow(10, DECIMALES_VISUAL_REGISTRO);
+
+        return Math.trunc(n * factor) / factor;
+    }
+
+    function redondearConsumo(valor, nomFamilia, decimalesApi) {
+        var dec = decimalesFamiliaConsumo(nomFamilia, decimalesApi);
+
+        return cantidadNormalizadaRegistro(valor, dec);
+    }
+
+    function cantidadPayloadRegistro(valor, decimales) {
+        var dec = decimalesPersistenciaRegistro(decimales);
+        var n = cantidadNormalizadaRegistro(valor, dec);
+        if (!isFinite(n)) {
+            return '0';
+        }
+
+        return String(parseFloat(n.toFixed(dec)));
+    }
+
+    function asignarCantidadInputRegistro(input, valorPersistido, decimalesPersistencia) {
+        if (!input) {
+            return;
+        }
+
+        var n = cantidadNormalizadaRegistro(valorPersistido, decimalesPersistencia);
+        if (!isFinite(n)) {
+            input.removeAttribute('data-cantidad-persistida');
+            input.value = '';
+            return;
+        }
+
+        input.setAttribute('data-cantidad-persistida', String(n));
+        input.value = formatearCantidadRegistro(n);
+    }
+
+    function leerCantidadInputRegistro(input) {
+        if (!input) {
+            return NaN;
+        }
+
+        var dec = decimalesPersistenciaRegistro(input.getAttribute('data-cantidad-decimales'));
+        var raw = input.getAttribute('data-cantidad-persistida');
+        if (raw !== null && raw !== '') {
+            return cantidadNormalizadaRegistro(Number(raw), dec);
+        }
+
+        return cantidadNormalizadaRegistro(parseCantidadRegistro(input.value), dec);
     }
 
     function formatearNumero(valor, nomFamilia, decimalesApi) {
@@ -134,6 +273,154 @@
             minimumFractionDigits: 0,
             maximumFractionDigits: dec,
         });
+    }
+
+    function parseCantidadRegistro(texto) {
+        var s = String(texto || '').trim().replace(/\s/g, '');
+        if (!s) {
+            return NaN;
+        }
+
+        var ultimaComa = s.lastIndexOf(',');
+        var ultimoPunto = s.lastIndexOf('.');
+
+        if (ultimaComa >= 0 && ultimoPunto >= 0) {
+            if (ultimaComa > ultimoPunto) {
+                s = s.replace(/\./g, '').replace(',', '.');
+            } else {
+                s = s.replace(/,/g, '');
+            }
+        } else if (ultimaComa >= 0) {
+            var partes = s.split(',');
+            if (partes.length === 2 && partes[1].length <= 8) {
+                s = partes[0].replace(/\./g, '') + '.' + partes[1];
+            } else {
+                s = s.replace(/,/g, '');
+            }
+        }
+
+        return parseFloat(s);
+    }
+
+    function formatearCantidadRegistro(valor) {
+        var n = truncarVisualRegistro(valor);
+        if (!isFinite(n)) {
+            return '';
+        }
+
+        if (Math.abs(n - Math.round(n)) < 1e-9) {
+            return Math.round(n).toLocaleString('es-PE', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+            });
+        }
+
+        var fixed = n.toFixed(DECIMALES_VISUAL_REGISTRO);
+        var partes = fixed.split('.');
+        var intPart = Number(partes[0]).toLocaleString('es-PE', { maximumFractionDigits: 0 });
+        var frac = (partes[1] || '').replace(/0+$/, '');
+        if (frac === '') {
+            return intPart;
+        }
+
+        return intPart + ',' + frac;
+    }
+
+    function normalizarInputCantidadParaEnvio(input) {
+        if (!input || input.disabled) {
+            return;
+        }
+
+        var texto = String(input.value || '').trim();
+        if (texto === '') {
+            input.removeAttribute('data-cantidad-persistida');
+            return;
+        }
+
+        var dec = input.getAttribute('data-cantidad-decimales');
+        var n = leerCantidadInputRegistro(input);
+        if (!isFinite(n)) {
+            return;
+        }
+
+        input.setAttribute('data-cantidad-persistida', String(n));
+        input.value = cantidadPayloadRegistro(n, dec);
+    }
+
+    function bindFormatoCantidadInput(input, decimales) {
+        if (!input) {
+            return;
+        }
+
+        if (input.getAttribute('data-cantidad-formato') !== '1') {
+            input.setAttribute('data-cantidad-formato', '1');
+            input.setAttribute('data-cantidad-decimales', String(
+                decimales != null ? decimales : DECIMALES_CANTIDAD_REGISTRO
+            ));
+
+            if (input.type === 'number') {
+                input.type = 'text';
+            }
+            input.setAttribute('inputmode', 'decimal');
+
+            input.addEventListener('focus', function () {
+                if (input.readOnly || input.disabled) {
+                    return;
+                }
+
+                var n = parseCantidadRegistro(input.value);
+                if (!isFinite(n)) {
+                    return;
+                }
+
+                var dec = input.getAttribute('data-cantidad-decimales');
+                var nNorm = leerCantidadInputRegistro(input);
+                if (!isFinite(nNorm)) {
+                    nNorm = cantidadNormalizadaRegistro(n, dec);
+                }
+                if (isFinite(nNorm)) {
+                    input.setAttribute('data-cantidad-persistida', String(nNorm));
+                    input.value = cantidadPayloadRegistro(nNorm, dec);
+                }
+            });
+
+            input.addEventListener('blur', function () {
+                var texto = String(input.value || '').trim();
+                if (texto === '') {
+                    input.removeAttribute('data-cantidad-persistida');
+                    return;
+                }
+
+                var dec = input.getAttribute('data-cantidad-decimales');
+                var n = cantidadNormalizadaRegistro(parseCantidadRegistro(texto), dec);
+                if (!isFinite(n)) {
+                    return;
+                }
+
+                input.setAttribute('data-cantidad-persistida', String(n));
+                input.value = formatearCantidadRegistro(n);
+            });
+        }
+
+        var inicial = String(input.value || '').trim();
+        if (inicial !== '') {
+            var n0 = parseCantidadRegistro(inicial);
+            if (isFinite(n0)) {
+                asignarCantidadInputRegistro(
+                    input,
+                    n0,
+                    decimales != null ? decimales : DECIMALES_CANTIDAD_REGISTRO
+                );
+            }
+        }
+    }
+
+    function normalizarCantidadesFormulario(form, selector) {
+        if (!form) {
+            return;
+        }
+
+        form.querySelectorAll(selector).forEach(normalizarInputCantidadParaEnvio);
     }
 
     function stepCantidadConsumo(nomFamilia, decimalesApi) {
@@ -193,7 +480,6 @@
             hint.hidden = false;
             hint.textContent = mensaje || 'Seleccione un producto para cargar los materiales desde Receta.';
         }
-        limpiarParametrosPresentacionConsumo();
     }
 
     function claveUsoConsumo(nomUso) {
@@ -280,57 +566,15 @@
         return null;
     }
 
-    function limpiarParametrosPresentacionConsumo() {
-        actualizarParametrosPresentacionConsumo(null);
-    }
-
-    function actualizarParametrosPresentacionConsumo(params) {
-        var conformacion = document.getElementById('egreso-conformacion-dentro');
-        var pallets = document.getElementById('egreso-pallets-fuera');
-
-        if (!params) {
-            if (conformacion) {
-                conformacion.value = '';
-            }
-            if (pallets) {
-                pallets.value = '';
-            }
-            return;
-        }
-
-        if (conformacion) {
-            conformacion.value = params.conformacion != null && String(params.conformacion).trim() !== ''
-                ? Number(params.conformacion).toFixed(2)
-                : '';
-        }
-        if (pallets) {
-            pallets.value = params.pallets != null && String(params.pallets).trim() !== ''
-                ? Number(params.pallets).toFixed(2)
-                : '';
-        }
-    }
-
-    function parametrosPresentacionConsumo() {
-        var conformacionEl = document.getElementById('egreso-conformacion-dentro');
-        var palletsEl = document.getElementById('egreso-pallets-fuera');
-        var palletsText = palletsEl ? String(palletsEl.value || '').trim() : '';
-        var conformacionText = conformacionEl ? String(conformacionEl.value || '').trim() : '';
-
-        return {
-            pallets: palletsText !== '' && Number(palletsText) >= 0 ? Number(palletsText) : 0,
-            conformacion: conformacionText !== '' && Number(conformacionText) > 0 ? Number(conformacionText) : 1,
-        };
-    }
-
     function parseFactorInput(input) {
         if (!input) {
             return 0;
         }
-        var texto = String(input.value || '').trim();
-        if (texto === '' || Number(texto) <= 0) {
+        var n = parseCantidadRegistro(input.value);
+        if (!isFinite(n) || n <= 0) {
             return 0;
         }
-        return Number(texto);
+        return n;
     }
 
     function factoresCajasDesdeTabla(body) {
@@ -367,29 +611,23 @@
         }
 
         var input = tr.querySelector('[data-consumo-override]');
-        var val = input ? String(input.value || '').trim() : '';
-        if (val !== '' && Number(val) > 0) {
-            return Number(val);
+        var val = input ? parseCantidadRegistro(input.value) : NaN;
+        if (isFinite(val) && val > 0) {
+            return val;
         }
 
         return cantCaja;
     }
 
-    function calcularTotalMaterial(tr, factores, params) {
-        var esCaja = tr.getAttribute('data-es-caja') === '1';
-        var usaPallets = tr.getAttribute('data-usa-pallets') === '1';
-        var factorCaja = factorCajaParaFila(tr, factores);
+    function calcularTotalMaterial(tr, factores) {
+        var esBoxFactor = tr.getAttribute('data-es-caja') === '1';
+        var factorBox = factorCajaParaFila(tr, factores);
 
-        if (esCaja) {
+        if (esBoxFactor) {
             return baseCantidadFila(tr);
         }
 
-        if (usaPallets) {
-            var conf = Math.max(params.conformacion, 0.00001);
-            return (params.pallets / conf) * factorCaja;
-        }
-
-        return baseCantidadFila(tr) * factorCaja;
+        return baseCantidadFila(tr) * factorBox;
     }
 
     function almacenConsumoSeleccionado() {
@@ -437,7 +675,8 @@
             return 0;
         }
 
-        return parseFloat(String(totalInput.value || '').replace(',', '.')) || 0;
+        var n = parseCantidadRegistro(totalInput.value);
+        return isFinite(n) ? n : 0;
     }
 
     function urlRegistroMovimientos(codigoPl, idAlmacen, tab) {
@@ -615,7 +854,6 @@
         }
 
         var factores = factoresCajasDesdeTabla(body);
-        var params = parametrosPresentacionConsumo();
 
         body.querySelectorAll('tr[data-consumo-row]').forEach(function (tr) {
             if (tr.getAttribute('data-total-manual') === '1') {
@@ -627,12 +865,20 @@
                 return;
             }
 
-            var total = calcularTotalMaterial(tr, factores, params);
+            var total = calcularTotalMaterial(tr, factores);
             var nomFamilia = tr.getAttribute('data-nom-familia') || '';
             var decimales = tr.getAttribute('data-decimales-cantidad');
-            totalInput.value = total > 0
-                ? redondearConsumo(total, nomFamilia, decimales).toFixed(decimalesFamiliaConsumo(nomFamilia, decimales))
-                : '';
+            var decConsumo = decimalesFamiliaConsumo(nomFamilia, decimales);
+            if (total > 0) {
+                asignarCantidadInputRegistro(
+                    totalInput,
+                    redondearConsumo(total, nomFamilia, decimales),
+                    decConsumo
+                );
+            } else {
+                totalInput.removeAttribute('data-cantidad-persistida');
+                totalInput.value = '';
+            }
         });
 
         actualizarAlertaStockConsumo();
@@ -663,7 +909,6 @@
             var override = overrideDeMaterial(idMaterial);
             var totalOverride = totalOverrideDeMaterial(idMaterial);
             var stock = item.stock == null ? null : Number(item.stock);
-            var usaPallets = !!item.usa_pallets;
             var esCajaEditable = esCajaEditableItem(item);
             var esCajaFactor = esCajaEditable;
             var esFilaCaja = esCajaEditable;
@@ -673,7 +918,6 @@
             tr.setAttribute('data-cantidad-caja', String(item.cantidad_por_caja || 0));
             tr.setAttribute('data-nom-familia', item.nom_familia || '');
             tr.setAttribute('data-decimales-cantidad', String(item.decimales_cantidad != null ? item.decimales_cantidad : ''));
-            tr.setAttribute('data-usa-pallets', usaPallets ? '1' : '0');
             tr.setAttribute('data-es-caja', esFilaCaja ? '1' : '0');
             tr.setAttribute('data-uso', claveUso);
             tr.setAttribute('data-codigo-pl', item.codigo_pl || '');
@@ -730,16 +974,17 @@
             tdPersonalizado.className = 'registro-consumo-tabla__qty registro-consumo-tabla__personalizado';
             if (esCajaFactor) {
                 var inputCaja = document.createElement('input');
-                inputCaja.type = 'number';
+                inputCaja.type = 'text';
                 inputCaja.className = 'field__input';
-                inputCaja.min = '0';
-                inputCaja.step = stepCantidadConsumo(item.nom_familia, item.decimales_cantidad);
                 inputCaja.placeholder = '';
                 inputCaja.value = override;
                 inputCaja.name = 'lineas[' + index + '][cantidad]';
                 inputCaja.setAttribute('data-consumo-override', idMaterial);
                 inputCaja.setAttribute('data-caja-factor', '1');
                 inputCaja.setAttribute('data-uso', claveUso);
+                inputCaja.setAttribute('inputmode', 'decimal');
+                var decBox = decimalesFamiliaConsumo(item.nom_familia, item.decimales_cantidad);
+                bindFormatoCantidadInput(inputCaja, decBox);
                 inputCaja.addEventListener('input', function () {
                     consumoOverrides[idMaterial] = inputCaja.value;
                     tr.removeAttribute('data-total-manual');
@@ -757,19 +1002,23 @@
             var tdTotal = document.createElement('td');
             tdTotal.className = 'registro-consumo-tabla__qty registro-consumo-tabla__total';
             var totalInput = document.createElement('input');
-            totalInput.type = 'number';
+            totalInput.type = 'text';
             totalInput.className = 'field__input';
-            totalInput.min = '0';
-            totalInput.step = stepCantidadConsumo(item.nom_familia, item.decimales_cantidad);
             totalInput.name = 'lineas[' + index + '][total]';
             totalInput.setAttribute('data-consumo-total', '1');
             totalInput.setAttribute('data-material-id', idMaterial);
+            totalInput.setAttribute('inputmode', 'decimal');
+            var decTotal = decimalesFamiliaConsumo(item.nom_familia, item.decimales_cantidad);
             if (totalOverride != null && String(totalOverride).trim() !== '') {
-                totalInput.value = redondearConsumo(totalOverride, item.nom_familia, item.decimales_cantidad)
-                    .toFixed(decimalesFamiliaConsumo(item.nom_familia, item.decimales_cantidad));
+                asignarCantidadInputRegistro(
+                    totalInput,
+                    redondearConsumo(totalOverride, item.nom_familia, item.decimales_cantidad),
+                    decTotal
+                );
                 totalInput.setAttribute('data-total-manual', '1');
                 tr.setAttribute('data-total-manual', '1');
             }
+            bindFormatoCantidadInput(totalInput, decTotal);
             totalInput.addEventListener('input', function () {
                 var texto = String(totalInput.value || '').trim();
                 if (texto === '') {
@@ -779,6 +1028,7 @@
                     recalcularTotalesConsumo();
                     return;
                 }
+                totalInput.removeAttribute('data-cantidad-persistida');
                 consumoTotalOverrides[idMaterial] = totalInput.value;
                 tr.setAttribute('data-total-manual', '1');
                 totalInput.setAttribute('data-total-manual', '1');
@@ -894,7 +1144,7 @@
         var solicitado = cajasSolicitadasDesdeTablaConsumo();
         var sem = consumoLimitePlan.semana || 'semana';
         var texto = 'Plan ' + sem + ': '
-            + Number(consumoLimitePlan.plan).toLocaleString() + ' cajas · '
+            + Number(consumoLimitePlan.plan).toLocaleString() + ' Box · '
             + 'Consumido: ' + Number(consumoLimitePlan.consumido).toLocaleString() + ' · '
             + 'Disponible: ' + Number(consumoLimitePlan.disponible).toLocaleString();
 
@@ -966,6 +1216,8 @@
 
     function prepararEnvioConsumo() {
         recalcularTotalesConsumo();
+        var egresoForm = document.getElementById('registro-egreso-form');
+        normalizarCantidadesFormulario(egresoForm, '[data-consumo-override], [data-consumo-total]');
         ['egreso-id-programa', 'egreso-id-presentacion'].forEach(function (id) {
             var campo = document.getElementById(id);
             if (campo && String(campo.value || '').trim() !== '') {
@@ -1112,14 +1364,6 @@
                     return;
                 }
 
-                var params = data.presentacion || null;
-                if (consumoOld && (consumoOld.conformacion_dentro != null || consumoOld.pallets_fuera != null)) {
-                    params = {
-                        conformacion: consumoOld.conformacion_dentro,
-                        pallets: consumoOld.pallets_fuera,
-                    };
-                }
-                actualizarParametrosPresentacionConsumo(params);
                 renderTablaMaterialesConsumo(materiales);
                 actualizarLimitePlanConsumo();
             })
@@ -1613,14 +1857,6 @@
         });
     }
 
-    ['egreso-conformacion-dentro', 'egreso-pallets-fuera'].forEach(function (id) {
-        var input = document.getElementById(id);
-        if (input) {
-            input.addEventListener('input', recalcularTotalesConsumo);
-            input.addEventListener('change', recalcularTotalesConsumo);
-        }
-    });
-
     var trasladoAlmacen = document.getElementById('traslado-id-almacen-origen');
     if (trasladoAlmacen) {
         trasladoAlmacen.addEventListener('change', function () {
@@ -1655,6 +1891,7 @@
     });
 
     ['ingreso', 'egreso', 'traslado'].forEach(function (tipo) {
+        aplicarConfirmGuardarFormulario(tipo, 'crear');
         var modal = modales[tipo];
         if (modal && modal.querySelector('.modal__errors')) {
             abrirModal(tipo);
@@ -1785,10 +2022,10 @@
                 '<td class="registro-ingreso-preview__material">' + escapeHtml(linea.nomMaterial) + '</td>' +
                 '<td class="registro-ingreso-preview__code">' + escapeHtml(linea.codigoPl) + '</td>' +
                 '<td class="registro-ingreso-preview__qty">' +
-                    '<input type="number" class="field__input registro-ingreso-preview__qty-input" ' +
+                    '<input type="text" class="field__input registro-ingreso-preview__qty-input" ' +
                     'name="lineas[' + index + '][cantidad]" ' +
-                    'value="' + escapeHtml(linea.cantidad) + '" ' +
-                    'min="0.01" step="0.01" inputmode="decimal" ' +
+                    'value="' + escapeHtml(formatearCantidadRegistro(linea.cantidad)) + '" ' +
+                    'inputmode="decimal" data-cantidad-decimales="2" ' +
                     'data-ingreso-cantidad-index="' + index + '">' +
                 '</td>' +
                 '<td class="registro-ingreso-preview__actions">' +
@@ -1808,27 +2045,30 @@
         }).join('');
 
         body.querySelectorAll('[data-ingreso-cantidad-index]').forEach(function (input) {
-            input.addEventListener('change', function () {
+            bindFormatoCantidadInput(input, DECIMALES_CANTIDAD_REGISTRO);
+
+            function sincronizarCantidadIngresoLinea() {
                 var idx = parseInt(input.getAttribute('data-ingreso-cantidad-index'), 10);
                 if (!ingresoLineas[idx]) {
                     return;
                 }
 
-                var val = parseFloat(String(input.value).replace(',', '.'));
-                if (!val || val <= 0) {
-                    input.value = ingresoLineas[idx].cantidad;
+                var val = parseCantidadRegistro(input.value);
+                if (!isFinite(val) || val <= 0) {
+                    input.value = formatearCantidadRegistro(ingresoLineas[idx].cantidad);
                     mostrarHintIngreso('La cantidad debe ser mayor a cero.', true);
                     return;
                 }
 
-                var cantidad = val.toFixed(2);
+                var cantidad = cantidadPayloadRegistro(val, DECIMALES_CANTIDAD_REGISTRO);
                 ingresoLineas[idx].cantidad = cantidad;
-                ingresoLineas[idx].cantidadTexto = val.toLocaleString('es-PE', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                });
-                input.value = cantidad;
-            });
+                ingresoLineas[idx].cantidadTexto = formatearCantidadRegistro(val);
+                input.setAttribute('data-cantidad-persistida', cantidad);
+                input.value = ingresoLineas[idx].cantidadTexto;
+            }
+
+            input.addEventListener('change', sincronizarCantidadIngresoLinea);
+            input.addEventListener('blur', sincronizarCantidadIngresoLinea);
         });
 
         body.querySelectorAll('[data-quitar-ingreso-linea]').forEach(function (btn) {
@@ -1872,7 +2112,7 @@
 
         ingresoLineas.push({
             idMaterialPL: String(fila.idMaterial),
-            cantidad: cantidad.toFixed(2),
+            cantidad: cantidadPayloadRegistro(cantidad),
             cantidadTexto: cantidad.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
             codigoPl: fila.codigoPl || material.codigo || '',
             nomMaterial: fila.nom || material.nombre || '',
@@ -1904,8 +2144,8 @@
             return;
         }
 
-        var cantidad = parseFloat(String(cantidadInput.value).replace(',', '.'));
-        if (!cantidad || cantidad <= 0) {
+        var cantidad = parseCantidadRegistro(cantidadInput.value);
+        if (!isFinite(cantidad) || cantidad <= 0) {
             mostrarHintIngreso('Ingrese una cantidad mayor a cero.', true);
             cantidadInput.focus();
             return;
@@ -1916,7 +2156,7 @@
 
         ingresoLineas.push({
             idMaterialPL: select.value,
-            cantidad: cantidad.toFixed(2),
+            cantidad: cantidadPayloadRegistro(cantidad),
             cantidadTexto: cantidad.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
             codigoPl: material.codigo || option.getAttribute('data-codigo-pl') || '',
             nomMaterial: material.nombre || option.getAttribute('data-nom-material-pl') || '',
@@ -1939,7 +2179,7 @@
             var cantidad = parseFloat(linea.cantidad);
             return {
                 idMaterialPL: id,
-                cantidad: cantidad.toFixed(2),
+                cantidad: cantidadPayloadRegistro(cantidad),
                 cantidadTexto: cantidad.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
                 codigoPl: material.codigo || '',
                 nomMaterial: material.nombre || '',
@@ -1968,6 +2208,7 @@
 
     var cantidadIngreso = document.getElementById('ingreso-linea-cantidad');
     if (cantidadIngreso) {
+        bindFormatoCantidadInput(cantidadIngreso, DECIMALES_CANTIDAD_REGISTRO);
         cantidadIngreso.addEventListener('keydown', function (event) {
             if (event.key === 'Enter') {
                 event.preventDefault();
@@ -1976,12 +2217,26 @@
         });
     }
 
+    var trasladoForm = document.getElementById('registro-traslado-form');
+    var trasladoCantidadInput = trasladoForm ? trasladoForm.querySelector('[name="cantidad"]') : null;
+    if (trasladoCantidadInput) {
+        bindFormatoCantidadInput(trasladoCantidadInput, DECIMALES_CANTIDAD_REGISTRO);
+    }
+    if (trasladoForm) {
+        trasladoForm.addEventListener('submit', function () {
+            normalizarCantidadesFormulario(trasladoForm, '[name="cantidad"]');
+        });
+    }
+
     if (ingresoForm) {
         ingresoForm.addEventListener('submit', function (event) {
             if (ingresoLineas.length === 0) {
                 event.preventDefault();
+                event.stopPropagation();
                 mostrarHintIngreso('Agregue al menos un material con Añadir o cargue el XML de la guía.', true);
+                return;
             }
+            normalizarCantidadesFormulario(ingresoForm, '[data-ingreso-cantidad-index]');
         });
     }
 
@@ -1992,6 +2247,7 @@
             pintarHintLimitePlanConsumo();
             if (consumoExcedePlanSemanal()) {
                 event.preventDefault();
+                event.stopPropagation();
                 var hintPlan = document.getElementById('egreso-plan-limite-hint');
                 if (hintPlan) {
                     hintPlan.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -2061,7 +2317,7 @@
             var cantidad = parseFloat(linea.cantidad);
             return {
                 idMaterialPL: String(linea.id_material_pl),
-                cantidad: cantidad.toFixed(2),
+                cantidad: cantidadPayloadRegistro(cantidad),
                 cantidadTexto: cantidad.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
                 codigoPl: linea.codigo_pl || '',
                 nomMaterial: linea.nom_material || '',
@@ -2560,6 +2816,8 @@
                     submitBtn.textContent = 'Guardar cambios';
                 }
 
+                aplicarConfirmGuardarFormulario(modalTipo, 'editar');
+
                 if (modalTipo === 'ingreso') {
                     setFieldValue(form, 'fecha', edit.fecha || '');
                     setFieldValue(form, 'id_almacen', edit.id_almacen || '');
@@ -2581,7 +2839,7 @@
                         return {
                             idMovimiento: linea.id_movimiento ? String(linea.id_movimiento) : null,
                             idMaterialPL: idMaterial,
-                            cantidad: cantidad.toFixed(2),
+                            cantidad: cantidadPayloadRegistro(cantidad),
                             cantidadTexto: cantidad.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
                             codigoPl: codigoPl,
                             nomMaterial: nomMaterial,
@@ -2663,7 +2921,6 @@
                         })
                         .then(function () {
                             if (Array.isArray(ctx.materiales)) {
-                                actualizarParametrosPresentacionConsumo(ctx.presentacion || null);
                                 renderTablaMaterialesConsumo(ctx.materiales);
                                 return;
                             }
@@ -2679,7 +2936,16 @@
                 setFieldValue(form, 'fecha', edit.fecha || '');
                 setFieldValue(form, 'id_almacen_origen', edit.id_almacen_origen || '');
                 setFieldValue(form, 'id_almacen_destino', edit.id_almacen_destino || '');
-                setFieldValue(form, 'cantidad', edit.cantidad != null ? Number(edit.cantidad).toFixed(2) : '');
+                setFieldValue(
+                    form,
+                    'cantidad',
+                    edit.cantidad != null
+                        ? formatearCantidadRegistro(Number(edit.cantidad))
+                        : ''
+                );
+                if (trasladoCantidadInput && edit.cantidad != null) {
+                    bindFormatoCantidadInput(trasladoCantidadInput, DECIMALES_CANTIDAD_REGISTRO);
+                }
                 setFieldValue(form, 'factura', edit.factura || '');
                 setFieldValue(form, 'guia', edit.guia || '');
                 setFieldValue(form, 'observacion', edit.observacion || '');

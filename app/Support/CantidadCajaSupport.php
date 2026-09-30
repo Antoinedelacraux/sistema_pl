@@ -105,6 +105,59 @@ final class CantidadCajaSupport
         return self::formatearVisualizacionCelda($valor, $nomFamilia);
     }
 
+    /** Registro (solo visual): trunca a 2 dec.; BD guarda precisión de familia. */
+    public static function truncarVisualRegistro(float $valor, int $decVisual = self::DECIMALES_NORMAL): float
+    {
+        if ($decVisual <= 0) {
+            return (float) (int) $valor;
+        }
+
+        $factor = 10 ** $decVisual;
+
+        if ($valor >= 0) {
+            return floor($valor * $factor + 1e-12) / $factor;
+        }
+
+        return ceil($valor * $factor - 1e-12) / $factor;
+    }
+
+    public static function formatearRegistroVisual(?float $valor, int $decVisual = self::DECIMALES_NORMAL): string
+    {
+        if ($valor === null) {
+            return '—';
+        }
+
+        return self::formatearCantidadFlexible(self::truncarVisualRegistro((float) $valor, $decVisual), $decVisual);
+    }
+
+    /** MRP consumo/ingreso/stock: enteros sin .00; decimales solo si aplica (p. ej. 205.21). */
+    public static function formatearCantidadFlexible(?float $valor, int $maxDecimales = self::DECIMALES_NORMAL): string
+    {
+        if ($valor === null) {
+            return '—';
+        }
+
+        $num = round((float) $valor, $maxDecimales);
+        if ($num == 0.0) {
+            return '—';
+        }
+
+        if (abs($num - round($num, 0)) < 1e-9) {
+            return number_format((int) round($num), 0, '.', ',');
+        }
+
+        $formatted = number_format($num, $maxDecimales, '.', ',');
+        $pos = strrpos($formatted, '.');
+        if ($pos === false) {
+            return $formatted;
+        }
+
+        $entero = substr($formatted, 0, $pos);
+        $frac = rtrim(substr($formatted, $pos + 1), '0');
+
+        return $frac === '' ? $entero : $entero.'.'.$frac;
+    }
+
     public static function normalizarValor(string|float|null $valor, ?string $nomFamilia): float
     {
         return (float) self::claveCantidad($valor, $nomFamilia);

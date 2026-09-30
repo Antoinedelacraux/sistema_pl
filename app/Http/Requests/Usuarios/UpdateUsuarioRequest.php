@@ -6,6 +6,7 @@ use App\Models\Estado;
 use App\Models\Usuario;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class UpdateUsuarioRequest extends FormRequest
 {
@@ -37,7 +38,7 @@ class UpdateUsuarioRequest extends FormRequest
                 'max:150',
                 Rule::unique('Usuario', 'Usuario')->ignore($cuenta->idUsuario, 'idUsuario'),
             ],
-            'password' => ['nullable', 'string', 'min:8', 'max:255'],
+            'password' => ['nullable', 'string', 'max:255', Password::defaults()],
             'estado' => ['required', 'integer', Rule::in([Estado::ACTIVO, Estado::INACTIVO])],
             'permisos' => ['nullable', 'array'],
             'permisos.*' => ['nullable', 'array'],

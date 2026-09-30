@@ -5,7 +5,18 @@
             <h2 class="modal__title" id="registro-traslado-title">Agregar traslado</h2>
             <button type="button" class="modal__close" data-cerrar-modal-registro="traslado">&times;</button>
         </header>
-        <form method="POST" action="{{ route('registro.traslado.store') }}" class="modal__form" id="registro-traslado-form" data-store-action="{{ route('registro.traslado.store') }}" enctype="multipart/form-data">
+        <form
+            method="POST"
+            action="{{ route('registro.traslado.store') }}"
+            class="modal__form"
+            id="registro-traslado-form"
+            data-store-action="{{ route('registro.traslado.store') }}"
+            enctype="multipart/form-data"
+            data-confirm="¿Está seguro de guardar este traslado?"
+            data-confirm-title="Guardar traslado"
+            data-confirm-ok="Sí, guardar"
+            data-confirm-variant="warning"
+        >
             @csrf
             <input type="hidden" name="_method" id="registro-traslado-method" value="POST" disabled>
             <div class="modal__grid">
@@ -39,7 +50,7 @@
                 </p>
                 <label class="field">
                     <span class="field__label">Cantidad</span>
-                    <input type="number" class="field__input @error('cantidad') is-invalid @enderror" name="cantidad" value="{{ old('cantidad') }}" min="0.01" step="0.01" required>
+                    <input type="text" class="field__input @error('cantidad') is-invalid @enderror" name="cantidad" value="{{ old('cantidad') }}" inputmode="decimal" autocomplete="off" required>
                 </label>
                 @include('registro._documento_fields')
                 <label class="field field--full">

@@ -52,7 +52,7 @@ class MrpGridService
 
         $version = (int) Cache::get('mrp.cache_version', 0);
         $familia = (int) ($filtros['familia'] ?? 0);
-        $cacheKey = 'mrp.datos.v'.$version.'.f'.$familia.'.'.implode('-', $secciones);
+        $cacheKey = 'mrp.datos.v'.$version.'.f'.$familia.'.'.implode('-', $secciones).'.ordbd';
         $ttl = $this->ttlDatos($secciones);
 
         return Cache::remember($cacheKey, $ttl, fn () => $this->buildDatos($filtros, $secciones));
@@ -274,6 +274,9 @@ class MrpGridService
         }
 
         $materiales = $query->get(['idMaterialPL', 'CodigoPL', 'nomMaterial']);
+        $idsLista = $materiales->map(fn (MaterialProgramaPL $m): int => (int) $m->idMaterialPL)->all();
+
+        PlanConsumoOrdenSupport::asegurarOrden($idsLista);
         $mapaOrden = PlanConsumoOrdenSupport::mapaOrden();
 
         return $materiales
@@ -386,11 +389,7 @@ class MrpGridService
 
     private function textoCeldaDecimal(float $num): string
     {
-        if ($num == 0.0) {
-            return '—';
-        }
-
-        return number_format($num, 2, '.', ',');
+        return CantidadCajaSupport::formatearCantidadFlexible($num);
     }
 
     /**

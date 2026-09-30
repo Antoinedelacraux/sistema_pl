@@ -7,7 +7,9 @@ use App\Models\Stock\Almacen;
 use App\Models\Stock\MovimientoStock;
 use App\Models\Usuario;
 use App\Services\Stock\MovimientoService;
+use App\Services\Mrp\MrpGridService;
 use App\Support\MaterialProgramaLookup;
+use App\Support\PlanConsumoOrdenSupport;
 use App\Support\StockExcelFilas;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
@@ -23,7 +25,7 @@ class ImportarStockSafcoCommand extends Command
 
     protected $description = 'DESTRUCTIVO: reemplaza el stock de SAFCO (SFC) con Stock.xlsx (upsert de materiales + un ingreso agrupado).';
 
-    public function handle(MovimientoService $movimientos): int
+    public function handle(MovimientoService $movimientos, MrpGridService $mrpGrid): int
     {
         $ruta = (string) ($this->argument('archivo') ?: base_path('Stock.xlsx'));
         if (! is_file($ruta)) {
@@ -118,12 +120,18 @@ class ImportarStockSafcoCommand extends Command
         Cache::forget('catalogo.almacenes.v2');
         Cache::forget('catalogo.programas_consumo');
 
+        $ordenStock = PlanConsumoOrdenSupport::sincronizarOrdenDesdeStockExcel($ruta);
+        if ($ordenStock > 0) {
+            $mrpGrid->forgetCaches();
+        }
+
         $this->info("Import SAFCO ({$almacen->codigo}) desde ".basename($ruta));
         $this->line('- Filas Excel: '.count($filas));
         $this->line("- Materiales upsert: {$materiales}");
         $this->line("- Sin Idproducto (-), resueltas por descripción: {$sinCodigo}");
         $this->line("- Sin stock (0 o -): {$sinStock}");
         $this->line("- Líneas ingreso: {$ingresosCreados}");
+        $this->line("- Orden plan MRP (Stock.xlsx): {$ordenStock} material(es)");
 
         return self::SUCCESS;
     }

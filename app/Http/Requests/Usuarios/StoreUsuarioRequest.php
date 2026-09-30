@@ -5,6 +5,7 @@ namespace App\Http\Requests\Usuarios;
 use App\Models\Estado;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class StoreUsuarioRequest extends FormRequest
 {
@@ -23,7 +24,7 @@ class StoreUsuarioRequest extends FormRequest
             'id_cargo' => ['required', 'integer', Rule::exists('Cargo', 'idCargo')],
             'id_rol' => ['required', 'integer', Rule::exists('Rol', 'idRol')],
             'usuario' => ['required', 'string', 'max:150', Rule::unique('Usuario', 'Usuario')],
-            'password' => ['required', 'string', 'min:8', 'max:255'],
+            'password' => ['required', 'string', 'max:255', Password::defaults()],
             'estado' => ['required', 'integer', Rule::in([Estado::ACTIVO, Estado::INACTIVO])],
             'permisos' => ['nullable', 'array'],
             'permisos.*' => ['nullable', 'array'],

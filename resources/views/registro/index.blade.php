@@ -97,7 +97,7 @@
                             <td class="programas-grid__material registro-grid__td--material">{{ $ingreso->material }}</td>
                             <td class="registro-grid__td--fecha">{{ $ingreso->fecha?->format('d/m/Y') }}</td>
                             <td class="programas-grid__code">{{ $ingreso->codigo_pl }}</td>
-                            <td class="programas-grid__qty">{{ number_format((float) $ingreso->cantidad, 2, '.', '') }}</td>
+                            <td class="programas-grid__qty">{{ \App\Support\CantidadCajaSupport::formatearRegistroVisual((float) $ingreso->cantidad) }}</td>
                             <td>{{ $ingreso->factura ?: '—' }}</td>
                             <td>{{ $ingreso->guia ?: '—' }}</td>
                             <td class="registro-grid__td--pdf">
@@ -114,8 +114,8 @@
                                 'puedeEliminar' => $puedeEliminar,
                                 'destroyRoute' => route('registro.movimiento.destroy', $ingreso->idMovimiento),
                                 'confirmMessage' => $ingreso->es_lote
-                                    ? 'Se anulará este ingreso y todos sus materiales asociados. Esta acción no se puede deshacer.'
-                                    : 'Se anulará este ingreso. Esta acción no se puede deshacer.',
+                                    ? '¿Está seguro de anular este ingreso? Se anularán todos los materiales asociados. Esta acción no se puede deshacer.'
+                                    : '¿Está seguro de anular este ingreso? Esta acción no se puede deshacer.',
                                 'confirmTitle' => 'Anular ingreso',
                                 'editLabel' => 'Editar ingreso',
                             ])
@@ -176,7 +176,7 @@
                             <td>{{ $mov->presentacion?->nomPresentacion ?: '—' }}</td>
                             <td>{{ $mov->tipoConsumo?->nomTipoConsumo ?: '—' }}</td>
                             <td class="programas-grid__material registro-grid__td--material">{{ $materialEgreso }}</td>
-                            <td class="programas-grid__qty">{{ number_format((float) $mov->cantidad, 2, '.', '') }}</td>
+                            <td class="programas-grid__qty">{{ \App\Support\CantidadCajaSupport::formatearRegistroVisual((float) $mov->cantidad) }}</td>
                             <td>{{ $mov->observacion ?: '—' }}</td>
                             @include('registro._fila_acciones', [
                                 'tipoDetalle' => 'movimiento',
@@ -186,8 +186,8 @@
                                 'puedeEliminar' => $puedeEliminar,
                                 'destroyRoute' => route('registro.movimiento.destroy', $mov->idMovimiento),
                                 'confirmMessage' => ! empty($mov->es_lote)
-                                    ? 'Se anulará este consumo y todos sus materiales asociados. Esta acción no se puede deshacer.'
-                                    : 'Se anulará este consumo. Esta acción no se puede deshacer.',
+                                    ? '¿Está seguro de anular este consumo? Se anularán todos los materiales asociados. Esta acción no se puede deshacer.'
+                                    : '¿Está seguro de anular este consumo? Esta acción no se puede deshacer.',
                                 'confirmTitle' => 'Anular consumo',
                                 'editLabel' => 'Editar consumo',
                             ])
@@ -251,7 +251,7 @@
                             <td>{{ $traslado->almacenDestino?->codigo }}</td>
                             <td class="programas-grid__code">{{ $traslado->materialPl?->CodigoPL }}</td>
                             <td class="programas-grid__material registro-grid__td--material">{{ $traslado->materialPl?->nomMaterial }}</td>
-                            <td class="programas-grid__qty">{{ number_format((float) $traslado->cantidad, 2, '.', '') }}</td>
+                            <td class="programas-grid__qty">{{ \App\Support\CantidadCajaSupport::formatearRegistroVisual((float) $traslado->cantidad) }}</td>
                             <td>{{ $traslado->factura ?: '—' }}</td>
                             <td>{{ $guiaTraslado ?: '—' }}</td>
                             <td class="registro-grid__td--pdf">
@@ -267,7 +267,7 @@
                                 'puedeEditar' => $puedeEditar,
                                 'puedeEliminar' => $puedeEliminar,
                                 'destroyRoute' => route('registro.traslado.destroy', $traslado->idTraslado),
-                                'confirmMessage' => 'Se anulará este traslado. Esta acción no se puede deshacer.',
+                                'confirmMessage' => '¿Está seguro de anular este traslado? Esta acción no se puede deshacer.',
                                 'confirmTitle' => 'Anular traslado',
                                 'editLabel' => 'Editar traslado',
                             ])
@@ -361,5 +361,5 @@
 <script src="{{ asset('js/offline-queue.js') }}" defer></script>
 <script src="{{ asset('js/offline-sync-registro.js') }}?v=3" defer></script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script src="{{ asset('js/registro.js') }}?v=21" defer></script>
+<script src="{{ asset('js/registro.js') }}?v=29" defer></script>
 @endpush
