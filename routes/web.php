@@ -204,6 +204,10 @@ Route::middleware(['auth', 'usuario.activo', 'throttle:web'])->group(function ()
         ->middleware(['permiso:proveedor,crear', 'throttle:imports'])
         ->name('proveedor.import');
 
+    Route::get('/proveedor/materiales-buscar', [ProveedorController::class, 'buscarMateriales'])
+        ->middleware('permiso:proveedor,ver')
+        ->name('proveedor.materiales.buscar');
+
     Route::get('/proveedor/material-por-codigo', [ProveedorController::class, 'materialPorCodigo'])
         ->middleware('permiso:proveedor,ver')
         ->name('proveedor.material-por-codigo');

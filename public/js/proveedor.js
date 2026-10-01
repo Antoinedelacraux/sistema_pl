@@ -10,8 +10,7 @@
     var agregarMaterialPlSelect = document.getElementById('proveedor-agregar-material-pl-select');
     var agregarCodigoPlSearch = document.getElementById('proveedor-agregar-codigo-pl-search');
     var agregarMaterialPlSearch = document.getElementById('proveedor-agregar-material-pl-search');
-    var materialCodigoUrl = window.proveedorMaterialCodigoUrl || '';
-    var materialNombreUrl = window.proveedorMaterialNombreUrl || '';
+    var materialesBuscarUrl = window.proveedorMaterialesBuscarUrl || '';
     var importPreviewUrl = window.proveedorImportPreviewUrl || '';
     var agregarNomProveedor = document.getElementById('proveedor-agregar-nom-proveedor');
     var importArchivo = document.getElementById('proveedor-import-archivo');
@@ -579,6 +578,189 @@
         );
     }
 
+    function textoOpcionMaterial(item, modo) {
+        if (modo === 'material') {
+            return item.nom_material || item.codigo_pl || '';
+        }
+
+        return item.codigo_pl
+            ? (item.codigo_pl + (item.nom_material ? ' — ' + item.nom_material : ''))
+            : (item.nom_material || '');
+    }
+
+    function pintarSelectMateriales(select, items, modo) {
+        if (!select) {
+            return;
+        }
+
+        var actual = select.value;
+        var placeholder = select.querySelector('option[value=""]');
+        var textoPlaceholder = placeholder ? placeholder.textContent : 'Seleccionar';
+        select.innerHTML = '';
+
+        var vacio = document.createElement('option');
+        vacio.value = '';
+        vacio.textContent = textoPlaceholder;
+        select.appendChild(vacio);
+
+        items.forEach(function (item) {
+            var option = document.createElement('option');
+            option.value = String(item.id_material_pl);
+            option.setAttribute('data-codigo-pl', item.codigo_pl || '');
+            option.setAttribute('data-nom-material-pl', item.nom_material || '');
+            option.textContent = textoOpcionMaterial(item, modo);
+            select.appendChild(option);
+        });
+
+        if (actual) {
+            select.value = actual;
+        }
+    }
+
+    function avisoMaterial(select, texto) {
+        if (!select || !select.parentElement) {
+            return;
+        }
+
+        var aviso = select.parentElement.querySelector('.proveedor-material-aviso');
+        if (!aviso) {
+            aviso = document.createElement('p');
+            aviso.className = 'field__hint proveedor-material-aviso';
+            select.parentElement.appendChild(aviso);
+        }
+
+        aviso.hidden = !texto;
+        aviso.textContent = texto || '';
+    }
+
+    function cargarMaterialesSelect() {
+        if (!materialesBuscarUrl) {
+            return;
+        }
+
+        avisoMaterial(agregarCodigoPlSelect, 'Cargando materiales…');
+        avisoMaterial(agregarMaterialPlSelect, 'Cargando materiales…');
+
+        fetch(materialesBuscarUrl + '?limite=200', { headers: { Accept: 'application/json' } })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('respuesta');
+                }
+
+                return response.json();
+            })
+            .then(function (data) {
+                var items = data.materiales || [];
+                pintarSelectMateriales(agregarCodigoPlSelect, items, 'codigo');
+                pintarSelectMateriales(agregarMaterialPlSelect, items, 'material');
+
+                var aviso = '';
+                if (!items.length) {
+                    aviso = 'No hay materiales.';
+                } else if (data.hay_mas) {
+                    aviso = 'Hay más materiales. Usa el buscador para filtrar.';
+                }
+
+                avisoMaterial(agregarCodigoPlSelect, aviso);
+                avisoMaterial(agregarMaterialPlSelect, aviso);
+            })
+            .catch(function () {
+                avisoMaterial(agregarCodigoPlSelect, 'No se pudieron cargar los materiales.');
+                avisoMaterial(agregarMaterialPlSelect, 'No se pudieron cargar los materiales.');
+            });
+    }
+
+    function listaResultados(input) {
+        if (!input || !input.parentElement) {
+            return null;
+        }
+
+        var lista = input.parentElement.querySelector('.proveedor-material-resultados');
+        if (!lista) {
+            lista = document.createElement('div');
+            lista.className = 'proveedor-material-resultados';
+            lista.hidden = true;
+            input.parentElement.appendChild(lista);
+        }
+
+        return lista;
+    }
+
+    function mostrarResultadosBusqueda(input, items, modo, mensajeVacio) {
+        var lista = listaResultados(input);
+        if (!lista) {
+            return;
+        }
+
+        lista.innerHTML = '';
+        if (!items.length) {
+            var vacio = document.createElement('p');
+            vacio.className = 'proveedor-material-resultados__vacio';
+            vacio.textContent = mensajeVacio || 'Sin resultados.';
+            lista.appendChild(vacio);
+            lista.hidden = false;
+            return;
+        }
+
+        items.forEach(function (item) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'proveedor-material-resultados__item';
+            btn.textContent = textoOpcionMaterial(item, modo);
+            btn.addEventListener('click', function () {
+                setMaterialPlSeleccion(item.id_material_pl, item.codigo_pl, item.nom_material);
+                lista.hidden = true;
+            });
+            lista.appendChild(btn);
+        });
+
+        if (mensajeVacio) {
+            var nota = document.createElement('p');
+            nota.className = 'proveedor-material-resultados__vacio';
+            nota.textContent = mensajeVacio;
+            lista.appendChild(nota);
+        }
+
+        lista.hidden = false;
+    }
+
+    function buscarMaterialesLista(input, modo) {
+        if (!input || !materialesBuscarUrl) {
+            return;
+        }
+
+        var q = input.value.trim();
+        if (q.length < 2) {
+            var lista = listaResultados(input);
+            if (lista) {
+                lista.hidden = true;
+            }
+            return;
+        }
+
+        fetch(materialesBuscarUrl + '?q=' + encodeURIComponent(q) + '&limite=30', {
+            headers: { Accept: 'application/json' },
+        })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('respuesta');
+                }
+
+                return response.json();
+            })
+            .then(function (data) {
+                var items = data.materiales || [];
+                var aviso = items.length ? '' : 'Sin resultados.';
+                if (items.length && data.hay_mas) {
+                    aviso = 'Hay más coincidencias. Afina la búsqueda.';
+                }
+                mostrarResultadosBusqueda(input, items, modo, aviso);
+            })
+            .catch(function () {
+                mostrarResultadosBusqueda(input, [], modo, 'No se pudo buscar. Reintenta.');
+            });
+    }
+
     function activarModoCampo(fieldMode, mode) {
         if (!fieldMode) {
             return;
@@ -591,60 +773,10 @@
         fieldMode.querySelectorAll('.field-mode__panel').forEach(function (panel) {
             panel.hidden = panel.getAttribute('data-panel') !== mode;
         });
-    }
 
-    function buscarMaterialPlPorCodigo() {
-        if (!agregarCodigoPlSearch || !materialCodigoUrl) {
-            return;
+        if (mode === 'select') {
+            cargarMaterialesSelect('');
         }
-
-        var codigo = agregarCodigoPlSearch.value.trim();
-        if (codigo.length < 4) {
-            if (agregarIdMaterial) {
-                agregarIdMaterial.value = '';
-            }
-            return;
-        }
-
-        fetch(materialCodigoUrl + '?codigo=' + encodeURIComponent(codigo), {
-            headers: { Accept: 'application/json' },
-        })
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-                if (data.encontrado) {
-                    setMaterialPlSeleccion(data.id_material_pl, data.codigo_pl, data.nom_material);
-                } else if (agregarIdMaterial) {
-                    agregarIdMaterial.value = '';
-                }
-            })
-            .catch(function () {});
-    }
-
-    function buscarMaterialPlPorNombre() {
-        if (!agregarMaterialPlSearch || !materialNombreUrl) {
-            return;
-        }
-
-        var nombre = agregarMaterialPlSearch.value.trim();
-        if (nombre.length < 3) {
-            if (agregarIdMaterial) {
-                agregarIdMaterial.value = '';
-            }
-            return;
-        }
-
-        fetch(materialNombreUrl + '?q=' + encodeURIComponent(nombre), {
-            headers: { Accept: 'application/json' },
-        })
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-                if (data.encontrado) {
-                    setMaterialPlSeleccion(data.id_material_pl, data.codigo_pl, data.nom_material);
-                } else if (agregarIdMaterial) {
-                    agregarIdMaterial.value = '';
-                }
-            })
-            .catch(function () {});
     }
 
     if (modal) {
@@ -761,17 +893,19 @@
     if (agregarCodigoPlSearch) {
         agregarCodigoPlSearch.addEventListener('input', function () {
             clearTimeout(lookupTimer);
-            lookupTimer = setTimeout(buscarMaterialPlPorCodigo, 350);
+            lookupTimer = setTimeout(function () {
+                buscarMaterialesLista(agregarCodigoPlSearch, 'codigo');
+            }, 300);
         });
-        agregarCodigoPlSearch.addEventListener('blur', buscarMaterialPlPorCodigo);
     }
 
     if (agregarMaterialPlSearch) {
         agregarMaterialPlSearch.addEventListener('input', function () {
             clearTimeout(lookupTimer);
-            lookupTimer = setTimeout(buscarMaterialPlPorNombre, 350);
+            lookupTimer = setTimeout(function () {
+                buscarMaterialesLista(agregarMaterialPlSearch, 'material');
+            }, 300);
         });
-        agregarMaterialPlSearch.addEventListener('blur', buscarMaterialPlPorNombre);
     }
 
     document.addEventListener('keydown', function (event) {

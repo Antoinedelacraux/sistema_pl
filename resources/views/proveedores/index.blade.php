@@ -6,7 +6,7 @@
 @section('crumbs', 'Planeamiento · códigos TGF y SAFCO')
 
 @push('head')
-<link rel="stylesheet" href="{{ asset('css/proveedor.css') }}?v=1">
+<link rel="stylesheet" href="{{ asset('css/proveedor.css') }}?v=3">
 <link rel="stylesheet" href="{{ asset('css/receta.css') }}?v=3">
 @endpush
 
@@ -200,11 +200,12 @@
 @push('scripts')
 <script>
     window.proveedorUpdateUrlTemplate = @json(route('proveedor.update', ['nroFila' => 0]));
+    window.proveedorMaterialesBuscarUrl = @json(route('proveedor.materiales.buscar'));
     window.proveedorMaterialCodigoUrl = @json(route('proveedor.material-por-codigo'));
     window.proveedorMaterialNombreUrl = @json(route('proveedor.material-por-nombre'));
     window.proveedorImportPreviewUrl = @json(route('proveedor.import.preview'));
     window.proveedorColumnasKeys = @json(collect($columnasProveedor)->pluck('key', 'nombre'));
 </script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script src="{{ asset('js/proveedor.js') }}?v=4" defer></script>
+<script src="{{ asset('js/proveedor.js') }}?v=6" defer></script>
 @endpush

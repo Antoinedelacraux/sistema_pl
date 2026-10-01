@@ -509,3 +509,44 @@ body.page-app[data-theme="dark"] .proveedor-toolbar__stat-label {
 .modal-proveedor-block.is-marked-delete .modal-proveedor-block__grid{
     pointer-events: none;
 }
+
+.field-mode__panel{
+    position: relative;
+}
+
+.proveedor-material-resultados{
+    position: absolute;
+    z-index: 5;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
+    max-height: 220px;
+    overflow: auto;
+    background: #fff;
+    border: 1px solid #d9d4ea;
+    border-radius: 8px;
+    box-shadow: 0 8px 20px rgba(40, 20, 70, 0.12);
+}
+
+.proveedor-material-resultados__item{
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 8px 10px;
+    border: 0;
+    background: #fff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+}
+
+.proveedor-material-resultados__item:hover{
+    background: #f4f0fa;
+}
+
+.proveedor-material-resultados__vacio{
+    margin: 0;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--ink-muted);
+}

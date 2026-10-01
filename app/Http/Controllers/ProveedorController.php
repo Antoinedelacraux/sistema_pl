@@ -123,6 +123,14 @@ class ProveedorController extends Controller
             ->with('status', 'Registro agregado.');
     }
 
+    public function buscarMateriales(Request $request): JsonResponse
+    {
+        return response()->json($this->gridService->buscarMateriales(
+            (string) $request->query('q', ''),
+            (int) $request->query('limite', 80)
+        ));
+    }
+
     public function materialPorCodigo(Request $request): JsonResponse
     {
         $material = $this->gridService->materialPorCodigo((string) $request->query('codigo', ''));

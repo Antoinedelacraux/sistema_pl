@@ -142,6 +142,14 @@ class ProveedorGridService
         return MaterialProgramaLookup::porCodigo($codigo, soloActivos: false);
     }
 
+    /**
+     * @return array{materiales: list<array{id_material_pl: int, codigo_pl: string, nom_material: string}>, hay_mas: bool}
+     */
+    public function buscarMateriales(string $termino, int $limite = 80): array
+    {
+        return MaterialProgramaLookup::buscar($termino, $limite, 200);
+    }
+
     public function materialPorNombre(string $nombre): ?MaterialProgramaPL
     {
         $nombre = trim($nombre);

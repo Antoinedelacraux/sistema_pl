@@ -112,6 +112,44 @@ final class MaterialProgramaLookup
         return $query->orderBy('idMaterialPL')->first();
     }
 
+    /**
+     * @return array{materiales: list<array{id_material_pl: int, codigo_pl: string, nom_material: string}>, hay_mas: bool}
+     */
+    public static function buscar(string $termino, int $limite = 50, int $tope = 200): array
+    {
+        $termino = trim($termino);
+        $limite = max(1, min($limite, max(1, $tope)));
+
+        if ($termino !== '' && mb_strlen($termino) < 2) {
+            return ['materiales' => [], 'hay_mas' => false];
+        }
+
+        $query = MaterialProgramaPL::query()
+            ->activo()
+            ->orderBy('CodigoPL');
+
+        if ($termino !== '') {
+            $like = '%'.$termino.'%';
+            $query->where(function ($q) use ($like) {
+                $q->where('CodigoPL', 'like', $like)
+                    ->orWhere('nomMaterial', 'like', $like);
+            });
+        }
+
+        $filas = $query
+            ->limit($limite + 1)
+            ->get(['idMaterialPL', 'CodigoPL', 'nomMaterial']);
+
+        return [
+            'materiales' => $filas->take($limite)->map(fn (MaterialProgramaPL $material) => [
+                'id_material_pl' => (int) $material->idMaterialPL,
+                'codigo_pl' => (string) $material->CodigoPL,
+                'nom_material' => (string) $material->nomMaterial,
+            ])->all(),
+            'hay_mas' => $filas->count() > $limite,
+        ];
+    }
+
     /** CodigoPL único para materiales sin Idproducto en Excel (uk_material_codigo_pl). */
     public static function codigoProvisionalPorDescripcion(string $descripcion): string
     {
