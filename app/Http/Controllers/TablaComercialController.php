@@ -17,7 +17,7 @@ class TablaComercialController extends Controller
 
     public function index(Request $request): View
     {
-        $datos = $this->gridService->datos();
+        $datos = $this->gridService->datosPlanVentas();
 
         $semanas = $datos['semanas'];
         $filas   = $datos['filas'];

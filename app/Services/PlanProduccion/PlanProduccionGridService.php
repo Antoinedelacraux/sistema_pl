@@ -35,6 +35,18 @@ class PlanProduccionGridService
     }
 
     /**
+     * Solo semanas y cajas del plan de ventas (sin receta ni plan de consumo).
+     *
+     * @return array{semanas: Collection<int, SemProduccion>, filas: list<array<string, mixed>>, total_programas: int}
+     */
+    public function datosPlanVentas(): array
+    {
+        $version = (int) Cache::get('plan_produccion.cache_version', 0);
+
+        return Cache::remember('plan_produccion.plan_ventas.v'.$version, 600, fn () => $this->buildDatosPlanVentas());
+    }
+
+    /**
      * Materiales de un programa (desglose plan de ventas), bajo demanda.
      *
      * @return list<array{
@@ -173,6 +185,75 @@ class PlanProduccionGridService
             'filas' => $filas,
             'planConsumo' => $planConsumo['filas'],
             'semanasPlanConsumo' => $planConsumo['semanas'],
+            'total_programas' => count($filas),
+        ];
+    }
+
+    /**
+     * @return array{semanas: Collection<int, SemProduccion>, filas: list<array<string, mixed>>, total_programas: int}
+     */
+    private function buildDatosPlanVentas(): array
+    {
+        $semanas = SemProduccion::query()
+            ->activo()
+            ->orderBy('nroOrden')
+            ->get(['idSemProduccion', 'codigoSemana', 'fechaInicio', 'nroOrden', 'Estado']);
+
+        if ($semanas->isEmpty()) {
+            return [
+                'semanas' => $semanas,
+                'filas' => [],
+                'total_programas' => 0,
+            ];
+        }
+
+        $idsSem = $semanas->pluck('idSemProduccion')->all();
+        $cantidades = PlanProduccion::query()
+            ->activo()
+            ->whereIn('idSemProduccion', $idsSem)
+            ->select(['idProgramaGeneral', 'idSemProduccion', 'cantidad', 'calificacion'])
+            ->get()
+            ->groupBy('idProgramaGeneral');
+
+        $programas = ProgramaGeneral::query()
+            ->activo()
+            ->whereIn('idProgramaGeneral', $cantidades->keys())
+            ->select(['idProgramaGeneral', 'nombre'])
+            ->get()
+            ->keyBy('idProgramaGeneral');
+
+        $ordenPg = PlanProduccion::query()
+            ->selectRaw('idProgramaGeneral, MIN(nroOrden) AS nroOrden')
+            ->whereIn('idSemProduccion', $idsSem)
+            ->groupBy('idProgramaGeneral')
+            ->orderBy('nroOrden')
+            ->get();
+
+        $filas = [];
+        foreach ($ordenPg as $item) {
+            $idPg = (int) $item->idProgramaGeneral;
+            $pg = $programas->get($idPg);
+            if (! $pg) {
+                continue;
+            }
+
+            $porSem = [];
+            $calificacion = null;
+            foreach ($cantidades->get($idPg, collect()) as $plan) {
+                $porSem['sem_'.$plan->idSemProduccion] = (float) $plan->cantidad;
+                $calificacion = $plan->calificacion ?? $calificacion;
+            }
+
+            $filas[] = [
+                'idProgramaGeneral' => $idPg,
+                'nombre' => $pg->nombre,
+                'calificacion' => $calificacion,
+            ] + $porSem;
+        }
+
+        return [
+            'semanas' => $semanas,
+            'filas' => $filas,
             'total_programas' => count($filas),
         ];
     }

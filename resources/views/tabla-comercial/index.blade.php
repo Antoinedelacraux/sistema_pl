@@ -1,7 +1,7 @@
 @extends('layouts.shell')
 
-@section('title', 'Tabla Comercial')
-@section('heading', 'Tabla Comercial')
+@section('title', 'Tablero comercial')
+@section('heading', 'Tablero comercial')
 @section('crumbs', 'Planeamiento · plan de ventas y asignación diaria')
 
 @push('head')

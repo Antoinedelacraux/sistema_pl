@@ -2,9 +2,11 @@
 
 namespace App\Services\TablaComercial;
 
+use App\Models\Estado;
 use App\Models\Programas\TablaComercialDia;
 use App\Models\Programas\TablaComercialEstado;
-use App\Services\Stock\ConsumoPlanLimiteService;
+use App\Models\Stock\MovimientoStock;
+use App\Support\FamiliaMaterialSupport;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -46,24 +48,96 @@ class TablaComercialService
             return [];
         }
 
-        $limite = app(ConsumoPlanLimiteService::class);
-        $resultado = [];
+        $rangos = [];
+        $fechaMin = null;
+        $fechaMax = null;
 
-        foreach ($pgIds as $idPg) {
-            $idPg = (int) $idPg;
-            if ($idPg <= 0) {
+        foreach ($semanas as $sem) {
+            if ($sem->fechaInicio === null) {
                 continue;
             }
-            foreach ($semanas as $sem) {
-                $idSem = (int) $sem->idSemProduccion;
-                if ($idSem <= 0) {
+
+            $inicio = $sem->fechaInicio->toDateString();
+            $fin = $sem->fechaInicio->copy()->addDays(6)->toDateString();
+            $rangos[] = [
+                'id' => (int) $sem->idSemProduccion,
+                'inicio' => $inicio,
+                'fin' => $fin,
+            ];
+            $fechaMin = $fechaMin === null || $inicio < $fechaMin ? $inicio : $fechaMin;
+            $fechaMax = $fechaMax === null || $fin > $fechaMax ? $fin : $fechaMax;
+        }
+
+        if ($rangos === [] || $fechaMin === null || $fechaMax === null) {
+            return [];
+        }
+
+        $filas = DB::table('MovimientoStock as ms')
+            ->join('Programa as p', 'p.idPrograma', '=', 'ms.idPrograma')
+            ->join('ProgramaFila as pf', function ($join) {
+                $join->on('pf.idPrograma', '=', 'ms.idPrograma')
+                    ->on('pf.idPresentacion', '=', 'ms.idPresentacion')
+                    ->on('pf.idMaterialPL', '=', 'ms.idMaterialPL')
+                    ->where('pf.Estado', Estado::ACTIVO);
+            })
+            ->join('Familia as f', 'f.idFamilia', '=', 'pf.idFamilia')
+            ->whereIn('p.idProgramaGeneral', $pgIds)
+            ->where('ms.tipo', MovimientoStock::TIPO_EGRESO)
+            ->where('ms.estado', 1)
+            ->whereNull('ms.idTraslado')
+            ->whereBetween('ms.fecha', [$fechaMin, $fechaMax])
+            ->whereNotNull('ms.idPrograma')
+            ->whereRaw("LOWER(TRIM(f.nomFamilia)) IN ('cajas', 'caja', 'box')")
+            ->get([
+                'p.idProgramaGeneral',
+                'ms.idPrograma',
+                'ms.idPresentacion',
+                'ms.fecha',
+                'ms.fechaRegistro',
+                'ms.idUsuario',
+                'ms.idTipoConsumo',
+                'ms.cantidad',
+                'f.nomFamilia',
+            ]);
+
+        $porLote = [];
+
+        foreach ($filas as $row) {
+            if (! FamiliaMaterialSupport::esCajas($row->nomFamilia ?? null)) {
+                continue;
+            }
+
+            $fecha = (string) $row->fecha;
+            $fechaDia = substr($fecha, 0, 10);
+
+            foreach ($rangos as $rango) {
+                if ($fechaDia < $rango['inicio'] || $fechaDia > $rango['fin']) {
                     continue;
                 }
-                $cajas = $limite->cajasConsumidasProgramaGeneralSemana($idPg, $idSem);
-                if ($cajas > 0) {
-                    $resultado[$idPg.'_'.$idSem] = $cajas;
-                }
+
+                $lote = implode('|', [
+                    (int) $row->idProgramaGeneral,
+                    $rango['id'],
+                    (int) $row->idPrograma,
+                    (int) $row->idPresentacion,
+                    $fecha,
+                    (string) $row->fechaRegistro,
+                    (int) ($row->idUsuario ?? 0),
+                    (int) ($row->idTipoConsumo ?? 0),
+                ]);
+                $cantidad = (float) $row->cantidad;
+                $porLote[$lote] = isset($porLote[$lote]) ? max($porLote[$lote], $cantidad) : $cantidad;
             }
+        }
+
+        $resultado = [];
+        foreach ($porLote as $lote => $cantidad) {
+            $partes = explode('|', $lote, 3);
+            $clave = $partes[0].'_'.$partes[1];
+            if ($cantidad <= 0) {
+                continue;
+            }
+            $resultado[$clave] = ($resultado[$clave] ?? 0) + $cantidad;
         }
 
         return $resultado;
