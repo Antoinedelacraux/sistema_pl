@@ -2,7 +2,11 @@
 
 namespace App\Services\Stock;
 
+use App\Models\Programas\Familia;
 use App\Models\Programas\MaterialProgramaPL;
+use App\Models\Programas\ProgramaFila;
+use App\Models\Proveedores\Proveedor;
+use App\Support\CantidadCajaSupport;
 use App\Models\Programas\TipoConsumo;
 use App\Models\Stock\Almacen;
 use App\Models\Stock\MovimientoStock;
@@ -54,7 +58,9 @@ class MovimientoService
         'idMovimiento',
         'idAlmacen',
         'idMaterialPL',
+        'idUsuario',
         'fecha',
+        'fechaRegistro',
         'factura',
         'guia',
         'facturaGuia',
@@ -284,7 +290,7 @@ class MovimientoService
                     'materialPl' => $principal->materialPl,
                     'material' => $totalLineas > 1 ? $nombreMaterial.' y varios' : $nombreMaterial,
                     'codigo_pl' => $totalLineas > 1 ? 'Varios' : ($principal->materialPl?->CodigoPL ?: '—'),
-                    'cantidad' => $lineas->sum(fn (MovimientoStock $linea) => (float) $linea->cantidad),
+                    'cantidad' => $this->calcularCajasBoxLoteEgreso($lineas),
                     'es_lote' => $totalLineas > 1,
                     'total_lineas' => $totalLineas,
                 ];
@@ -460,34 +466,7 @@ class MovimientoService
      */
     public function buscarMateriales(string $termino, int $limite = 50): array
     {
-        $termino = trim($termino);
-        $limite = max(1, min($limite, 100));
-
-        $query = MaterialProgramaPL::query()
-            ->activo()
-            ->orderBy('CodigoPL');
-
-        if ($termino !== '') {
-            if (mb_strlen($termino) < 2) {
-                return [];
-            }
-
-            $like = '%'.$termino.'%';
-            $query->where(function ($q) use ($like) {
-                $q->where('CodigoPL', 'like', $like)
-                    ->orWhere('nomMaterial', 'like', $like);
-            });
-        }
-
-        return $query
-            ->limit($limite)
-            ->get(['idMaterialPL', 'CodigoPL', 'nomMaterial'])
-            ->map(fn (MaterialProgramaPL $material) => [
-                'id_material_pl' => (int) $material->idMaterialPL,
-                'codigo_pl' => (string) $material->CodigoPL,
-                'nom_material' => (string) $material->nomMaterial,
-            ])
-            ->all();
+        return MaterialProgramaLookup::buscar($termino, $limite, 100)['materiales'];
     }
 
     public function crearIngreso(array $datos, ?int $idUsuario, ?UploadedFile $archivo = null): int
@@ -1105,7 +1084,7 @@ class MovimientoService
             'lineas' => [[
                 'codigo_pl' => $traslado->materialPl?->CodigoPL,
                 'material' => $traslado->materialPl?->nomMaterial,
-                'cantidad' => $this->formatearCantidad($traslado->cantidad),
+                'cantidad' => $this->formatearCantidad($traslado->cantidad, (int) $traslado->idMaterialPL),
                 'almacen' => ($traslado->almacenOrigen?->codigo ?? '—').' → '.($traslado->almacenDestino?->codigo ?? '—'),
             ]],
             'movimientos_vinculados' => $traslado->movimientos
@@ -1114,7 +1093,7 @@ class MovimientoService
                 ->map(fn (MovimientoStock $mov) => [
                     'tipo' => $mov->tipo === MovimientoStock::TIPO_INGRESO ? 'Ingreso' : 'Consumo',
                     'almacen' => $mov->almacen?->codigo,
-                    'cantidad' => $this->formatearCantidad($mov->cantidad),
+                    'cantidad' => $this->formatearCantidad($mov->cantidad, (int) $mov->idMaterialPL),
                 ])
                 ->all(),
             'datos_edicion' => [
@@ -1392,7 +1371,9 @@ class MovimientoService
             'observacion' => $principal?->observacion,
             'material' => $totalLineas > 1 ? $nombreMaterial.' y varios' : $nombreMaterial,
             'codigo_pl' => $totalLineas > 1 ? 'Varios' : ($principal?->materialPl?->CodigoPL ?: '—'),
-            'cantidad' => (float) $lote->cantidad_total,
+            'cantidad' => $tipo === MovimientoStock::TIPO_EGRESO
+                ? $this->calcularCajasBoxLoteEgresoDesdePrincipal($principal)
+                : (float) $lote->cantidad_total,
             'es_lote' => $totalLineas > 1,
             'total_lineas' => $totalLineas,
         ];
@@ -1405,6 +1386,77 @@ class MovimientoService
         }
 
         return $item;
+    }
+
+    /**
+     * @param  Collection<int, MovimientoStock>  $lineas
+     */
+    private function calcularCajasBoxLoteEgreso(Collection $lineas): float
+    {
+        $principal = $lineas->first();
+        if ($principal === null) {
+            return 0.0;
+        }
+
+        $idPrograma = (int) ($principal->idPrograma ?? 0);
+        $idPresentacion = (int) ($principal->idPresentacion ?? 0);
+        if ($idPrograma <= 0 || $idPresentacion <= 0) {
+            return 0.0;
+        }
+
+        return app(ConsumoRecetaService::class)->cajasDesdeMovimientosConsumo(
+            $idPrograma,
+            $idPresentacion,
+            $lineas
+        );
+    }
+
+    private function calcularCajasBoxLoteEgresoDesdePrincipal(?MovimientoStock $principal): float
+    {
+        if ($principal === null) {
+            return 0.0;
+        }
+
+        $referencia = MovimientoStock::query()
+            ->select(array_merge(self::COLUMNAS_GRID_PRINCIPAL, ['archivoOneDriveId']))
+            ->find($principal->idMovimiento);
+
+        if ($referencia === null) {
+            return 0.0;
+        }
+
+        $query = MovimientoStock::query()
+            ->where('tipo', MovimientoStock::TIPO_EGRESO)
+            ->where('estado', 1)
+            ->whereNull('idTraslado')
+            ->where('idAlmacen', $referencia->idAlmacen)
+            ->whereDate('fecha', $referencia->fecha);
+
+        foreach (self::COLUMNAS_LOTE_EGRESO as $columna) {
+            if ($columna === 'idAlmacen' || $columna === 'fecha') {
+                continue;
+            }
+
+            $this->aplicarFiltroColumnaLote($query, $columna, $referencia->{$columna} ?? null);
+        }
+
+        return $this->calcularCajasBoxLoteEgreso($query->get());
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<MovimientoStock>  $query
+     */
+    private function aplicarFiltroColumnaLote($query, string $columna, mixed $valor): void
+    {
+        if ($valor === null || $valor === '') {
+            $query->where(function ($sub) use ($columna) {
+                $sub->whereNull($columna)->orWhere($columna, '');
+            });
+
+            return;
+        }
+
+        $query->where($columna, $valor);
     }
 
     /**
@@ -1443,7 +1495,7 @@ class MovimientoService
                 'id_movimiento' => $linea->idMovimiento,
                 'codigo_pl' => $linea->materialPl?->CodigoPL,
                 'material' => $linea->materialPl?->nomMaterial,
-                'cantidad' => $this->formatearCantidad($linea->cantidad),
+                'cantidad' => $this->formatearCantidad($linea->cantidad, $esIngreso ? null : (int) $linea->idMaterialPL),
                 'almacen' => $linea->almacen?->codigo,
             ])->values()->all(),
             'movimientos_vinculados' => [],
@@ -1517,9 +1569,46 @@ class MovimientoService
         return $payload;
     }
 
-    private function formatearCantidad(float|string|null $cantidad): string
+    /** @var array<int, string|null> */
+    private array $nomFamiliaMaterialCache = [];
+
+    private function formatearCantidad(float|string|null $cantidad, ?int $idMaterialPL = null): string
     {
-        return number_format((float) $cantidad, 2, '.', '');
+        if ($idMaterialPL === null) {
+            // Ingreso: mismo formato que en produccion (2 decimales fijos).
+            return number_format((float) $cantidad, 2, '.', '');
+        }
+
+        $nomFamilia = $idMaterialPL ? $this->nomFamiliaMaterial($idMaterialPL) : null;
+
+        return CantidadCajaSupport::formatearCantidadFlexible(
+            (float) $cantidad,
+            CantidadCajaSupport::decimales($nomFamilia)
+        );
+    }
+
+    private function nomFamiliaMaterial(int $idMaterialPL): ?string
+    {
+        if (array_key_exists($idMaterialPL, $this->nomFamiliaMaterialCache)) {
+            return $this->nomFamiliaMaterialCache[$idMaterialPL];
+        }
+
+        $idFamilia = ProgramaFila::query()
+            ->where('idMaterialPL', $idMaterialPL)
+            ->whereNotNull('idFamilia')
+            ->value('idFamilia');
+
+        if ($idFamilia === null) {
+            $idFamilia = Proveedor::query()
+                ->where('idMaterialPL', $idMaterialPL)
+                ->where('estado', 1)
+                ->whereNotNull('idFamilia')
+                ->value('idFamilia');
+        }
+
+        $nom = $idFamilia ? Familia::query()->whereKey($idFamilia)->value('nomFamilia') : null;
+
+        return $this->nomFamiliaMaterialCache[$idMaterialPL] = $nom ? (string) $nom : null;
     }
 
     private function listarPorTipo(string $tipo, array $filtros = []): Collection

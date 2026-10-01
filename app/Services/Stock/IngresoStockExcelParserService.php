@@ -5,6 +5,7 @@ namespace App\Services\Stock;
 use App\Models\Programas\Familia;
 use App\Models\Stock\Almacen;
 use App\Support\MaterialProgramaLookup;
+use App\Support\StockExcelFilas;
 use Illuminate\Http\UploadedFile;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -237,29 +238,7 @@ class IngresoStockExcelParserService
 
     private function parseCantidadCelda(Worksheet $hoja, string $celda): float
     {
-        $cell = $hoja->getCell($celda);
-        $valor = $cell->getValue();
-
-        if (is_int($valor) || is_float($valor)) {
-            return max(0.0, round((float) $valor, 2));
-        }
-
-        $texto = trim((string) $cell->getFormattedValue());
-        if ($texto === '' || $texto === '-' || $texto === '—') {
-            return 0.0;
-        }
-
-        $texto = preg_replace('/\s+/u', '', $texto) ?? $texto;
-
-        if (preg_match('/^\d{1,3}(,\d{3})+(\.\d+)?$/', $texto)) {
-            $texto = str_replace(',', '', $texto);
-        } elseif (preg_match('/,\d{1,2}$/', $texto)) {
-            $texto = str_replace(',', '.', $texto);
-        } else {
-            $texto = str_replace(',', '', $texto);
-        }
-
-        return max(0.0, round((float) $texto, 2));
+        return StockExcelFilas::parseCantidadCelda($hoja, $celda);
     }
 
     /**

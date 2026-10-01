@@ -3,7 +3,6 @@
     var programa = document.getElementById('inicio-filtro-programa');
     var producto = document.getElementById('inicio-filtro-producto');
     var cajas = document.getElementById('inicio-filtro-cajas');
-    var pallets = document.getElementById('inicio-filtro-pallets');
 
     if (!programa || !producto) {
         return;
@@ -45,11 +44,7 @@
         if (cajas) {
             cajas.value = '';
         }
-        if (pallets) {
-            pallets.value = '';
-        }
     });
 
     atarSimulacion(cajas);
-    atarSimulacion(pallets);
 })();

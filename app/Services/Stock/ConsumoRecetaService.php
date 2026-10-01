@@ -350,18 +350,15 @@ class ConsumoRecetaService
     }
 
     /**
-     * Calcula cantidades necesarias por material para N cajas y/o pallets (misma lógica que consumo).
+     * Cantidad necesaria por material: N cajas × cantidad por caja de cada material.
      *
      * @return array<int, float> idMaterialPL => cantidad
      */
     public function proyectarNecesidadesPorCajas(
         int $idPrograma,
         int $idPresentacion,
-        float $cajas,
-        ?float $pallets = null
+        float $cajas
     ): array {
-        unset($pallets);
-
         if ($idPrograma <= 0 || $idPresentacion <= 0 || $cajas <= 0) {
             return [];
         }
@@ -466,6 +463,92 @@ class ConsumoRecetaService
      * @param  Collection<int, mixed>  $inputPorId
      * @return array<string, float>
      */
+    /**
+     * Box (cajas) de un consumo ya guardado, a partir de sus líneas de movimiento.
+     *
+     * @param  iterable<int, MovimientoStock|array{id_material_pl?: int, cantidad?: float}>  $movimientos
+     */
+    public function cajasDesdeMovimientosConsumo(int $idPrograma, int $idPresentacion, iterable $movimientos): float
+    {
+        if ($idPrograma <= 0 || $idPresentacion <= 0) {
+            return 0.0;
+        }
+
+        $lineasInput = [];
+        foreach ($movimientos as $mov) {
+            $idMaterial = (int) (is_array($mov) ? ($mov['id_material_pl'] ?? 0) : $mov->idMaterialPL);
+            $qty = (float) (is_array($mov) ? ($mov['cantidad'] ?? 0) : $mov->cantidad);
+            if ($idMaterial <= 0 || $qty <= 0) {
+                continue;
+            }
+
+            $lineasInput[] = [
+                'id_material_pl' => $idMaterial,
+                'cantidad' => $qty,
+                'total' => $qty,
+            ];
+        }
+
+        if ($lineasInput === []) {
+            return 0.0;
+        }
+
+        $cajas = $this->cajasSolicitadasEnLineas($idPrograma, $idPresentacion, $lineasInput);
+        if ($cajas > 0) {
+            return $cajas;
+        }
+
+        return $this->inferirCajasBoxDesdeTotalesMovimiento($idPrograma, $idPresentacion, $lineasInput);
+    }
+
+    /**
+     * @param  list<array{id_material_pl: int, cantidad?: float, total?: float}>  $lineasInput
+     */
+    private function inferirCajasBoxDesdeTotalesMovimiento(int $idPrograma, int $idPresentacion, array $lineasInput): float
+    {
+        $receta = $this->materialesDePresentacion($idPrograma, $idPresentacion);
+        if ($receta === []) {
+            return 0.0;
+        }
+
+        $porId = collect($lineasInput)->keyBy(fn (array $linea) => (int) ($linea['id_material_pl'] ?? 0));
+        $cajas = 0.0;
+
+        foreach ($receta as $item) {
+            $idMaterial = (int) ($item['id_material_pl'] ?? 0);
+            if ($idMaterial <= 0) {
+                continue;
+            }
+
+            $input = $porId->get($idMaterial);
+            if ($input === null) {
+                continue;
+            }
+
+            $qty = (float) ($input['total'] ?? $input['cantidad'] ?? 0);
+            if ($qty <= 0) {
+                continue;
+            }
+
+            if (! empty($item['es_caja_factor'])) {
+                $cajas = max($cajas, $qty);
+
+                continue;
+            }
+
+            $factor = (float) ($item['cantidad_por_caja'] ?? 0);
+            if ($factor > 0) {
+                $cajas = max($cajas, $qty / $factor);
+            }
+        }
+
+        if ($cajas <= 0) {
+            return 0.0;
+        }
+
+        return CantidadCajaSupport::redondear($cajas, null);
+    }
+
     /**
      * Cajas indicadas en el formulario (campo «otra cantidad» en filas Box / alternativa).
      */

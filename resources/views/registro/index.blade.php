@@ -97,7 +97,7 @@
                             <td class="programas-grid__material registro-grid__td--material">{{ $ingreso->material }}</td>
                             <td class="registro-grid__td--fecha">{{ $ingreso->fecha?->format('d/m/Y') }}</td>
                             <td class="programas-grid__code">{{ $ingreso->codigo_pl }}</td>
-                            <td class="programas-grid__qty">{{ \App\Support\CantidadCajaSupport::formatearRegistroVisual((float) $ingreso->cantidad) }}</td>
+                            <td class="programas-grid__qty">{{ number_format((float) $ingreso->cantidad, 2, '.', '') }}</td>
                             <td>{{ $ingreso->factura ?: '—' }}</td>
                             <td>{{ $ingreso->guia ?: '—' }}</td>
                             <td class="registro-grid__td--pdf">
@@ -114,8 +114,8 @@
                                 'puedeEliminar' => $puedeEliminar,
                                 'destroyRoute' => route('registro.movimiento.destroy', $ingreso->idMovimiento),
                                 'confirmMessage' => $ingreso->es_lote
-                                    ? '¿Está seguro de anular este ingreso? Se anularán todos los materiales asociados. Esta acción no se puede deshacer.'
-                                    : '¿Está seguro de anular este ingreso? Esta acción no se puede deshacer.',
+                                    ? 'Se anulará este ingreso y todos sus materiales asociados. Esta acción no se puede deshacer.'
+                                    : 'Se anulará este ingreso. Esta acción no se puede deshacer.',
                                 'confirmTitle' => 'Anular ingreso',
                                 'editLabel' => 'Editar ingreso',
                             ])
@@ -153,7 +153,7 @@
                         <th class="programas-grid__th">Producto</th>
                         <th class="programas-grid__th">Motivo</th>
                         <th class="programas-grid__th registro-grid__th--material">Material</th>
-                        <th class="programas-grid__th programas-grid__th--num">Cantidad</th>
+                        <th class="programas-grid__th programas-grid__th--num" title="Cajas Box del consumo">Cantidades</th>
                         <th class="programas-grid__th">Observación</th>
                         <th class="programas-grid__th proveedor-grid__th--actions">Acciones</th>
                     </tr>
@@ -361,5 +361,5 @@
 <script src="{{ asset('js/offline-queue.js') }}" defer></script>
 <script src="{{ asset('js/offline-sync-registro.js') }}?v=3" defer></script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script src="{{ asset('js/registro.js') }}?v=29" defer></script>
+<script src="{{ asset('js/registro.js') }}?v=35" defer></script>
 @endpush

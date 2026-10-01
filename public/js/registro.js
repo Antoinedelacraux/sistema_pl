@@ -291,11 +291,15 @@
                 s = s.replace(/,/g, '');
             }
         } else if (ultimaComa >= 0) {
-            var partes = s.split(',');
-            if (partes.length === 2 && partes[1].length <= 8) {
-                s = partes[0].replace(/\./g, '') + '.' + partes[1];
-            } else {
+            if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) {
                 s = s.replace(/,/g, '');
+            } else {
+                var partes = s.split(',');
+                if (partes.length === 2 && partes[1].length <= 2) {
+                    s = partes[0].replace(/\./g, '') + '.' + partes[1];
+                } else {
+                    s = s.replace(/,/g, '');
+                }
             }
         }
 
@@ -1994,6 +1998,48 @@
         limpiarHintIngreso();
     }
 
+    /** Número real de la línea (18,448 → 18448). No usar parseFloat sobre el texto con coma. */
+    function numeroCantidadIngreso(valor) {
+        if (typeof valor === 'number' && isFinite(valor)) {
+            return valor;
+        }
+
+        return parseCantidadRegistro(String(valor == null ? '' : valor));
+    }
+
+    function canonCantidadIngreso(n) {
+        if (!isFinite(n)) {
+            return '';
+        }
+
+        if (Math.abs(n - Math.round(n)) < 1e-9) {
+            return String(Math.round(n));
+        }
+
+        return String(Math.round(n * 100) / 100);
+    }
+
+    /** Vista: miles con coma, sin .00 (18448 → 18,448). */
+    function cantidadIngresoPreview(valor) {
+        var n = numeroCantidadIngreso(valor);
+        if (!isFinite(n)) {
+            return '';
+        }
+
+        if (Math.abs(n - Math.round(n)) < 1e-9) {
+            return Math.round(n).toLocaleString('es-PE', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+            });
+        }
+
+        var partes = (Math.round(n * 100) / 100).toFixed(2).split('.');
+        var entero = Number(partes[0]).toLocaleString('es-PE', { maximumFractionDigits: 0 });
+        var frac = (partes[1] || '').replace(/0+$/, '');
+
+        return frac === '' ? entero : entero + '.' + frac;
+    }
+
     function renderIngresoPreview() {
         var preview = document.getElementById('registro-ingreso-preview');
         var body = document.getElementById('registro-ingreso-preview-body');
@@ -2023,10 +2069,12 @@
                 '<td class="registro-ingreso-preview__code">' + escapeHtml(linea.codigoPl) + '</td>' +
                 '<td class="registro-ingreso-preview__qty">' +
                     '<input type="text" class="field__input registro-ingreso-preview__qty-input" ' +
-                    'name="lineas[' + index + '][cantidad]" ' +
-                    'value="' + escapeHtml(formatearCantidadRegistro(linea.cantidad)) + '" ' +
-                    'inputmode="decimal" data-cantidad-decimales="2" ' +
+                    'value="' + escapeHtml(cantidadIngresoPreview(linea.cantidad)) + '" ' +
+                    'inputmode="decimal" autocomplete="off" ' +
                     'data-ingreso-cantidad-index="' + index + '">' +
+                    '<input type="hidden" name="lineas[' + index + '][cantidad]" ' +
+                    'value="' + escapeHtml(canonCantidadIngreso(numeroCantidadIngreso(linea.cantidad))) + '" ' +
+                    'data-ingreso-cantidad-raw="' + index + '">' +
                 '</td>' +
                 '<td class="registro-ingreso-preview__actions">' +
                     '<button type="button" class="icon-action icon-action--delete" data-quitar-ingreso-linea="' + index + '" title="Quitar">&times;</button>' +
@@ -2045,30 +2093,27 @@
         }).join('');
 
         body.querySelectorAll('[data-ingreso-cantidad-index]').forEach(function (input) {
-            bindFormatoCantidadInput(input, DECIMALES_CANTIDAD_REGISTRO);
-
-            function sincronizarCantidadIngresoLinea() {
+            input.addEventListener('change', function () {
                 var idx = parseInt(input.getAttribute('data-ingreso-cantidad-index'), 10);
                 if (!ingresoLineas[idx]) {
                     return;
                 }
 
-                var val = parseCantidadRegistro(input.value);
+                var val = numeroCantidadIngreso(input.value);
                 if (!isFinite(val) || val <= 0) {
-                    input.value = formatearCantidadRegistro(ingresoLineas[idx].cantidad);
+                    input.value = cantidadIngresoPreview(ingresoLineas[idx].cantidad);
                     mostrarHintIngreso('La cantidad debe ser mayor a cero.', true);
                     return;
                 }
 
-                var cantidad = cantidadPayloadRegistro(val, DECIMALES_CANTIDAD_REGISTRO);
-                ingresoLineas[idx].cantidad = cantidad;
-                ingresoLineas[idx].cantidadTexto = formatearCantidadRegistro(val);
-                input.setAttribute('data-cantidad-persistida', cantidad);
-                input.value = ingresoLineas[idx].cantidadTexto;
-            }
-
-            input.addEventListener('change', sincronizarCantidadIngresoLinea);
-            input.addEventListener('blur', sincronizarCantidadIngresoLinea);
+                var canon = canonCantidadIngreso(val);
+                ingresoLineas[idx].cantidad = canon;
+                var raw = body.querySelector('[data-ingreso-cantidad-raw="' + idx + '"]');
+                if (raw) {
+                    raw.value = canon;
+                }
+                input.value = cantidadIngresoPreview(canon);
+            });
         });
 
         body.querySelectorAll('[data-quitar-ingreso-linea]').forEach(function (btn) {
@@ -2112,7 +2157,7 @@
 
         ingresoLineas.push({
             idMaterialPL: String(fila.idMaterial),
-            cantidad: cantidadPayloadRegistro(cantidad),
+            cantidad: cantidad.toFixed(2),
             cantidadTexto: cantidad.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
             codigoPl: fila.codigoPl || material.codigo || '',
             nomMaterial: fila.nom || material.nombre || '',
@@ -2144,8 +2189,8 @@
             return;
         }
 
-        var cantidad = parseCantidadRegistro(cantidadInput.value);
-        if (!isFinite(cantidad) || cantidad <= 0) {
+        var cantidad = parseFloat(String(cantidadInput.value).replace(',', '.'));
+        if (!cantidad || cantidad <= 0) {
             mostrarHintIngreso('Ingrese una cantidad mayor a cero.', true);
             cantidadInput.focus();
             return;
@@ -2156,7 +2201,7 @@
 
         ingresoLineas.push({
             idMaterialPL: select.value,
-            cantidad: cantidadPayloadRegistro(cantidad),
+            cantidad: cantidad.toFixed(2),
             cantidadTexto: cantidad.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
             codigoPl: material.codigo || option.getAttribute('data-codigo-pl') || '',
             nomMaterial: material.nombre || option.getAttribute('data-nom-material-pl') || '',
@@ -2179,7 +2224,7 @@
             var cantidad = parseFloat(linea.cantidad);
             return {
                 idMaterialPL: id,
-                cantidad: cantidadPayloadRegistro(cantidad),
+                cantidad: cantidad.toFixed(2),
                 cantidadTexto: cantidad.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
                 codigoPl: material.codigo || '',
                 nomMaterial: material.nombre || '',
@@ -2208,7 +2253,6 @@
 
     var cantidadIngreso = document.getElementById('ingreso-linea-cantidad');
     if (cantidadIngreso) {
-        bindFormatoCantidadInput(cantidadIngreso, DECIMALES_CANTIDAD_REGISTRO);
         cantidadIngreso.addEventListener('keydown', function (event) {
             if (event.key === 'Enter') {
                 event.preventDefault();
@@ -2232,11 +2276,32 @@
         ingresoForm.addEventListener('submit', function (event) {
             if (ingresoLineas.length === 0) {
                 event.preventDefault();
-                event.stopPropagation();
                 mostrarHintIngreso('Agregue al menos un material con Añadir o cargue el XML de la guía.', true);
                 return;
             }
-            normalizarCantidadesFormulario(ingresoForm, '[data-ingreso-cantidad-index]');
+
+            var invalida = false;
+            ingresoForm.querySelectorAll('[data-ingreso-cantidad-index]').forEach(function (input) {
+                var idx = parseInt(input.getAttribute('data-ingreso-cantidad-index'), 10);
+                var n = numeroCantidadIngreso(input.value);
+                var raw = ingresoForm.querySelector('[data-ingreso-cantidad-raw="' + idx + '"]');
+                if (!isFinite(n) || n <= 0) {
+                    invalida = true;
+                    return;
+                }
+
+                var canon = canonCantidadIngreso(n);
+                if (ingresoLineas[idx]) {
+                    ingresoLineas[idx].cantidad = canon;
+                }
+                if (raw) {
+                    raw.value = canon;
+                }
+            });
+            if (invalida) {
+                event.preventDefault();
+                mostrarHintIngreso('Hay una cantidad inválida. Use miles con coma (18,448).', true);
+            }
         });
     }
 
@@ -2317,7 +2382,7 @@
             var cantidad = parseFloat(linea.cantidad);
             return {
                 idMaterialPL: String(linea.id_material_pl),
-                cantidad: cantidadPayloadRegistro(cantidad),
+                cantidad: cantidad.toFixed(2),
                 cantidadTexto: cantidad.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
                 codigoPl: linea.codigo_pl || '',
                 nomMaterial: linea.nom_material || '',
@@ -2839,7 +2904,7 @@
                         return {
                             idMovimiento: linea.id_movimiento ? String(linea.id_movimiento) : null,
                             idMaterialPL: idMaterial,
-                            cantidad: cantidadPayloadRegistro(cantidad),
+                            cantidad: cantidad.toFixed(2),
                             cantidadTexto: cantidad.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
                             codigoPl: codigoPl,
                             nomMaterial: nomMaterial,

@@ -5,18 +5,7 @@
             <h2 class="modal__title" id="registro-ingreso-title">Agregar ingreso</h2>
             <button type="button" class="modal__close" data-cerrar-modal-registro="ingreso">&times;</button>
         </header>
-        <form
-            method="POST"
-            action="{{ route('registro.ingreso.store') }}"
-            class="modal__form"
-            id="registro-ingreso-form"
-            data-store-action="{{ route('registro.ingreso.store') }}"
-            enctype="multipart/form-data"
-            data-confirm="¿Está seguro de guardar este ingreso?"
-            data-confirm-title="Guardar ingreso"
-            data-confirm-ok="Sí, guardar"
-            data-confirm-variant="warning"
-        >
+        <form method="POST" action="{{ route('registro.ingreso.store') }}" class="modal__form" id="registro-ingreso-form" data-store-action="{{ route('registro.ingreso.store') }}" enctype="multipart/form-data" data-confirm="¿Está seguro de guardar este ingreso?" data-confirm-title="Guardar ingreso" data-confirm-ok="Sí, guardar" data-confirm-variant="warning">
             @csrf
             <input type="hidden" name="_method" id="registro-ingreso-method" value="POST" disabled>
             <div class="modal__grid">
@@ -78,7 +67,7 @@
                     <div class="field registro-ingreso-cantidad-wrap">
                         <span class="field__label">Cantidad</span>
                         <div class="registro-ingreso-cantidad-row">
-                            <input type="text" class="field__input" id="ingreso-linea-cantidad" inputmode="numeric" placeholder="0" autocomplete="off">
+                            <input type="number" class="field__input" id="ingreso-linea-cantidad" min="0.01" step="0.01" placeholder="0.00">
                             <button type="button" class="btn btn--purple btn--sm" id="ingreso-linea-anadir">Añadir</button>
                         </div>
                         <span class="field__hint registro-ingreso-linea-hint" id="ingreso-linea-hint" hidden></span>

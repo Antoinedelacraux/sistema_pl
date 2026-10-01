@@ -81,7 +81,14 @@ final class StockExcelFilas
         $valor = $cell->getValue();
 
         if (is_int($valor) || is_float($valor)) {
-            return max(0.0, round((float) $valor, 2));
+            return max(0.0, (float) $valor);
+        }
+
+        if (is_string($valor)) {
+            $raw = trim($valor);
+            if ($raw !== '' && is_numeric($raw)) {
+                return max(0.0, (float) $raw);
+            }
         }
 
         $texto = trim((string) $cell->getFormattedValue());
@@ -90,14 +97,22 @@ final class StockExcelFilas
         }
 
         $texto = preg_replace('/\s+/u', '', $texto) ?? $texto;
+        $texto = self::normalizarTextoCantidad($texto);
+
+        return max(0.0, (float) $texto);
+    }
+
+    /** Coma de miles en Excel (18,448 → 18448). Coma decimal solo si no es patrón de miles. */
+    public static function normalizarTextoCantidad(string $texto): string
+    {
         if (preg_match('/^\d{1,3}(,\d{3})+(\.\d+)?$/', $texto)) {
-            $texto = str_replace(',', '', $texto);
-        } elseif (preg_match('/,\d{1,2}$/', $texto)) {
-            $texto = str_replace(',', '.', $texto);
-        } else {
-            $texto = str_replace(',', '', $texto);
+            return str_replace(',', '', $texto);
         }
 
-        return max(0.0, round((float) $texto, 2));
+        if (preg_match('/,\d{1,2}$/', $texto)) {
+            return str_replace(',', '.', $texto);
+        }
+
+        return str_replace(',', '', $texto);
     }
 }

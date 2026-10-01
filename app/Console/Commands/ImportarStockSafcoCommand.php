@@ -8,6 +8,7 @@ use App\Models\Stock\MovimientoStock;
 use App\Models\Usuario;
 use App\Services\Stock\MovimientoService;
 use App\Services\Mrp\MrpGridService;
+use App\Support\CantidadCajaSupport;
 use App\Support\MaterialProgramaLookup;
 use App\Support\PlanConsumoOrdenSupport;
 use App\Support\StockExcelFilas;
@@ -91,9 +92,10 @@ class ImportarStockSafcoCommand extends Command
                 continue;
             }
 
+            $nomFamilia = $fila['familia'] !== '' ? $fila['familia'] : null;
             $lineasIngreso[] = [
                 'id_material_pl' => (int) $material->idMaterialPL,
-                'cantidad' => $fila['cantidad'],
+                'cantidad' => CantidadCajaSupport::redondear($fila['cantidad'], $nomFamilia),
             ];
         }
 

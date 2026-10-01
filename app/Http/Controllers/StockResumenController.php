@@ -48,7 +48,7 @@ class StockResumenController extends Controller
     }
 
     /**
-     * @return array{programa: int|null, producto: int|null, estado: mixed, buscar: string, cajas: float|null, pallets: float|null}
+     * @return array{programa: int|null, producto: int|null, estado: mixed, buscar: string, cajas: float|null}
      */
     private function filtrosDesdeRequest(Request $request): array
     {
@@ -73,21 +73,15 @@ class StockResumenController extends Controller
             'estado' => $request->query('estado'),
             'buscar' => trim((string) $request->query('buscar', '')),
             'cajas' => $this->cajasDesdeRequest($request, $programa, $producto),
-            'pallets' => $this->palletsDesdeRequest($request, $programa, $producto),
         ];
     }
 
     private function cajasDesdeRequest(Request $request, ?int $programa, ?int $producto): ?float
     {
-        return $this->numeroSimulacion($request->query('cajas'), $programa, $producto, false);
+        return $this->numeroSimulacion($request->query('cajas'), $programa, $producto);
     }
 
-    private function palletsDesdeRequest(Request $request, ?int $programa, ?int $producto): ?float
-    {
-        return $this->numeroSimulacion($request->query('pallets'), $programa, $producto, true);
-    }
-
-    private function numeroSimulacion(mixed $raw, ?int $programa, ?int $producto, bool $permiteCero): ?float
+    private function numeroSimulacion(mixed $raw, ?int $programa, ?int $producto): ?float
     {
         if ($programa === null || $producto === null) {
             return null;
@@ -98,9 +92,6 @@ class StockResumenController extends Controller
         }
 
         $valor = (float) $raw;
-        if ($permiteCero) {
-            return $valor >= 0 ? $valor : null;
-        }
 
         return $valor > 0 ? $valor : null;
     }
