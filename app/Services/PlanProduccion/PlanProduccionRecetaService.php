@@ -325,18 +325,99 @@ class PlanProduccionRecetaService
      */
     private function idsRecetaRelacionadosPorProgramas(array $nombresPorIdPg): array
     {
+        // Una sola consulta de candidatos para todos los planes; el match se hace en PHP.
+        $candidatos = $nombresPorIdPg === [] ? [] : $this->candidatosProgramaGeneralConReceta();
+        $matchEnPhp = $candidatos !== null;
+        $fusionPorProgramas = [];
+
         $resultado = [];
         foreach ($nombresPorIdPg as $idPg => $nombre) {
-            $ids = $this->idsPorNombreProgramaGeneral($nombre);
-            $ids = array_values(array_unique(array_merge(
-                $ids,
-                $this->idsPorFusionCalibre($nombre)
-            )));
+            $ids = $matchEnPhp
+                ? $this->idsPorNombreEnCandidatos($candidatos, (string) $nombre)
+                : null;
+            $ids ??= $this->idsPorNombreProgramaGeneral($nombre);
 
-            $resultado[$idPg] = $ids;
+            $fusion = [];
+            if (PlanProduccionRecetaAliasSupport::planUsaFusionWellcomeCalibre($nombre)) {
+                $programas = PlanProduccionRecetaAliasSupport::programasClienteParaPlan($nombre);
+                if ($programas !== []) {
+                    $clave = json_encode($programas);
+                    $fusion = $fusionPorProgramas[$clave] ??= $this->idsPorProgramasCliente($programas);
+                }
+            }
+
+            $resultado[$idPg] = array_values(array_unique(array_merge($ids, $fusion)));
         }
 
         return $resultado;
+    }
+
+    /**
+     * Mismos ProgramaGeneral (y en el mismo orden) que filtra idsPorNombreProgramaGeneral(), sin el filtro de nombre.
+     * Devuelve null si algún nombre no es ASCII imprimible: ahí la collation (acentos, etc.) se deja a MySQL.
+     *
+     * @return list<array{id: int, clave: string}>|null
+     */
+    private function candidatosProgramaGeneralConReceta(): ?array
+    {
+        $filas = ProgramaGeneral::query()
+            ->activo()
+            ->whereIn('idProgramaGeneral', function ($sub) {
+                $sub->select('idProgramaGeneral')
+                    ->from('ProgramaFila')
+                    ->whereNotNull('idProgramaGeneral')
+                    ->where('Estado', Estado::ACTIVO)
+                    ->distinct();
+            })
+            ->orderBy('nombre')
+            ->get(['idProgramaGeneral', 'nombre']);
+
+        $candidatos = [];
+        foreach ($filas as $fila) {
+            $nombre = (string) $fila->nombre;
+            if (! $this->esAsciiImprimible($nombre)) {
+                return null;
+            }
+
+            // Equivale a LOWER(TRIM(nombre)) de MySQL: TRIM solo quita espacios.
+            $candidatos[] = ['id' => (int) $fila->idProgramaGeneral, 'clave' => strtolower(trim($nombre, ' '))];
+        }
+
+        return $candidatos;
+    }
+
+    /**
+     * Réplica en PHP de: LOWER(TRIM(nombre)) = :lower OR LOWER(TRIM(nombre)) LIKE ':lower (%'.
+     * Devuelve null (usar la consulta SQL) si el nombre trae caracteres no ASCII o comodines de LIKE.
+     *
+     * @param  list<array{id: int, clave: string}>  $candidatos
+     * @return list<int>|null
+     */
+    private function idsPorNombreEnCandidatos(array $candidatos, string $nombrePlan): ?array
+    {
+        $lower = mb_strtolower(trim($nombrePlan));
+        if ($lower === '') {
+            return [];
+        }
+
+        if (! $this->esAsciiImprimible($lower) || strpbrk($lower, '%_\\') !== false) {
+            return null;
+        }
+
+        $prefijo = $lower.' (';
+        $ids = [];
+        foreach ($candidatos as $candidato) {
+            if ($candidato['clave'] === $lower || str_starts_with($candidato['clave'], $prefijo)) {
+                $ids[] = $candidato['id'];
+            }
+        }
+
+        return $ids;
+    }
+
+    private function esAsciiImprimible(string $texto): bool
+    {
+        return preg_match('/^[\x20-\x7E]*$/', $texto) === 1;
     }
 
     /**
