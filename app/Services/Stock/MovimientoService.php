@@ -480,10 +480,13 @@ class MovimientoService
         $archivoData = $this->procesarArchivoPdf($archivo, MovimientoStock::TIPO_INGRESO, $referenciaPdf);
 
         $creados = DB::transaction(function () use ($datos, $idUsuario, $lineas, $archivoData) {
-            $creados = 0;
+            // Un solo instante para todo el lote: las líneas se agrupan por fechaRegistro.
+            $ahora = now();
+            $filas = [];
 
             foreach ($lineas as $linea) {
-                MovimientoStock::query()->create([
+                // fill()->getAttributes() aplica los mismos casts que create(), sin un INSERT por línea.
+                $filas[] = (new MovimientoStock)->fill([
                     'tipo' => MovimientoStock::TIPO_INGRESO,
                     'idAlmacen' => (int) $datos['id_almacen'],
                     'idMaterialPL' => (int) $linea['id_material_pl'],
@@ -497,14 +500,16 @@ class MovimientoService
                     'archivoOneDriveUrl' => $archivoData['webUrl'],
                     'archivoNombre' => $archivoData['name'],
                     'idUsuario' => $idUsuario,
-                    'fechaRegistro' => now(),
+                    'fechaRegistro' => $ahora,
                     'estado' => 1,
-                ]);
-
-                $creados++;
+                ])->getAttributes();
             }
 
-            return $creados;
+            foreach (array_chunk($filas, 500) as $bloque) {
+                MovimientoStock::query()->insert($bloque);
+            }
+
+            return count($filas);
         });
 
         $this->olvidarCacheGrillaRegistro();

@@ -4,10 +4,12 @@ namespace App\Http\Requests\Stock;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreIngresoRequest extends FormRequest
 {
     use MovimientoDocumentoRules;
+    use ValidaMaterialesEnLote;
 
     public function authorize(): bool
     {
@@ -24,6 +26,11 @@ class StoreIngresoRequest extends FormRequest
             'lineas.*.id_material_pl' => ['required', 'integer', Rule::exists('MaterialProgramaPL', 'idMaterialPL')],
             'lineas.*.cantidad' => ['required', 'numeric', 'gt:0'],
         ], $this->documentoRules());
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $this->validarMaterialesEnLote($validator);
     }
 
     public function attributes(): array
