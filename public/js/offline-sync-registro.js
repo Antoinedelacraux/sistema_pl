@@ -138,13 +138,17 @@
         if (errorsEl) {
             if (conError.length === 0) {
                 errorsEl.hidden = true;
-                errorsEl.innerHTML = '';
+                errorsEl.textContent = '';
             } else {
                 errorsEl.hidden = false;
-                errorsEl.innerHTML = conError.map(function (item, index) {
+                errorsEl.textContent = '';
+                // El mensaje viene del servidor/cola local: se inserta como texto, nunca como HTML.
+                conError.forEach(function (item, index) {
                     var msg = item.error || 'Error al sincronizar';
-                    return '<li>' + etiquetaTipo(item.tipo) + ' #' + (index + 1) + ': ' + msg + '</li>';
-                }).join('');
+                    var li = document.createElement('li');
+                    li.textContent = etiquetaTipo(item.tipo) + ' #' + (index + 1) + ': ' + msg;
+                    errorsEl.appendChild(li);
+                });
             }
         }
 

@@ -309,14 +309,20 @@
 
             var estadoTexto = fila.mensaje ? (etiquetaEstado(fila.estado) + ': ' + fila.mensaje) : etiquetaEstado(fila.estado);
 
-            tr.innerHTML =
-                '<td>' + (fila.fila_excel || '') + '</td>' +
-                '<td>' + (fila.codigo_pl || '') + '</td>' +
-                '<td>' + (fila.nom_material_pl || '—') + '</td>' +
-                '<td>' + (fila.nom_familia || '—') + '</td>' +
-                '<td>' + (fila.codigo_proveedor || '') + '</td>' +
-                '<td>' + (fila.nom_material || '') + '</td>' +
-                '<td>' + estadoTexto + '</td>';
+            // Datos del Excel: se insertan como texto (nunca como HTML) para evitar XSS.
+            [
+                fila.fila_excel || '',
+                fila.codigo_pl || '',
+                fila.nom_material_pl || '—',
+                fila.nom_familia || '—',
+                fila.codigo_proveedor || '',
+                fila.nom_material || '',
+                estadoTexto,
+            ].forEach(function (valor) {
+                var td = document.createElement('td');
+                td.textContent = String(valor);
+                tr.appendChild(td);
+            });
 
             importPreviewBody.appendChild(tr);
         });
