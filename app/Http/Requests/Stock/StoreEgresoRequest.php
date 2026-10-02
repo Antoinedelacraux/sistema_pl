@@ -11,6 +11,8 @@ use Illuminate\Validation\Validator;
 
 class StoreEgresoRequest extends FormRequest
 {
+    use ValidaMaterialesEnLote;
+
     public function authorize(): bool
     {
         return $this->user()?->puede('registro', 'crear') ?? false;
@@ -40,6 +42,8 @@ class StoreEgresoRequest extends FormRequest
 
     public function withValidator(Validator $validator): void
     {
+        $this->validarMaterialesEnLote($validator);
+
         $validator->after(function (Validator $validator) {
             if ($validator->errors()->isNotEmpty()) {
                 return;
@@ -66,9 +70,12 @@ class StoreEgresoRequest extends FormRequest
                 return;
             }
 
-            $movimiento = app(MovimientoService::class);
+            $stocks = app(MovimientoService::class)->stocksDisponiblesEnAlmacen(
+                array_map(fn (array $linea) => (int) $linea['id_material_pl'], $lineas),
+                $idAlmacen
+            );
             foreach ($lineas as $linea) {
-                $disponible = $movimiento->stockDisponible((int) $linea['id_material_pl'], $idAlmacen);
+                $disponible = (float) ($stocks[(int) $linea['id_material_pl']] ?? 0.0);
                 if ($linea['cantidad'] > $disponible) {
                     $nombre = $linea['nom_material'] ?: 'material';
                     $faltante = max(0, round((float) $linea['cantidad'] - $disponible, 2));

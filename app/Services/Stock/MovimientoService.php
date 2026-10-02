@@ -315,10 +315,27 @@ class MovimientoService
 
     public function stockDisponible(int $idMaterialPL, int $idAlmacen): float
     {
-        return $this->stockAlmacenService->sumaStockEnAlmacen(
-            $this->idsMaterialEquivalentes($idMaterialPL),
-            $idAlmacen
-        );
+        // CodigoPL es único (uk_material_codigo_pl): el material no tiene "equivalentes" distintos de sí mismo.
+        return $this->stockAlmacenService->sumaStockEnAlmacen([$idMaterialPL], $idAlmacen);
+    }
+
+    /**
+     * stockDisponible() para varios materiales con una sola consulta.
+     *
+     * @param  list<int>  $idsMaterial
+     * @return array<int, float>
+     */
+    public function stocksDisponiblesEnAlmacen(array $idsMaterial, int $idAlmacen): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $idsMaterial)));
+        $mapa = $this->stockAlmacenService->mapaStockEnAlmacen($ids, $idAlmacen);
+
+        $stocks = [];
+        foreach ($ids as $id) {
+            $stocks[$id] = (float) ($mapa[$id] ?? 0.0);
+        }
+
+        return $stocks;
     }
 
     /**
@@ -379,76 +396,44 @@ class MovimientoService
     }
 
     /**
-     * @return list<int>
-     */
-    private function idsMaterialEquivalentes(int $idMaterialPL): array
-    {
-        $codigoPL = MaterialProgramaPL::query()
-            ->where('idMaterialPL', $idMaterialPL)
-            ->value('CodigoPL');
-
-        $codigoPL = trim((string) $codigoPL);
-        if ($codigoPL === '') {
-            return [$idMaterialPL];
-        }
-
-        return MaterialProgramaPL::query()
-            ->where('CodigoPL', $codigoPL)
-            ->pluck('idMaterialPL')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-    }
-
-    /**
      * Descuenta del idMaterialPL que realmente tiene stock (mismo CodigoPL).
      *
      * @return list<array{id_material_pl: int, cantidad: float}>
      */
     public function asignarMaterialesParaEgreso(int $idMaterialPL, int $idAlmacen, float $cantidad): array
     {
-        $ids = $this->idsMaterialEquivalentes($idMaterialPL);
+        return $this->asignacionEgresoDesdeStock(
+            $idMaterialPL,
+            $cantidad,
+            $this->stockPorIdMaterial($idMaterialPL, $idAlmacen)
+        );
+    }
 
-        $candidatos = collect($ids)
-            ->map(fn (int $id) => [
-                'id' => $id,
-                'stock' => max(0, $this->stockPorIdMaterial($id, $idAlmacen)),
-            ])
-            ->filter(fn (array $fila) => $fila['stock'] > 0)
-            ->sortByDesc('stock')
-            ->values();
-
+    /**
+     * Misma regla que la asignación por candidatos con CodigoPL único (un solo candidato: el propio material):
+     * toma min(cantidad, stock) redondeado a 2 decimales; si no hay nada que tomar, devuelve la cantidad completa.
+     *
+     * @return list<array{id_material_pl: int, cantidad: float}>
+     */
+    private function asignacionEgresoDesdeStock(int $idMaterialPL, float $cantidad, float $stock): array
+    {
+        $stock = max(0, $stock);
         $pendiente = round($cantidad, 2);
-        $asignaciones = [];
 
-        foreach ($candidatos as $candidato) {
-            if ($pendiente <= 0) {
-                break;
+        if ($stock > 0 && $pendiente > 0) {
+            $tomar = min($pendiente, round($stock, 2));
+            if ($tomar > 0) {
+                return [[
+                    'id_material_pl' => $idMaterialPL,
+                    'cantidad' => $tomar,
+                ]];
             }
-
-            $tomar = min($pendiente, round($candidato['stock'], 2));
-            if ($tomar <= 0) {
-                continue;
-            }
-
-            $asignaciones[] = [
-                'id_material_pl' => $candidato['id'],
-                'cantidad' => $tomar,
-            ];
-            $pendiente = round($pendiente - $tomar, 2);
         }
 
-        if ($asignaciones === []) {
-            $mejorId = collect($ids)
-                ->sortByDesc(fn (int $id) => $this->stockPorIdMaterial($id, $idAlmacen))
-                ->first();
-
-            return [[
-                'id_material_pl' => $mejorId ?? $idMaterialPL,
-                'cantidad' => $cantidad,
-            ]];
-        }
-
-        return $asignaciones;
+        return [[
+            'id_material_pl' => $idMaterialPL,
+            'cantidad' => $cantidad,
+        ]];
     }
 
     private function stockPorIdMaterial(int $idMaterialPL, int $idAlmacen): float
@@ -541,11 +526,16 @@ class MovimientoService
             return $this->conBloqueoStockAlmacen($idAlmacen, function () use ($datos, $idUsuario, $idAlmacen, $lineas, $archivoData) {
                 $creados = 0;
                 $ahora = now();
+                // Stock leído una sola vez dentro del bloqueo y descontado en memoria tras cada línea.
+                $stocks = $this->stocksDisponiblesEnAlmacen(
+                    array_map(fn (array $linea) => (int) $linea['id_material_pl'], $lineas),
+                    $idAlmacen
+                );
 
                 foreach ($lineas as $linea) {
                     $idMaterialPL = (int) $linea['id_material_pl'];
                     $cantidad = (float) $linea['cantidad'];
-                    $disponible = $this->stockDisponible($idMaterialPL, $idAlmacen);
+                    $disponible = (float) ($stocks[$idMaterialPL] ?? 0.0);
 
                     if ($cantidad > $disponible) {
                         $nombre = $linea['nom_material'] ?: 'material';
@@ -554,9 +544,14 @@ class MovimientoService
                         );
                     }
 
-                    $asignaciones = $this->asignarMaterialesParaEgreso($idMaterialPL, $idAlmacen, $cantidad);
+                    $asignaciones = $this->asignacionEgresoDesdeStock($idMaterialPL, $cantidad, $disponible);
 
                     foreach ($asignaciones as $asignacion) {
+                        $stocks[(int) $asignacion['id_material_pl']] = round(
+                            (float) ($stocks[(int) $asignacion['id_material_pl']] ?? 0.0) - round((float) $asignacion['cantidad'], 2),
+                            2
+                        );
+
                         MovimientoStock::query()->create([
                             'tipo' => MovimientoStock::TIPO_EGRESO,
                             'idAlmacen' => $idAlmacen,
