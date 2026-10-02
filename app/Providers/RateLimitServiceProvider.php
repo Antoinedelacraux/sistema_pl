@@ -15,10 +15,23 @@ class RateLimitServiceProvider extends ServiceProvider
             $usuario = mb_strtolower(trim((string) $request->input('usuario', '')));
             $porIp = (int) config('security.rate_limit.login_per_minute', 5);
 
-            return [
+            $limites = [
                 Limit::perMinute($porIp)->by($request->ip()),
                 Limit::perMinute(max($porIp * 3, 15))->by($request->ip().'|'.$usuario),
             ];
+
+            // Límite por cuenta, independiente de la IP: frena fuerza bruta distribuida
+            // (muchas IPs contra un mismo usuario). Se aplica por minuto y por hora.
+            if ($usuario !== '') {
+                $porUsuarioMinuto = (int) config('security.rate_limit.login_per_user_per_minute', 10);
+                $porUsuarioHora = (int) config('security.rate_limit.login_per_user_per_hour', 50);
+                $claveUsuario = 'login-user|'.sha1($usuario);
+
+                $limites[] = Limit::perMinute(max($porUsuarioMinuto, 1))->by($claveUsuario.'|m');
+                $limites[] = Limit::perHour(max($porUsuarioHora, 1))->by($claveUsuario.'|h');
+            }
+
+            return $limites;
         });
 
         RateLimiter::for('web', function (Request $request) {

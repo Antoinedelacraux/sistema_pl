@@ -11,8 +11,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Cloudflare Tunnel / reverse proxies (X-Forwarded-Proto, Host)
-        $middleware->trustProxies(at: '*');
+        // Proxies de confianza (Cloudflare Tunnel / cloudflared local): ver config/trustedproxy.php
+        // (env TRUSTED_PROXIES, por defecto 127.0.0.1,::1). No usar '*': permitiría falsear la IP
+        // con X-Forwarded-For y evadir el rate limit de login.
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo(fn () => route('inicio'));
         $middleware->alias([
