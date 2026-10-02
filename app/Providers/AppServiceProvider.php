@@ -19,6 +19,11 @@ class AppServiceProvider extends ServiceProvider
         // Nunca mostrar stack traces ni .env si el host no es desarrollo.
         if (! $this->app->environment(['local', 'testing'])) {
             $this->app['config']->set('app.debug', false);
+
+            // Debugbar (require-dev) nunca activo fuera de local, aunque esté instalado,
+            // APP_DEBUG=true o DEBUGBAR_ENABLED=true por error en el .env.
+            $this->app['config']->set('debugbar.enabled', false);
+            $this->app['config']->set('debugbar.force_allow_enable', false);
         }
     }
 
