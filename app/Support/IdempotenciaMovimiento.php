@@ -7,10 +7,11 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Idempotencia de altas de movimientos (ingreso / consumo) enviadas desde la cola offline.
+ * Idempotencia de altas de movimientos (ingreso / consumo / traslado): cola offline y envío
+ * normal con conexión (doble clic o reintento del mismo formulario).
  *
- * El navegador genera un UUID por registro encolado (client_request_id) y lo reenvía en cada
- * reintento. Aquí se reserva la clave usuario + tipo + uuid con Cache::add (atómico en los
+ * El navegador genera un UUID por registro encolado o por formulario abierto (client_request_id)
+ * y lo reenvía en cada reintento; si no viene, el alta se procesa como siempre (sin deduplicar). Aquí se reserva la clave usuario + tipo + uuid con Cache::add (atómico en los
  * stores database/redis), de modo que un mismo registro no se inserte dos veces aunque la
  * respuesta se pierda y el cliente reintente.
  *

@@ -1,4 +1,4 @@
-var CACHE = 'talsa-static-v13';
+var CACHE = 'talsa-static-v14';
 var ASSETS = [
     '/css/app.css',
     '/css/responsive.css',

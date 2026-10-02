@@ -91,6 +91,10 @@
         modal.classList.add('is-open');
         modal.setAttribute('aria-hidden', 'false');
         document.body.classList.add('modal-open');
+
+        if (tipo !== 'detalle') {
+            prepararClientRequestId(tipo, false);
+        }
     }
 
     function cerrarModal(tipo) {
@@ -156,6 +160,7 @@
         }
 
         aplicarConfirmGuardarFormulario(tipo, 'crear');
+        prepararClientRequestId(tipo, true);
     }
 
     function decimalesFamiliaConsumo(nomFamilia, decimalesApi) {
@@ -3054,4 +3059,139 @@
             cerrarModal('egreso');
         }
     });
+    /*
+     * Envío con conexión sin duplicados (doble clic, Enter repetido o reintento):
+     * - cada formulario lleva un client_request_id (UUID) que el servidor deduplica con la misma
+     *   idempotencia de la cola offline (usuario + tipo + uuid);
+     * - se reutiliza mientras el mismo envío se reintenta y solo se renueva al abrir/limpiar un
+     *   formulario nuevo (tras un guardado exitoso la página se recarga y nace uno nuevo);
+     * - el botón Guardar queda deshabilitado mientras la petición está en curso.
+     */
+    var REGISTRO_TIPOS_ENVIO = ['ingreso', 'egreso', 'traslado'];
+    var REGISTRO_REHABILITAR_MS = 30000;
+
+    function nuevoClientRequestId() {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+            try {
+                return window.crypto.randomUUID();
+            } catch (e) {
+                // Contexto no seguro (http sin localhost): se usa el respaldo.
+            }
+        }
+        var bytes = new Array(16);
+        if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+            var buf = new Uint8Array(16);
+            window.crypto.getRandomValues(buf);
+            for (var i = 0; i < 16; i++) {
+                bytes[i] = buf[i];
+            }
+        } else {
+            for (var j = 0; j < 16; j++) {
+                bytes[j] = Math.floor(Math.random() * 256);
+            }
+        }
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        var hex = bytes.map(function (b) {
+            return (b + 0x100).toString(16).substr(1);
+        }).join('');
+        return hex.substr(0, 8) + '-' + hex.substr(8, 4) + '-' + hex.substr(12, 4) + '-' + hex.substr(16, 4) + '-' + hex.substr(20, 12);
+    }
+
+    function tipoFormularioEnvio(form) {
+        if (!form || !form.id) {
+            return '';
+        }
+        var match = /^registro-(ingreso|egreso|traslado)-form$/.exec(form.id);
+        return match ? match[1] : '';
+    }
+
+    function campoClientRequestId(form) {
+        var campo = form.querySelector('input[name="client_request_id"]');
+        if (!campo) {
+            campo = document.createElement('input');
+            campo.type = 'hidden';
+            campo.name = 'client_request_id';
+            form.appendChild(campo);
+        }
+        return campo;
+    }
+
+    function prepararClientRequestId(tipo, forzarNuevo) {
+        var form = document.getElementById('registro-' + tipo + '-form');
+        if (!form || form.dataset.registroEnviando === '1') {
+            return;
+        }
+        var campo = campoClientRequestId(form);
+        if (forzarNuevo || !campo.value) {
+            campo.value = nuevoClientRequestId();
+        }
+    }
+
+    function rehabilitarEnvioRegistro(form) {
+        if (!form) {
+            return;
+        }
+        if (form._registroEnvioTimer) {
+            window.clearTimeout(form._registroEnvioTimer);
+            form._registroEnvioTimer = null;
+        }
+        delete form.dataset.registroEnviando;
+        var tipo = tipoFormularioEnvio(form);
+        var boton = tipo ? document.getElementById('registro-' + tipo + '-guardar') : null;
+        if (boton) {
+            boton.disabled = false;
+            boton.removeAttribute('aria-busy');
+        }
+    }
+
+    REGISTRO_TIPOS_ENVIO.forEach(function (tipo) {
+        prepararClientRequestId(tipo, false);
+    });
+
+    // Fase de captura en window: corta cualquier segundo envío mientras el primero está en curso
+    // (antes del diálogo de confirmación y de la cola offline).
+    window.addEventListener('submit', function (event) {
+        var form = event.target;
+        if (tipoFormularioEnvio(form) && form.dataset.registroEnviando === '1') {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }
+    }, true);
+
+    // Fase de burbuja en window: corre después de las validaciones y del diálogo de confirmación;
+    // si nadie canceló el envío, la petición sale ahora.
+    window.addEventListener('submit', function (event) {
+        var form = event.target;
+        var tipo = tipoFormularioEnvio(form);
+        if (!tipo || event.defaultPrevented) {
+            return;
+        }
+        var campo = campoClientRequestId(form);
+        if (!campo.value) {
+            campo.value = nuevoClientRequestId();
+        }
+        form.dataset.registroEnviando = '1';
+        var boton = document.getElementById('registro-' + tipo + '-guardar');
+        if (boton) {
+            boton.disabled = true;
+            boton.setAttribute('aria-busy', 'true');
+        }
+        // Si la navegación no llega a completarse (red lenta, envío detenido), se vuelve a habilitar
+        // el botón conservando el mismo client_request_id: el reintento no duplica.
+        form._registroEnvioTimer = window.setTimeout(function () {
+            rehabilitarEnvioRegistro(form);
+        }, REGISTRO_REHABILITAR_MS);
+    });
+
+    // Volver con "Atrás" (bfcache) restaura la página con el botón deshabilitado.
+    window.addEventListener('pageshow', function (event) {
+        if (!event.persisted) {
+            return;
+        }
+        REGISTRO_TIPOS_ENVIO.forEach(function (tipo) {
+            rehabilitarEnvioRegistro(document.getElementById('registro-' + tipo + '-form'));
+        });
+    });
+
 })();

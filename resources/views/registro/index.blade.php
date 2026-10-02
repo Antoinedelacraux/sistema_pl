@@ -362,5 +362,5 @@
 <script src="{{ asset('js/offline-queue.js') }}?v=2" defer></script>
 <script src="{{ asset('js/offline-sync-registro.js') }}?v=4" defer></script>
 <script src="{{ asset('js/grid-query-filters.js') }}" defer></script>
-<script src="{{ asset('js/registro.js') }}?v=35" defer></script>
+<script src="{{ asset('js/registro.js') }}?v=36" defer></script>
 @endpush
