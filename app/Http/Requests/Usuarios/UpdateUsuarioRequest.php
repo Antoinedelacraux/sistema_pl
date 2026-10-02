@@ -26,6 +26,8 @@ class UpdateUsuarioRequest extends FormRequest
             'correo' => [
                 'required',
                 'email',
+                // Mitiga el aviso de Laravel 11 "CRLF injection in default email rule" (sin parche en 11.x).
+                'not_regex:/[\r\n]/',
                 'max:150',
                 Rule::unique('Persona', 'Correo')->ignore($cuenta->idPersona, 'idPersona'),
             ],
