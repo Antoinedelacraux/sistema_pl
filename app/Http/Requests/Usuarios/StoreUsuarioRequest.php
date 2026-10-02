@@ -19,7 +19,7 @@ class StoreUsuarioRequest extends FormRequest
         return [
             'nombres' => ['required', 'string', 'max:100'],
             'apellidos' => ['required', 'string', 'max:100'],
-            'correo' => ['required', 'email', 'max:150', Rule::unique('Persona', 'Correo')],
+            'correo' => ['required', 'email', 'not_regex:/[\r\n]/', 'max:150', Rule::unique('Persona', 'Correo')],
             'id_area' => ['required', 'integer', Rule::exists('Area', 'idArea')],
             'id_cargo' => ['required', 'integer', Rule::exists('Cargo', 'idCargo')],
             'id_rol' => ['required', 'integer', Rule::exists('Rol', 'idRol')],

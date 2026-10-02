@@ -4,7 +4,34 @@
     }
 
     var csrfUrl = window.registroOfflineCsrfUrl || '';
+    // Usuario autenticado en esta página: cada registro de la cola queda ligado a él
+    // y solo se sincroniza/descarta con su sesión (equipos compartidos).
+    var usuarioActual = window.registroUsuarioId != null ? String(window.registroUsuarioId) : '';
+    var MSG_SIN_USUARIO = 'Guardado con una versión anterior y sin usuario asociado: no se sincroniza automáticamente. Verifique si ya existe y descártelo o regístrelo de nuevo.';
     var syncing = false;
+
+    function esDelUsuarioActual(item) {
+        return usuarioActual !== '' && item.idUsuario != null && String(item.idUsuario) === usuarioActual;
+    }
+
+    function esLegadoSinUsuario(item) {
+        return item.idUsuario == null || item.idUsuario === '';
+    }
+
+    // Pendientes visibles para esta sesión: los del usuario actual + los antiguos sin usuario (solo para avisar/descartar).
+    function pendientesVisibles() {
+        return OfflineQueue.pending().then(function (items) {
+            return items.filter(function (item) {
+                return esDelUsuarioActual(item) || esLegadoSinUsuario(item);
+            }).map(function (item) {
+                if (esLegadoSinUsuario(item)) {
+                    item.status = 'error';
+                    item.error = MSG_SIN_USUARIO;
+                }
+                return item;
+            });
+        });
+    }
 
     function toast(msg, type) {
         if (window.TalsaToast) {
@@ -75,7 +102,7 @@
     function entriesToFormData(entries, token) {
         var fd = new FormData();
         entries.forEach(function (pair) {
-            if (pair[0] === '_token') {
+            if (pair[0] === '_token' || pair[0] === 'client_request_id') {
                 return;
             }
             fd.append(pair[0], pair[1]);
@@ -138,13 +165,17 @@
         if (errorsEl) {
             if (conError.length === 0) {
                 errorsEl.hidden = true;
-                errorsEl.innerHTML = '';
+                errorsEl.textContent = '';
             } else {
                 errorsEl.hidden = false;
-                errorsEl.innerHTML = conError.map(function (item, index) {
+                errorsEl.textContent = '';
+                // El mensaje viene del servidor/cola local: se inserta como texto, nunca como HTML.
+                conError.forEach(function (item, index) {
                     var msg = item.error || 'Error al sincronizar';
-                    return '<li>' + etiquetaTipo(item.tipo) + ' #' + (index + 1) + ': ' + msg + '</li>';
-                }).join('');
+                    var li = document.createElement('li');
+                    li.textContent = etiquetaTipo(item.tipo) + ' #' + (index + 1) + ': ' + msg;
+                    errorsEl.appendChild(li);
+                });
             }
         }
 
@@ -157,7 +188,7 @@
     }
 
     function refreshBanner() {
-        return OfflineQueue.pending().then(function (items) {
+        return pendientesVisibles().then(function (items) {
             updateBanner(items, isOffline());
             return items;
         });
@@ -182,15 +213,22 @@
 
     function syncItem(item, token) {
         item.status = 'syncing';
+        if (!item.clientRequestId) {
+            // Registros encolados antes de esta versión: se fija el id una sola vez y se persiste.
+            item.clientRequestId = OfflineQueue.requestId();
+        }
         return OfflineQueue.update(item).then(function () {
+            var body = entriesToFormData(item.entries, token);
+            body.append('client_request_id', item.clientRequestId);
             return fetch(item.url, {
                 method: 'POST',
                 headers: {
                     Accept: 'application/json',
                     'X-CSRF-TOKEN': token,
                     'X-Requested-With': 'XMLHttpRequest',
+                    'X-Idempotency-Key': item.clientRequestId,
                 },
-                body: entriesToFormData(item.entries, token),
+                body: body,
                 credentials: 'same-origin',
             }).then(function (res) {
                 return res.json().then(function (data) {
@@ -208,8 +246,15 @@
         }
         syncing = true;
 
+        if (usuarioActual === '') {
+            syncing = false;
+            return Promise.resolve();
+        }
+
         return fetchCsrf().then(function (token) {
-            return OfflineQueue.pending().then(function (items) {
+            return OfflineQueue.pending().then(function (todos) {
+                // Solo se envían los registros del usuario de la sesión actual.
+                var items = todos.filter(esDelUsuarioActual);
                 var chain = Promise.resolve();
                 var ok = 0;
                 var fail = 0;
@@ -270,9 +315,15 @@
             return Promise.reject();
         }
 
+        if (usuarioActual === '') {
+            return Promise.reject();
+        }
+
         return OfflineQueue.add({
             tipo: tipo,
             url: url,
+            idUsuario: usuarioActual,
+            clientRequestId: OfflineQueue.requestId(),
             entries: serializeForm(form),
         }).then(function () {
             toast('Guardado localmente. Se sincronizará al volver internet. PDF puede cargarse después.', 'info');
@@ -330,7 +381,13 @@
         if (clearBtn) {
             clearBtn.addEventListener('click', function () {
                 var confirmar = function () {
-                    return OfflineQueue.clearAll().then(function () {
+                    // Solo descarta lo visible para esta sesión (propios + antiguos sin usuario),
+                    // nunca los registros pendientes de otro usuario del mismo navegador.
+                    return pendientesVisibles().then(function (items) {
+                        return Promise.all(items.map(function (item) {
+                            return OfflineQueue.remove(item.id);
+                        }));
+                    }).then(function () {
                         toast('Cola descartada.', 'info');
                         refreshBanner();
                     });

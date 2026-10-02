@@ -14,9 +14,43 @@ class ProgramaImagenService
 
     private const JPEG_QUALITY = 85;
 
+    /**
+     * MIME real (detectado por contenido) => extensión permitida en disco.
+     * Nunca se usa la extensión que envía el cliente.
+     */
+    private const MIME_PERMITIDOS = [
+        'image/jpeg' => 'jpg',
+        'image/pjpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+        'image/gif' => 'gif',
+    ];
+
+    /**
+     * Tipos IMAGETYPE_* aceptados al verificar la cabecera binaria con getimagesize().
+     */
+    private const IMAGETYPES_PERMITIDOS = [
+        IMAGETYPE_JPEG => 'jpg',
+        IMAGETYPE_PNG => 'png',
+        IMAGETYPE_WEBP => 'webp',
+        IMAGETYPE_GIF => 'gif',
+    ];
+
     public function guardar(?UploadedFile $archivo, int $idProgramaFila): ?string
     {
         if (! $archivo) {
+            return null;
+        }
+
+        $extensionSegura = $this->extensionSegura($archivo);
+
+        if ($extensionSegura === null) {
+            Log::warning('ProgramaImagenService: archivo rechazado (MIME real no permitido o no es imagen válida).', [
+                'idProgramaFila' => $idProgramaFila,
+                'mime' => $archivo->getMimeType(),
+                'size' => $archivo->getSize(),
+            ]);
+
             return null;
         }
 
@@ -51,8 +85,8 @@ class ProgramaImagenService
             ]);
         }
 
-        $extension = strtolower($archivo->getClientOriginalExtension() ?: 'jpg');
-        $nombre = $idProgramaFila.'.'.$extension;
+        // Fallback sin compresión: extensión derivada del MIME real (lista blanca), nunca del nombre del cliente.
+        $nombre = $idProgramaFila.'.'.$extensionSegura;
 
         return $archivo->storeAs($directorio, $nombre, 'public') ?: null;
     }
@@ -60,6 +94,16 @@ class ProgramaImagenService
     public function reemplazar(?UploadedFile $archivo, int $idProgramaFila, ?string $rutaAnterior): ?string
     {
         if (! $archivo) {
+            return $rutaAnterior;
+        }
+
+        // Si el archivo nuevo no es una imagen permitida, se conserva la imagen anterior.
+        if ($this->extensionSegura($archivo) === null) {
+            Log::warning('ProgramaImagenService: reemplazo rechazado; se conserva la imagen anterior.', [
+                'idProgramaFila' => $idProgramaFila,
+                'mime' => $archivo->getMimeType(),
+            ]);
+
             return $rutaAnterior;
         }
 
@@ -92,6 +136,40 @@ class ProgramaImagenService
         }
 
         return Storage::disk('public')->url($ruta);
+    }
+
+    /**
+     * Devuelve la extensión segura (jpg/png/webp/gif) si el contenido real del archivo es una imagen permitida.
+     * Exige que coincidan el MIME detectado por contenido (finfo) y la firma binaria (getimagesize).
+     */
+    private function extensionSegura(UploadedFile $archivo): ?string
+    {
+        if (! $archivo->isValid()) {
+            return null;
+        }
+
+        $ruta = $archivo->getRealPath();
+
+        if ($ruta === false || ! is_file($ruta)) {
+            return null;
+        }
+
+        $mime = strtolower((string) $archivo->getMimeType());
+        $porMime = self::MIME_PERMITIDOS[$mime] ?? null;
+
+        if ($porMime === null) {
+            return null;
+        }
+
+        $info = @getimagesize($ruta);
+
+        if ($info === false || ! isset($info[2]) || ($info[0] ?? 0) <= 0 || ($info[1] ?? 0) <= 0) {
+            return null;
+        }
+
+        $porFirma = self::IMAGETYPES_PERMITIDOS[$info[2]] ?? null;
+
+        return $porFirma !== null && $porFirma === $porMime ? $porFirma : null;
     }
 
     private function procesarYGuardar(UploadedFile $archivo, string $destino, string $formato): bool

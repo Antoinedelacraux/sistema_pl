@@ -21,6 +21,7 @@ use App\Services\Stock\MovimientoService;
 use App\Services\Stock\RegistroExportService;
 use App\Support\AuditoriaAccion;
 use App\Support\DocumentoExportSupport;
+use App\Support\IdempotenciaMovimiento;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -39,7 +40,8 @@ class MovimientoController extends Controller
         private readonly IngresoStockExcelParserService $ingresoStockExcelParserService,
         private readonly RegistroExportService $exportService,
         private readonly IngresoNotificacionService $ingresoNotificacionService,
-        private readonly AuditoriaService $auditoria
+        private readonly AuditoriaService $auditoria,
+        private readonly IdempotenciaMovimiento $idempotencia
     ) {}
 
     public function index(Request $request): View
@@ -182,6 +184,13 @@ class MovimientoController extends Controller
 
     public function storeIngreso(StoreIngresoRequest $request): RedirectResponse|JsonResponse
     {
+        $claveIdempotencia = $this->idempotencia->clave($request, 'ingreso');
+        $previo = $this->idempotencia->iniciar($claveIdempotencia);
+
+        if ($previo['estado'] !== IdempotenciaMovimiento::ESTADO_NUEVO) {
+            return $this->respuestaIdempotente($request, $previo, 'ingresos');
+        }
+
         try {
             $cantidad = $this->movimientoService->crearIngreso(
                 $request->validated(),
@@ -189,6 +198,8 @@ class MovimientoController extends Controller
                 $request->file('archivo_pdf')
             );
         } catch (InvalidArgumentException $exception) {
+            $this->idempotencia->liberar($claveIdempotencia);
+
             if ($request->expectsJson()) {
                 return response()->json(['ok' => false, 'message' => $exception->getMessage()], 422);
             }
@@ -198,6 +209,8 @@ class MovimientoController extends Controller
                 ->withErrors(['lineas' => $exception->getMessage()])
                 ->withInput();
         } catch (\RuntimeException $exception) {
+            $this->idempotencia->liberar($claveIdempotencia);
+
             if ($request->expectsJson()) {
                 return response()->json(['ok' => false, 'message' => $exception->getMessage()], 422);
             }
@@ -206,7 +219,15 @@ class MovimientoController extends Controller
                 ->route('registro.index', ['tab' => 'ingresos'])
                 ->withErrors(['archivo_pdf' => $exception->getMessage()])
                 ->withInput();
+        } catch (\Throwable $exception) {
+            $this->idempotencia->liberar($claveIdempotencia);
+
+            throw $exception;
         }
+
+        // Marcar como hecho apenas se creó el movimiento (antes de auditoría/notificaciones),
+        // para que un reintento nunca vuelva a insertarlo.
+        $this->idempotencia->completar($claveIdempotencia, ['cantidad' => $cantidad]);
 
         $this->auditoria->registrar(
             accion: AuditoriaAccion::REGISTRO_INGRESO_CREAR,
@@ -235,6 +256,13 @@ class MovimientoController extends Controller
 
     public function storeEgreso(StoreEgresoRequest $request): RedirectResponse|JsonResponse
     {
+        $claveIdempotencia = $this->idempotencia->clave($request, 'egreso');
+        $previo = $this->idempotencia->iniciar($claveIdempotencia);
+
+        if ($previo['estado'] !== IdempotenciaMovimiento::ESTADO_NUEVO) {
+            return $this->respuestaIdempotente($request, $previo, 'consumos');
+        }
+
         try {
             $cantidad = $this->movimientoService->crearEgreso(
                 $request->validated(),
@@ -242,6 +270,8 @@ class MovimientoController extends Controller
                 $request->file('archivo_pdf')
             );
         } catch (InvalidArgumentException $exception) {
+            $this->idempotencia->liberar($claveIdempotencia);
+
             if ($request->expectsJson()) {
                 return response()->json(['ok' => false, 'message' => $exception->getMessage()], 422);
             }
@@ -251,6 +281,8 @@ class MovimientoController extends Controller
                 ->withErrors(['lineas' => $exception->getMessage()])
                 ->withInput();
         } catch (\RuntimeException $exception) {
+            $this->idempotencia->liberar($claveIdempotencia);
+
             if ($request->expectsJson()) {
                 return response()->json(['ok' => false, 'message' => $exception->getMessage()], 422);
             }
@@ -259,7 +291,15 @@ class MovimientoController extends Controller
                 ->route('registro.index', ['tab' => 'consumos'])
                 ->withErrors(['archivo_pdf' => $exception->getMessage()])
                 ->withInput();
+        } catch (\Throwable $exception) {
+            $this->idempotencia->liberar($claveIdempotencia);
+
+            throw $exception;
         }
+
+        // Marcar como hecho apenas se creó el movimiento (antes de auditoría/notificaciones),
+        // para que un reintento nunca vuelva a insertarlo.
+        $this->idempotencia->completar($claveIdempotencia, ['cantidad' => $cantidad]);
 
         $this->auditoria->registrar(
             accion: AuditoriaAccion::REGISTRO_EGRESO_CREAR,
@@ -278,6 +318,37 @@ class MovimientoController extends Controller
         return redirect()
             ->route('registro.index', ['tab' => 'consumos'])
             ->with('status', $mensaje);
+    }
+
+    /**
+     * Respuesta para un reintento del mismo client_request_id (cola offline).
+     *
+     * @param  array{estado: string, respuesta: array<string, mixed>|null}  $previo
+     */
+    private function respuestaIdempotente(Request $request, array $previo, string $tab): RedirectResponse|JsonResponse
+    {
+        if ($previo['estado'] === IdempotenciaMovimiento::ESTADO_HECHO) {
+            $mensaje = 'Este registro ya se había sincronizado; no se duplicó.';
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'ok' => true,
+                    'duplicado' => true,
+                    'message' => $mensaje,
+                    'cantidad' => (int) ($previo['respuesta']['cantidad'] ?? 0),
+                ]);
+            }
+
+            return redirect()->route('registro.index', ['tab' => $tab])->with('status', $mensaje);
+        }
+
+        $mensaje = 'Este registro se está procesando. Reintente en unos segundos.';
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => false, 'en_proceso' => true, 'message' => $mensaje], 409);
+        }
+
+        return redirect()->route('registro.index', ['tab' => $tab])->withErrors(['lineas' => $mensaje]);
     }
 
     public function storeTraslado(StoreTrasladoRequest $request): RedirectResponse
