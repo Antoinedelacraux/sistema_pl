@@ -95,6 +95,27 @@ final class MaterialProgramaLookup
         ]);
     }
 
+    /**
+     * Igual que resolverPorCodigo() cuando el material con ese CodigoPL ya se cargó (p. ej. precarga en lote):
+     * aplica las mismas actualizaciones (reactivar / completar nombre) sin volver a consultarlo.
+     */
+    public static function resolverPrecargado(
+        MaterialProgramaPL $material,
+        string $codigo,
+        string $descripcion = '',
+        bool $reactivar = true,
+        bool $actualizarNombre = false
+    ): MaterialProgramaPL {
+        return self::actualizarMaterialExistente(
+            $material,
+            self::normalizarCodigo($codigo),
+            trim($descripcion),
+            $reactivar,
+            $actualizarNombre,
+            false
+        );
+    }
+
     public static function porNombreExacto(string $descripcion, bool $soloActivos = true): ?MaterialProgramaPL
     {
         $descripcion = trim($descripcion);
@@ -164,6 +185,7 @@ final class MaterialProgramaLookup
         string $descripcion,
         bool $reactivar,
         bool $actualizarNombre,
+        bool $refrescar = true,
     ): MaterialProgramaPL {
         $updates = [];
         $nomMaterial = trim($descripcion) !== '' ? trim($descripcion) : $codigo;
@@ -182,6 +204,6 @@ final class MaterialProgramaLookup
             $material->update($updates);
         }
 
-        return $material->fresh();
+        return $refrescar ? $material->fresh() : $material;
     }
 }

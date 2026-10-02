@@ -3,6 +3,7 @@
 namespace App\Services\Stock;
 
 use App\Models\Programas\Familia;
+use App\Models\Programas\MaterialProgramaPL;
 use App\Models\Stock\Almacen;
 use App\Support\MaterialProgramaLookup;
 use App\Support\StockExcelFilas;
@@ -20,6 +21,12 @@ class IngresoStockExcelParserService
         'stock' => ['STOCK', 'Stock', 'Cantidad'],
         'observaciones' => ['OBSERVACIONES', 'Observaciones', 'Familia'],
     ];
+
+    /** @var array<string, true> Familias cuyo nomFamilia exacto ya existe (o se creó) en esta lectura. */
+    private array $familiasExistentes = [];
+
+    /** @var array<string, MaterialProgramaPL> Materiales por CodigoPL exacto, precargados en esta lectura. */
+    private array $materialesPorCodigo = [];
 
     /**
      * @return array{
@@ -87,6 +94,7 @@ class IngresoStockExcelParserService
         $lineas = [];
         $advertencias = [];
         $ultimaFila = (int) $hoja->getHighestDataRow();
+        $filas = [];
 
         for ($fila = $filaEncabezado + 1; $fila <= $ultimaFila; $fila++) {
             $codigo = $this->normalizarCodigo($this->valorCodigoProducto($hoja, $mapa['id_producto'].$fila));
@@ -112,6 +120,14 @@ class IngresoStockExcelParserService
                 continue;
             }
 
+            $filas[] = [$codigo, $descripcion, $familia, $cantidad];
+        }
+
+        // Precarga en lote de familias y materiales (evita 2-3 consultas por fila). La resolución sigue
+        // siendo fila a fila y en el mismo orden, creando familias/materiales faltantes igual que antes.
+        $this->precargarCatalogos($filas);
+
+        foreach ($filas as [$codigo, $descripcion, $familia, $cantidad]) {
             $material = $this->resolverMaterial($codigo, $descripcion, $familia);
 
             $lineas[] = [
@@ -242,21 +258,76 @@ class IngresoStockExcelParserService
     }
 
     /**
+     * Carga con un whereIn las familias y los materiales (por CodigoPL) que usa el Excel.
+     * Solo se indexan coincidencias exactas; cualquier otro caso (mayúsculas, espacios, acentos que
+     * la collation considera iguales) cae al camino original de consulta individual.
+     *
+     * @param  list<array{0: string, 1: string, 2: string|null, 3: float}>  $filas
+     */
+    private function precargarCatalogos(array $filas): void
+    {
+        $this->familiasExistentes = [];
+        $this->materialesPorCodigo = [];
+
+        $familias = [];
+        $codigos = [];
+        foreach ($filas as [$codigo, , $familia]) {
+            if ($familia !== null && $familia !== '') {
+                $familias[$familia] = true;
+            }
+            if ($codigo !== '' && $codigo !== '-') {
+                $codigos[$codigo] = true;
+            }
+        }
+
+        foreach (array_chunk(array_keys($familias), 500) as $bloque) {
+            Familia::query()
+                ->whereIn('nomFamilia', $bloque)
+                ->pluck('nomFamilia')
+                ->each(function ($nombre) {
+                    $this->familiasExistentes[(string) $nombre] = true;
+                });
+        }
+
+        foreach (array_chunk(array_map('strval', array_keys($codigos)), 500) as $bloque) {
+            MaterialProgramaPL::query()
+                ->whereIn('CodigoPL', $bloque)
+                ->orderBy('idMaterialPL')
+                ->get()
+                ->each(function (MaterialProgramaPL $material) {
+                    $clave = (string) $material->CodigoPL;
+                    $this->materialesPorCodigo[$clave] ??= $material;
+                });
+        }
+    }
+
+    /**
      * @return array{id_material_pl: int, codigo_pl: string, nom_material: string, nom_familia: string|null}
      */
     private function resolverMaterial(string $codigo, string $descripcion, ?string $familia): array
     {
-        if ($familia !== null && $familia !== '') {
+        if ($familia !== null && $familia !== '' && ! isset($this->familiasExistentes[$familia])) {
             Familia::query()->firstOrCreate(
                 ['nomFamilia' => $familia],
                 ['Estado' => 1]
             );
+            $this->familiasExistentes[$familia] = true;
         }
 
-        $material = MaterialProgramaLookup::resolverPorCodigo(
-            $codigo,
-            $descripcion !== '' ? $descripcion : $codigo
-        );
+        $descripcionMaterial = $descripcion !== '' ? $descripcion : $codigo;
+        $precargado = $codigo !== '-' ? ($this->materialesPorCodigo[$codigo] ?? null) : null;
+
+        if ($precargado !== null) {
+            $material = MaterialProgramaLookup::resolverPrecargado($precargado, $codigo, $descripcionMaterial);
+        } else {
+            $material = MaterialProgramaLookup::resolverPorCodigo($codigo, $descripcionMaterial);
+        }
+
+        // Mantiene la caché alineada con lo que quedó en BD (material creado, reactivado o renombrado).
+        $clave = (string) $material->CodigoPL;
+        if ($clave === $codigo || isset($this->materialesPorCodigo[$clave])) {
+            $this->materialesPorCodigo[$clave] = $material;
+        }
 
         return [
             'id_material_pl' => (int) $material->idMaterialPL,
