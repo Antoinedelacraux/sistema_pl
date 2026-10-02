@@ -670,14 +670,18 @@ class MovimientoService
             ->findOrFail($idMovimiento);
 
         if ($movimiento->tipo === MovimientoStock::TIPO_INGRESO) {
-            $this->anularLineas($this->queryLineasIngresoRelacionadas($movimiento));
+            $this->lineasIngresoRelacionadas($movimiento)->each(function (MovimientoStock $linea) {
+                $linea->update(['estado' => 0]);
+            });
             $this->olvidarCacheGrillaRegistro();
 
             return;
         }
 
         if ($movimiento->tipo === MovimientoStock::TIPO_EGRESO) {
-            $this->anularLineas($this->queryLineasEgresoRelacionadas($movimiento));
+            $this->lineasEgresoRelacionadas($movimiento)->each(function (MovimientoStock $linea) {
+                $linea->update(['estado' => 0]);
+            });
             $this->olvidarCacheGrillaRegistro();
 
             return;
@@ -1137,18 +1141,8 @@ class MovimientoService
      */
     private function lineasEgresoRelacionadas(MovimientoStock $movimiento): Collection
     {
-        return $this->queryLineasEgresoRelacionadas($movimiento)
-            ->with(['materialPl', 'almacen', 'tipoConsumo', 'programa', 'presentacion'])
-            ->orderBy('idMovimiento')
-            ->get();
-    }
-
-    /**
-     * Mismos criterios de lote que lineasEgresoRelacionadas(), sin eager loading ni orden.
-     */
-    private function queryLineasEgresoRelacionadas(MovimientoStock $movimiento)
-    {
         $query = MovimientoStock::query()
+            ->with(['materialPl', 'almacen', 'tipoConsumo', 'programa', 'presentacion'])
             ->where('estado', 1)
             ->where('tipo', MovimientoStock::TIPO_EGRESO)
             ->whereNull('idTraslado')
@@ -1161,7 +1155,9 @@ class MovimientoService
             ->where('idPresentacion', $movimiento->idPresentacion);
         $this->aplicarCriteriosLoteDocumento($query, $movimiento);
 
-        return $query;
+        return $query
+            ->orderBy('idMovimiento')
+            ->get();
     }
 
     /**
@@ -1169,18 +1165,8 @@ class MovimientoService
      */
     private function lineasIngresoRelacionadas(MovimientoStock $movimiento): Collection
     {
-        return $this->queryLineasIngresoRelacionadas($movimiento)
-            ->with(['materialPl', 'almacen'])
-            ->orderBy('idMovimiento')
-            ->get();
-    }
-
-    /**
-     * Mismos criterios de lote que lineasIngresoRelacionadas(), sin eager loading ni orden.
-     */
-    private function queryLineasIngresoRelacionadas(MovimientoStock $movimiento)
-    {
         $query = MovimientoStock::query()
+            ->with(['materialPl', 'almacen'])
             ->where('estado', 1)
             ->where('tipo', MovimientoStock::TIPO_INGRESO)
             ->whereNull('idTraslado')
@@ -1190,25 +1176,9 @@ class MovimientoService
             ->where('fechaRegistro', $movimiento->fechaRegistro);
         $this->aplicarCriteriosLoteDocumento($query, $movimiento);
 
-        return $query;
-    }
-
-    /**
-     * Anula (estado = 0) todas las líneas del lote con un solo UPDATE ... WHERE idMovimiento IN (...).
-     * MovimientoStock no tiene eventos/observers ni timestamps, así que equivale al update() por fila.
-     */
-    private function anularLineas($query): void
-    {
-        DB::transaction(function () use ($query) {
-            $ids = (clone $query)->pluck('idMovimiento')->all();
-            if ($ids === []) {
-                return;
-            }
-
-            MovimientoStock::query()
-                ->whereIn('idMovimiento', $ids)
-                ->update(['estado' => 0]);
-        });
+        return $query
+            ->orderBy('idMovimiento')
+            ->get();
     }
 
     private function aplicarCriteriosLoteDocumento($query, MovimientoStock $movimiento): void
