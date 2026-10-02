@@ -90,6 +90,9 @@ class MovimientoService
 
     private const CACHE_GRID_REGISTRO_TTL = 45;
 
+    /** Decimales con que se guarda MovimientoStock.cantidad (DECIMAL(18,6)). */
+    private const DECIMALES_CANTIDAD_BD = 6;
+
     public function __construct(
         private readonly PowerAutomateService $powerAutomateService,
         private readonly StockAlmacenService $stockAlmacenService,
@@ -411,17 +414,18 @@ class MovimientoService
 
     /**
      * Misma regla que la asignación por candidatos con CodigoPL único (un solo candidato: el propio material):
-     * toma min(cantidad, stock) redondeado a 2 decimales; si no hay nada que tomar, devuelve la cantidad completa.
+     * toma min(cantidad, stock) con la precisión de BD (6 decimales; el redondeo a 2 es solo visual);
+     * si no hay nada que tomar, devuelve la cantidad completa.
      *
      * @return list<array{id_material_pl: int, cantidad: float}>
      */
     private function asignacionEgresoDesdeStock(int $idMaterialPL, float $cantidad, float $stock): array
     {
         $stock = max(0, $stock);
-        $pendiente = round($cantidad, 2);
+        $pendiente = $this->cantidadBd($cantidad);
 
         if ($stock > 0 && $pendiente > 0) {
-            $tomar = min($pendiente, round($stock, 2));
+            $tomar = min($pendiente, $this->cantidadBd($stock));
             if ($tomar > 0) {
                 return [[
                     'id_material_pl' => $idMaterialPL,
@@ -432,8 +436,17 @@ class MovimientoService
 
         return [[
             'id_material_pl' => $idMaterialPL,
-            'cantidad' => $cantidad,
+            'cantidad' => $this->cantidadBd($cantidad),
         ]];
+    }
+
+    /**
+     * Precisión con la que se guarda MovimientoStock.cantidad (DECIMAL(18,6)).
+     * Solo elimina ruido de float; el redondeo a 2 decimales es exclusivamente visual.
+     */
+    private function cantidadBd(float $valor): float
+    {
+        return round($valor, self::DECIMALES_CANTIDAD_BD);
     }
 
     private function stockPorIdMaterial(int $idMaterialPL, int $idAlmacen): float
@@ -534,8 +547,8 @@ class MovimientoService
 
                 foreach ($lineas as $linea) {
                     $idMaterialPL = (int) $linea['id_material_pl'];
-                    $cantidad = (float) $linea['cantidad'];
-                    $disponible = (float) ($stocks[$idMaterialPL] ?? 0.0);
+                    $cantidad = $this->cantidadBd((float) $linea['cantidad']);
+                    $disponible = $this->cantidadBd((float) ($stocks[$idMaterialPL] ?? 0.0));
 
                     if ($cantidad > $disponible) {
                         $nombre = $linea['nom_material'] ?: 'material';
@@ -547,16 +560,15 @@ class MovimientoService
                     $asignaciones = $this->asignacionEgresoDesdeStock($idMaterialPL, $cantidad, $disponible);
 
                     foreach ($asignaciones as $asignacion) {
-                        $stocks[(int) $asignacion['id_material_pl']] = round(
-                            (float) ($stocks[(int) $asignacion['id_material_pl']] ?? 0.0) - round((float) $asignacion['cantidad'], 2),
-                            2
+                        $stocks[(int) $asignacion['id_material_pl']] = $this->cantidadBd(
+                            (float) ($stocks[(int) $asignacion['id_material_pl']] ?? 0.0) - $this->cantidadBd((float) $asignacion['cantidad'])
                         );
 
                         MovimientoStock::query()->create([
                             'tipo' => MovimientoStock::TIPO_EGRESO,
                             'idAlmacen' => $idAlmacen,
                             'idMaterialPL' => (int) $asignacion['id_material_pl'],
-                            'cantidad' => (float) $asignacion['cantidad'],
+                            'cantidad' => $this->cantidadBd((float) $asignacion['cantidad']),
                             'fecha' => $datos['fecha'],
                             'observacion' => $this->nullableString($datos['observacion'] ?? null),
                             'idTipoConsumo' => (int) $datos['id_tipo_consumo'],
@@ -742,7 +754,7 @@ class MovimientoService
                 $idsActualizados = [];
 
                 foreach ($lineasResueltas as $idMaterialPL => $lineaData) {
-                    $cantidad = (float) $lineaData['cantidad'];
+                    $cantidad = $this->cantidadBd((float) $lineaData['cantidad']);
                     $input = $lineasInput->get((int) $idMaterialPL, []);
                     $idLinea = isset($input['id_movimiento']) ? (int) $input['id_movimiento'] : null;
                     $linea = $idLinea ? $lineasActuales->firstWhere('idMovimiento', $idLinea) : null;
@@ -751,6 +763,7 @@ class MovimientoService
                     if ($linea) {
                         $disponible += (float) $linea->cantidad;
                     }
+                    $disponible = $this->cantidadBd($disponible);
 
                     if ($cantidad > $disponible) {
                         $nombre = $lineaData['nom_material'] ?: 'material';

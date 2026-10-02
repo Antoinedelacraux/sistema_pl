@@ -47,7 +47,8 @@ class MovimientoStock extends Model
     protected function casts(): array
     {
         return [
-            'cantidad' => 'decimal:2',
+            // BD: DECIMAL(18,6). Se guarda la cantidad exacta; los 2 decimales son solo visuales.
+            'cantidad' => 'decimal:6',
             'fecha' => 'date',
             'fechaRegistro' => 'datetime',
             'estado' => 'integer',

@@ -75,8 +75,9 @@ class StoreEgresoRequest extends FormRequest
                 $idAlmacen
             );
             foreach ($lineas as $linea) {
-                $disponible = (float) ($stocks[(int) $linea['id_material_pl']] ?? 0.0);
-                if ($linea['cantidad'] > $disponible) {
+                // Comparación con la precisión de BD (6 decimales); los 2 decimales del mensaje son solo visuales.
+                $disponible = round((float) ($stocks[(int) $linea['id_material_pl']] ?? 0.0), 6);
+                if (round((float) $linea['cantidad'], 6) > $disponible) {
                     $nombre = $linea['nom_material'] ?: 'material';
                     $faltante = max(0, round((float) $linea['cantidad'] - $disponible, 2));
                     $validator->errors()->add(
